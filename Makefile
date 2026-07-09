@@ -13,4 +13,4 @@ shell:
 test-backend:
 	docker-compose exec web pytest
 test-frontend:
-	docker-compose exec frontend npm run test
+	cd frontend && npm run test
