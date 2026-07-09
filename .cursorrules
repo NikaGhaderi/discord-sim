@@ -1,0 +1,22 @@
+Strictly enforce Clean Architecture in the backend. Do not write business logic in the `api` layer (views/serializers). Logic must live in the `application` layer (services) or `domain` layer (models). Frontend must follow Feature-Sliced Design.
+
+Additional guidelines:
+
+- Backend layering (per app: authentication, messaging, notifications, etc.):
+  - `domain/`: Entities, value objects, and pure business rules. No Django ORM imports, no framework dependencies, no I/O.
+  - `application/`: Use-cases/services that orchestrate domain objects and repositories. This is where business workflows live.
+  - `api/`: Django views, DRF serializers, routers. Thin adapters only — parse request, call an application service, shape the response. No conditionals encoding business rules here.
+  - Cross-app or infrastructure-only code (email, storage, third-party clients) belongs in `backend/apps/shared/infrastructure/` or `backend/core/`, never duplicated per app.
+  - Celery tasks live in `backend/core/tasks/` and should call into `application` services rather than embedding logic themselves.
+
+- Frontend layering (Feature-Sliced / Screaming Architecture):
+  - `src/modules/<domain>/`: One folder per business domain (identity, workspaces, private_spaces, messaging, notifications, profile). Each module owns its components, hooks, state, and `__tests__`.
+  - `src/shared/`: Reusable, domain-agnostic UI primitives and utilities. Must never import from `modules/`.
+  - `src/infrastructure/`: API clients, websocket clients, storage adapters. Modules depend on this layer, not the other way around.
+  - `src/app/`: Application shell — routing, providers, global layout composition only.
+  - A module must not reach into another module's internals; cross-module communication goes through `shared` or `infrastructure`.
+
+- General:
+  - Never bypass the layering to "save time" — if a shortcut feels necessary, it's a signal the use-case belongs in `application`/domain instead.
+  - Keep views/serializers and React components free of direct DB/API orchestration logic that isn't already delegated to a service/hook.
+  - New business rules require a corresponding unit test in `domain`/`application` (backend) or the module's `__tests__` (frontend).
