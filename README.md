@@ -6,7 +6,7 @@ This repository contains the source code for the **System Analysis and Design** 
 
 **Course:** System Analysis and Design
 **Instructors:** Dr. Jafar Habibi, Dr. Mohsen Hokama
-**Phase 1 report:** `[docs/SD-PROJ-6.pdf](docs/SD-PROJ-6.pdf)` — requirements (Agile user stories & MoSCoW), methodology justification, architecture diagrams, ERD, wireframes, and the full API contract.
+**Phase 1 report:** `[docs/SD-PROJ-6.pdf](docs/SD-PROJ-6.pdf)` — requirements, methodology justification, architecture diagrams, ERD, wireframes, and the full API contract.
 
 ## The Team
 
