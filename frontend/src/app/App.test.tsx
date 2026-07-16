@@ -1,11 +1,10 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, test, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { App } from './App';
 
-import { App } from "@app/App";
-
-describe("App", () => {
-  it("renders the app shell", () => {
+describe('App Component', () => {
+  test('renders login form by default', () => {
     render(<App />);
-    expect(screen.getByText("Discord-Sim")).toBeInTheDocument();
+    expect(screen.getByText(/Login/i)).toBeInTheDocument();
   });
 });
