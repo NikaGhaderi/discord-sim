@@ -12,6 +12,9 @@ class AbstractAuthRepository(ABC):
     def get_by_username(self, username: str) -> UserEntity | None: ...
 
     @abstractmethod
+    def get_by_id(self, user_id: int) -> UserEntity | None: ...
+
+    @abstractmethod
     def save_user(self, user_entity: UserEntity) -> UserEntity: ...
 
     @abstractmethod
@@ -19,3 +22,9 @@ class AbstractAuthRepository(ABC):
 
     @abstractmethod
     def verify_2fa_code(self, user_id: int, code: str) -> bool: ...
+
+    @abstractmethod
+    def blacklist_refresh_token(self, token: str) -> None: ...
+
+    @abstractmethod
+    def is_refresh_token_blacklisted(self, token: str) -> bool: ...
