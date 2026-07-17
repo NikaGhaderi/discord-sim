@@ -35,6 +35,10 @@ class LoginUseCase:
             raise InvalidCredentialsError("Invalid username or password.")
 
         if user.is_2fa_enabled:
+            # get_by_username only ever returns persisted users, so id is set;
+            # asserted (not re-raised as InvalidCredentialsError) so a broken
+            # repository adapter surfaces as its own bug, not a bogus login failure.
+            assert user.id is not None, "repository returned a user with no id"
             code = f"{secrets.randbelow(10**_CODE_DIGITS):0{_CODE_DIGITS}d}"
             self._repository.store_2fa_code(user.id, code)
             # Handed to the caller so the api layer can email it out; must never

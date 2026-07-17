@@ -6,6 +6,7 @@ from apps.authentication.application.use_cases.verify_two_factor import (
     VerifyTwoFactorUseCase,
 )
 from apps.authentication.domain.exceptions import InvalidTwoFactorCodeError
+from apps.authentication.domain.models import UserEntity
 
 from .fakes import InMemoryAuthRepository
 
@@ -14,7 +15,7 @@ EMAIL = "nika@example.com"
 PASSWORD = "correct-horse-battery"
 
 
-def _login_and_request_2fa(repo) -> Requires2FA:
+def _login_and_request_2fa(repo) -> tuple[UserEntity, Requires2FA]:
     user = RegisterUserUseCase(repo).execute(USERNAME, EMAIL, PASSWORD)
     user.is_2fa_enabled = True
     result = LoginUseCase(repo).execute(USERNAME, PASSWORD)
