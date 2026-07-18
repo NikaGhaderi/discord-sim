@@ -15,7 +15,7 @@ This repository contains the source code for the **System Analysis and Design** 
 | ----------------- | --------------------------------- |
 | Parnia Shahsavari | Frontend Developer                |
 | Fatemeh Roosta    | Frontend Developer                |
-| Samyar Lajevardi  | Product Owner & Backend Developer |
+| Samyar Lajevardy  | Product Owner & Backend Developer |
 | Nika Ghaderi      | Scrum Master & Backend Developer  |
 
 
