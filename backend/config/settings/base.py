@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "apps.notifications",
 ]
 
+AUTH_USER_MODEL = "authentication.User"
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -132,12 +134,14 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+
 # --- Channels (websockets for realtime messaging/notifications) ---
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.environ.get("REDIS_URL", "redis://redis:6379/0")],
+            "hosts": [REDIS_URL],
         },
     },
 }
