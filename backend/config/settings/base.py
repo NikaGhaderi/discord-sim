@@ -126,6 +126,9 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")
 
+# --- Redis (shared by Celery, Channels, and core.redis_client) ---
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+
 # --- Celery ---
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
