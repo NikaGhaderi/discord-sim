@@ -10,9 +10,43 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: discord_sim_test
+          POSTGRES_USER: discord_sim_user
+          POSTGRES_PASSWORD: discord_sim_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U discord_sim_user"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
     defaults:
       run:
         working-directory: backend
+    env:
+      SECRET_KEY: ci-test-secret-key
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      POSTGRES_DB: discord_sim_test
+      POSTGRES_USER: discord_sim_user
+      POSTGRES_PASSWORD: discord_sim_test_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,6 +68,9 @@ jobs:
 
       - name: Lint (flake8)
         run: flake8 .
+
+      - name: Run migrations
+        run: python manage.py migrate --noinput
 
       - name: Run tests (pytest)
         run: pytest
