@@ -27,7 +27,9 @@ def test_verify_with_correct_code_returns_the_user():
     repo = InMemoryAuthRepository()
     user, requires_2fa = _login_and_request_2fa(repo)
 
-    verified = VerifyTwoFactorUseCase(repo).execute(user.id, requires_2fa.code)
+    verified = VerifyTwoFactorUseCase(repo).execute(
+        requires_2fa.temp_token, requires_2fa.code
+    )
 
     assert verified.id == user.id
     assert verified.username == USERNAME
@@ -35,17 +37,24 @@ def test_verify_with_correct_code_returns_the_user():
 
 def test_verify_with_wrong_code_raises():
     repo = InMemoryAuthRepository()
-    user, _requires_2fa = _login_and_request_2fa(repo)
+    _user, requires_2fa = _login_and_request_2fa(repo)
 
     with pytest.raises(InvalidTwoFactorCodeError):
-        VerifyTwoFactorUseCase(repo).execute(user.id, "000000")
+        VerifyTwoFactorUseCase(repo).execute(requires_2fa.temp_token, "000000")
+
+
+def test_verify_with_unknown_temp_token_raises():
+    repo = InMemoryAuthRepository()
+
+    with pytest.raises(InvalidTwoFactorCodeError):
+        VerifyTwoFactorUseCase(repo).execute("no-such-token", "123456")
 
 
 def test_code_can_only_be_used_once():
     repo = InMemoryAuthRepository()
-    user, requires_2fa = _login_and_request_2fa(repo)
+    _user, requires_2fa = _login_and_request_2fa(repo)
 
-    VerifyTwoFactorUseCase(repo).execute(user.id, requires_2fa.code)
+    VerifyTwoFactorUseCase(repo).execute(requires_2fa.temp_token, requires_2fa.code)
 
     with pytest.raises(InvalidTwoFactorCodeError):
-        VerifyTwoFactorUseCase(repo).execute(user.id, requires_2fa.code)
+        VerifyTwoFactorUseCase(repo).execute(requires_2fa.temp_token, requires_2fa.code)
