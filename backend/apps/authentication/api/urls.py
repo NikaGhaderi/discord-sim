@@ -14,4 +14,5 @@ urlpatterns = [
         name="verify-two-factor",
     ),
     path("logout/", views.LogoutView.as_view(), name="logout"),
+    path("refresh/", views.TokenRefreshView.as_view(), name="token_refresh"),
 ]

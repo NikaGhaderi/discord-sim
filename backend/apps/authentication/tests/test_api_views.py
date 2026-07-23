@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.authentication.api.views import LogoutView
 from apps.authentication.application.use_cases.login import (
@@ -121,12 +122,44 @@ class TestAuthenticationApiViews:
             {"refresh_token": "refresh-token"},
             format="json",
         )
-        force_authenticate(request, user=SimpleNamespace(is_authenticated=True))
+        force_authenticate(request, user=SimpleNamespace(is_authenticated=True, id=1))
 
         response = LogoutView.as_view()(request)
 
         assert response.status_code == 200
         assert response.data == {"message": "Successfully logged out."}
+
+    @patch("apps.authentication.api.views.DjangoAuthRepository")
+    def test_refresh_returns_new_access_token_when_not_blacklisted(self, repo_class):
+        repo_class.return_value.is_refresh_token_blacklisted.return_value = False
+        token = str(RefreshToken.for_user(SimpleNamespace(pk=1, id=1)))
+
+        response = APIClient().post(
+            "/api/auth/refresh/", {"refresh_token": token}, format="json"
+        )
+
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+    @patch("apps.authentication.api.views.DjangoAuthRepository")
+    def test_refresh_rejects_blacklisted_token(self, repo_class):
+        repo_class.return_value.is_refresh_token_blacklisted.return_value = True
+
+        response = APIClient().post(
+            "/api/auth/refresh/", {"refresh_token": "whatever"}, format="json"
+        )
+
+        assert response.status_code == 401
+
+    @patch("apps.authentication.api.views.DjangoAuthRepository")
+    def test_refresh_rejects_invalid_token(self, repo_class):
+        repo_class.return_value.is_refresh_token_blacklisted.return_value = False
+
+        response = APIClient().post(
+            "/api/auth/refresh/", {"refresh_token": "not-a-real-token"}, format="json"
+        )
+
+        assert response.status_code == 401
 
 
 class TestUserModel:

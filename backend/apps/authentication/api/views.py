@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.authentication.application.use_cases.login import (
@@ -107,9 +108,29 @@ class LogoutView(APIView):
     def post(self, request):
         try:
             LogoutUseCase(DjangoAuthRepository()).execute(
-                request.data.get("refresh_token", "")
+                request.data.get("refresh_token", ""), request.user.id
             )
         except InvalidRefreshTokenError:
             return Response({"detail": "The refresh token is invalid."}, status=400)
 
         return Response({"message": "Successfully logged out."}, status=200)
+
+
+class TokenRefreshView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.data.get("refresh_token", "")
+        repository = DjangoAuthRepository()
+
+        if repository.is_refresh_token_blacklisted(refresh_token):
+            return Response(
+                {"detail": "This refresh token has been revoked."}, status=401
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+        except TokenError:
+            return Response({"detail": "The refresh token is invalid."}, status=401)
+
+        return Response({"access_token": str(token.access_token)}, status=200)

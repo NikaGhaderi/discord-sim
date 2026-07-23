@@ -11,10 +11,13 @@ class LogoutUseCase:
     def __init__(self, repository: AbstractAuthRepository) -> None:
         self._repository = repository
 
-    def execute(self, refresh_token: str) -> None:
+    def execute(self, refresh_token: str, requesting_user_id: int) -> None:
         try:
             token = RefreshToken(refresh_token)
         except TokenError as exc:
             raise InvalidRefreshTokenError("The refresh token is invalid.") from exc
+
+        if token["user_id"] != requesting_user_id:
+            raise InvalidRefreshTokenError("The refresh token is invalid.")
 
         self._repository.blacklist_refresh_token(refresh_token, token["exp"])
