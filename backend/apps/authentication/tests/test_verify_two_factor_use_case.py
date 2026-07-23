@@ -58,3 +58,12 @@ def test_code_can_only_be_used_once():
 
     with pytest.raises(InvalidTwoFactorCodeError):
         VerifyTwoFactorUseCase(repo).execute(requires_2fa.temp_token, requires_2fa.code)
+
+
+def test_verify_fails_if_user_became_inactive_after_login():
+    repo = InMemoryAuthRepository()
+    user, requires_2fa = _login_and_request_2fa(repo)
+    user.is_active = False
+
+    with pytest.raises(InvalidTwoFactorCodeError):
+        VerifyTwoFactorUseCase(repo).execute(requires_2fa.temp_token, requires_2fa.code)

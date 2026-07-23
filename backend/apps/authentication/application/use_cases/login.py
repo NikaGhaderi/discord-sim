@@ -32,6 +32,9 @@ class LoginUseCase:
         if user is None or not check_password(raw_password, user.password_hash):
             raise InvalidCredentialsError("Invalid username or password.")
 
+        if not user.is_active:
+            raise InvalidCredentialsError("Invalid username or password.")
+
         if user.is_2fa_enabled:
             # get_by_username only ever returns persisted users, so id is set;
             # asserted (not re-raised as InvalidCredentialsError) so a broken

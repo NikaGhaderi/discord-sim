@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 
 from apps.authentication.application.interfaces import AbstractAuthRepository
+from apps.authentication.domain.exceptions import DuplicateUserError
 from apps.authentication.domain.models import UserEntity
 from apps.shared.infrastructure.auth_redis import RedisAuthStore
 
@@ -15,6 +17,7 @@ def _to_entity(django_user) -> UserEntity:
         password_hash=django_user.password,
         is_2fa_enabled=django_user.is_2fa_enabled,
         allow_group_invitations=django_user.allow_group_invitations,
+        is_active=django_user.is_active,
         created_at=django_user.date_joined,
     )
 
@@ -44,13 +47,18 @@ class DjangoAuthRepository(AbstractAuthRepository):
         return _to_entity(django_user) if django_user else None
 
     def save_user(self, user_entity: UserEntity) -> UserEntity:
-        django_user = get_user_model().objects.create(
-            username=user_entity.username,
-            email=user_entity.email,
-            password=user_entity.password_hash,
-            is_2fa_enabled=user_entity.is_2fa_enabled,
-            allow_group_invitations=user_entity.allow_group_invitations,
-        )
+        try:
+            django_user = get_user_model().objects.create(
+                username=user_entity.username,
+                email=user_entity.email,
+                password=user_entity.password_hash,
+                is_2fa_enabled=user_entity.is_2fa_enabled,
+                allow_group_invitations=user_entity.allow_group_invitations,
+            )
+        except IntegrityError as exc:
+            raise DuplicateUserError(
+                "This username or email is already in use."
+            ) from exc
         return _to_entity(django_user)
 
     def create_two_factor_challenge(self, user_id: int) -> tuple[str, str]:

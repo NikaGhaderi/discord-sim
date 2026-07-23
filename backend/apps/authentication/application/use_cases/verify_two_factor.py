@@ -17,4 +17,8 @@ class VerifyTwoFactorUseCase:
         user = self._repository.get_by_id(user_id)
         if user is None:
             raise InvalidTwoFactorCodeError("Invalid or expired 2FA code.")
+
+        if not user.is_active:
+            raise InvalidTwoFactorCodeError("Invalid or expired 2FA code.")
+
         return user

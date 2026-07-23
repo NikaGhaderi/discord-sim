@@ -58,3 +58,12 @@ def test_login_with_unknown_username_raises_invalid_credentials():
 
     with pytest.raises(InvalidCredentialsError):
         LoginUseCase(repo).execute("ghost", "whatever")
+
+
+def test_login_with_inactive_user_raises_invalid_credentials():
+    repo = InMemoryAuthRepository()
+    user = _register(repo, is_2fa_enabled=False)
+    user.is_active = False
+
+    with pytest.raises(InvalidCredentialsError):
+        LoginUseCase(repo).execute(USERNAME, PASSWORD)
