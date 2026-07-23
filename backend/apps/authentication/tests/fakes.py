@@ -7,7 +7,8 @@ from apps.authentication.domain.models import UserEntity
 
 
 class InMemoryAuthRepository(AbstractAuthRepository):
-    """Test double — no Django ORM/DB/Redis access, keeps use-case tests fast and isolated."""
+    """Test double — no Django ORM/DB/Redis access, keeps use-case tests fast
+    and isolated."""
 
     def __init__(self) -> None:
         self._users_by_username: dict[str, UserEntity] = {}

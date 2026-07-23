@@ -27,7 +27,8 @@ class AbstractAuthRepository(ABC):
 
     @abstractmethod
     def consume_two_factor_challenge(self, temp_token: str, code: str) -> int | None:
-        """Returns the user_id on success, None if the token/code is wrong or expired."""
+        """Returns the user_id on success, None if the token/code is wrong or
+        expired."""
         ...
 
     @abstractmethod

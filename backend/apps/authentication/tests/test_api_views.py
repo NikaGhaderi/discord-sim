@@ -4,7 +4,10 @@ from unittest.mock import patch
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from apps.authentication.api.views import LogoutView
-from apps.authentication.application.use_cases.login import AuthenticatedUser, Requires2FA
+from apps.authentication.application.use_cases.login import (
+    AuthenticatedUser,
+    Requires2FA,
+)
 from apps.authentication.domain.models import UserEntity
 
 
@@ -66,7 +69,9 @@ class TestAuthenticationApiViews:
         self, use_case_class, issue_tokens
     ):
         use_case_class.return_value.execute.return_value = AuthenticatedUser(
-            user=UserEntity(id=1, username="nika_gh", email="nika@example.com", password_hash="x")
+            user=UserEntity(
+                id=1, username="nika_gh", email="nika@example.com", password_hash="x"
+            )
         )
         issue_tokens.return_value = {
             "access_token": "access-token",
