@@ -4,8 +4,7 @@ import json
 import secrets
 from datetime import datetime, timezone
 
-from django.conf import settings
-from redis import Redis
+from core.redis_client import get_redis_client
 
 
 class RedisAuthStore:
@@ -14,7 +13,7 @@ class RedisAuthStore:
     challenge_ttl_seconds = 5 * 60
 
     def __init__(self, client=None):
-        self.client = client or Redis.from_url(settings.REDIS_URL)
+        self.client = client or get_redis_client()
 
     def create_two_factor_challenge(self, user_id):
         code = f"{secrets.randbelow(1_000_000):06d}"
