@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 from dataclasses import dataclass
 
 from django.contrib.auth.hashers import check_password
@@ -8,8 +7,6 @@ from django.contrib.auth.hashers import check_password
 from apps.authentication.application.interfaces import AbstractAuthRepository
 from apps.authentication.domain.exceptions import InvalidCredentialsError
 from apps.authentication.domain.models import UserEntity
-
-_CODE_DIGITS = 6
 
 
 @dataclass(frozen=True)
@@ -21,6 +18,7 @@ class AuthenticatedUser:
 class Requires2FA:
     email: str
     code: str
+    temp_token: str
 
 
 class LoginUseCase:
@@ -39,10 +37,9 @@ class LoginUseCase:
             # asserted (not re-raised as InvalidCredentialsError) so a broken
             # repository adapter surfaces as its own bug, not a bogus login failure.
             assert user.id is not None, "repository returned a user with no id"
-            code = f"{secrets.randbelow(10**_CODE_DIGITS):0{_CODE_DIGITS}d}"
-            self._repository.store_2fa_code(user.id, code)
-            # Handed to the caller so the api layer can email it out; must never
-            # be serialized back to the client in an HTTP response.
-            return Requires2FA(email=user.email, code=code)
+            code, temp_token = self._repository.create_two_factor_challenge(user.id)
+            # code/temp_token handed to the caller so the api layer can email/
+            # return them; must never be logged or persisted in plaintext elsewhere.
+            return Requires2FA(email=user.email, code=code, temp_token=temp_token)
 
         return AuthenticatedUser(user=user)

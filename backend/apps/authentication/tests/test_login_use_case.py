@@ -31,7 +31,7 @@ def test_login_with_correct_credentials_and_no_2fa_returns_authenticated_user():
     assert result.user.username == USERNAME
 
 
-def test_login_with_2fa_enabled_returns_requires_2fa_and_stores_the_code():
+def test_login_with_2fa_enabled_returns_requires_2fa_with_a_temp_token():
     repo = InMemoryAuthRepository()
     user = _register(repo, is_2fa_enabled=True)
 
@@ -41,7 +41,8 @@ def test_login_with_2fa_enabled_returns_requires_2fa_and_stores_the_code():
     assert result.email == EMAIL
     assert len(result.code) == 6
     assert result.code.isdigit()
-    assert repo.verify_2fa_code(user.id, result.code) is True
+    assert result.temp_token
+    assert repo.consume_two_factor_challenge(result.temp_token, result.code) == user.id
 
 
 def test_login_with_wrong_password_raises_invalid_credentials():
