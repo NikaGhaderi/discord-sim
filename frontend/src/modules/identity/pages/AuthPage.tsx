@@ -5,7 +5,23 @@ import { TwoFactorForm } from '../components/TwoFactorForm';
 
 type AuthStep = 'login' | 'register' | '2fa';
 
-export const AuthPage: React.FC = () => {
+// These callbacks are placeholders standing in for real network integration
+// (AuthContext + identity/api.ts). They're plain optional props specifically
+// so that work can wire real handlers in from the outside later without
+// touching AuthPage's internals at all -- no default means "do nothing but
+// still navigate," a caller integrating real auth just passes its own
+// functions here instead of forking this file.
+interface AuthPageProps {
+  onLoginSuccess?: (email: string) => void;
+  onRegisterSuccess?: () => void;
+  on2FASuccess?: (email: string) => void;
+}
+
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onLoginSuccess,
+  onRegisterSuccess,
+  on2FASuccess,
+}) => {
   const [step, setStep] = useState<AuthStep>('login');
   const [userEmail, setUserEmail] = useState('');
   const [force2FA, setForce2FA] = useState(false);
@@ -13,15 +29,26 @@ export const AuthPage: React.FC = () => {
   const handleLoginSuccess = (email: string) => {
     setUserEmail(email);
     setStep('2fa');
+    onLoginSuccess?.(email);
   };
 
   const handleRegisterSuccess = () => {
-    alert('Registration successful! Please login.');
+    if (onRegisterSuccess) {
+      onRegisterSuccess();
+    } else {
+      // Standalone/demo fallback when no real registration handler is wired in.
+      alert('Registration successful! Please login.');
+    }
     setStep('login');
   };
 
   const handle2FASuccess = () => {
-    alert(`Successfully authenticated as ${userEmail}!`);
+    if (on2FASuccess) {
+      on2FASuccess(userEmail);
+    } else {
+      // Standalone/demo fallback when no real 2FA-completion handler is wired in.
+      alert(`Successfully authenticated as ${userEmail}!`);
+    }
   };
 
   // Determine which step to render, respecting the debug override

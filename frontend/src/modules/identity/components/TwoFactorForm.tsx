@@ -8,18 +8,25 @@ interface TwoFactorFormProps {
 export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBackToLogin }) => {
   const [code, setCode] = useState('');
   const [timeLeft, setTimeLeft] = useState(60); // 60-second countdown for resending code
+  const [resendCount, setResendCount] = useState(0); // bumped on resend to restart the timer effect
 
-  // Handle the countdown timer logic
+  // Handle the countdown timer logic. Only one interval is ever created per
+  // "countdown session" (mount, or a resend); it stops itself once the count
+  // hits zero instead of being torn down and recreated every second.
   useEffect(() => {
-    if (timeLeft <= 0) return;
-
     const timer = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
+      setTimeLeft((prevTime) => {
+        if (prevTime <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prevTime - 1;
+      });
     }, 1000);
 
     // Clean up the interval on component unmount to prevent memory leaks
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [resendCount]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +37,9 @@ export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBackT
   };
 
   const handleResend = () => {
-    // Reset the countdown timer back to 60 seconds
+    // Reset the countdown timer back to 60 seconds and restart the interval
     setTimeLeft(60);
+    setResendCount((count) => count + 1);
     alert("A new verification code has been sent!");
   };
 
