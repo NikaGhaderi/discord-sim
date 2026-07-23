@@ -137,8 +137,6 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-
 # --- Channels (websockets for realtime messaging/notifications) ---
 CHANNEL_LAYERS = {
     "default": {
