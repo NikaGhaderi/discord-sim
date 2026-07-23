@@ -16,4 +16,5 @@ class UserEntity:
     id: int | None = None
     is_2fa_enabled: bool = False
     allow_group_invitations: bool = True
+    is_active: bool = True
     created_at: datetime | None = None
