@@ -1,58 +1,73 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LoginForm } from '../components/LoginForm';
 import { RegisterForm } from '../components/RegisterForm';
 import { TwoFactorForm } from '../components/TwoFactorForm';
+import { useAuth } from '../context';
 
-type AuthStep = 'login' | 'register' | '2fa';
+type Mode = 'login' | 'register';
 
-// These callbacks are placeholders standing in for real network integration
-// (AuthContext + identity/api.ts). They're plain optional props specifically
-// so that work can wire real handlers in from the outside later without
-// touching AuthPage's internals at all -- no default means "do nothing but
-// still navigate," a caller integrating real auth just passes its own
-// functions here instead of forking this file.
 interface AuthPageProps {
-  onLoginSuccess?: (email: string) => void;
-  onRegisterSuccess?: () => void;
-  on2FASuccess?: (email: string) => void;
+  /**
+   * Called once the user reaches the AUTHENTICATED step. AuthPage itself
+   * doesn't navigate anywhere (there's no router/dashboard yet) — this is an
+   * escape hatch for whichever page composes AuthPage into a larger app.
+   */
+  onAuthenticated?: () => void;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({
-  onLoginSuccess,
-  onRegisterSuccess,
-  on2FASuccess,
-}) => {
-  const [step, setStep] = useState<AuthStep>('login');
-  const [userEmail, setUserEmail] = useState('');
+export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
+  const auth = useAuth();
+  const [mode, setMode] = useState<Mode>('login');
   const [force2FA, setForce2FA] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLoginSuccess = (email: string) => {
-    setUserEmail(email);
-    setStep('2fa');
-    onLoginSuccess?.(email);
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      onAuthenticated?.();
+    }
+    // Only re-run when authentication actually flips, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.isAuthenticated]);
+
+  const handleLogin = async (payload: { username: string; password: string }) => {
+    setError(null);
+    try {
+      await auth.login(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to log in with the provided credentials.');
+    }
   };
 
-  const handleRegisterSuccess = () => {
-    if (onRegisterSuccess) {
-      onRegisterSuccess();
-    } else {
-      // Standalone/demo fallback when no real registration handler is wired in.
-      alert('Registration successful! Please login.');
+  const handleRegister = async (payload: { username: string; email: string; password: string }) => {
+    setError(null);
+    try {
+      // Registration issues real tokens directly (no 2FA step for
+      // registration per the backend), so a successful call here takes the
+      // user straight to the AUTHENTICATED step.
+      await auth.register(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed.');
     }
-    setStep('login');
   };
 
-  const handle2FASuccess = () => {
-    if (on2FASuccess) {
-      on2FASuccess(userEmail);
-    } else {
-      // Standalone/demo fallback when no real 2FA-completion handler is wired in.
-      alert(`Successfully authenticated as ${userEmail}!`);
+  const handleVerify2FA = async (code: string) => {
+    setError(null);
+    try {
+      await auth.verifyTwoFactor(code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The 2FA code is invalid or expired.');
     }
+  };
+
+  const handleLogout = () => {
+    setMode('login');
+    setForce2FA(false);
+    setError(null);
+    void auth.logout();
   };
 
   // Determine which step to render, respecting the debug override
-  const activeStep = force2FA ? '2fa' : step;
+  const activeStep = force2FA ? '2FA' : auth.authStep;
 
   return (
     <div style={{
@@ -98,14 +113,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         width: '100%',
         maxWidth: '400px'
       }}>
-        {activeStep === 'login' && (
+        {error && (
+          <p role="alert" style={{ color: '#c0392b', backgroundColor: '#fdecea', padding: '10px', borderRadius: '4px', fontSize: '14px', marginTop: 0, marginBottom: '15px' }}>
+            {error}
+          </p>
+        )}
+
+        {activeStep === 'LOGIN' && mode === 'login' && (
           <>
-            <LoginForm onSuccess={handleLoginSuccess} />
+            <LoginForm onSubmit={handleLogin} isSubmitting={auth.isLoading} />
             <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
               Don't have an account?{' '}
               <button
                 type="button"
-                onClick={() => setStep('register')}
+                onClick={() => { setError(null); setMode('register'); }}
                 style={{ background: 'none', border: 'none', color: '#5865F2', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}
               >
                 Register
@@ -114,14 +135,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </>
         )}
 
-        {activeStep === 'register' && (
+        {activeStep === 'LOGIN' && mode === 'register' && (
           <>
-            <RegisterForm onSuccess={handleRegisterSuccess} />
+            <RegisterForm onSubmit={handleRegister} isSubmitting={auth.isLoading} />
             <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
               Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => setStep('login')}
+                onClick={() => { setError(null); setMode('login'); }}
                 style={{ background: 'none', border: 'none', color: '#5865F2', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}
               >
                 Login
@@ -130,14 +151,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </>
         )}
 
-        {activeStep === '2fa' && (
+        {activeStep === '2FA' && (
           <TwoFactorForm
-            onSuccess={handle2FASuccess}
+            onSubmit={handleVerify2FA}
+            isSubmitting={auth.isLoading}
             onBackToLogin={() => {
               setForce2FA(false); // Turn off debug mode when going back
-              setStep('login');
+              setError(null);
+              setMode('login');
             }}
           />
+        )}
+
+        {activeStep === 'AUTHENTICATED' && (
+          <div style={{ textAlign: 'center' }}>
+            <h2>You're logged in</h2>
+            <p style={{ color: '#666', fontSize: '14px' }}>Authenticated successfully.</p>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{ padding: '12px 20px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}
+            >
+              Logout
+            </button>
+          </div>
         )}
       </div>
     </div>

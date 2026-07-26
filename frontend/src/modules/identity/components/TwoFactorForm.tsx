@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
 interface TwoFactorFormProps {
-  onSuccess: () => void;
+  onSubmit: (code: string) => void;
   onBackToLogin: () => void;
+  isSubmitting?: boolean;
 }
 
-export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBackToLogin }) => {
+export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSubmit, onBackToLogin, isSubmitting = false }) => {
   const [code, setCode] = useState('');
   const [timeLeft, setTimeLeft] = useState(60); // 60-second countdown for resending code
   const [resendCount, setResendCount] = useState(0); // bumped on resend to restart the timer effect
@@ -30,10 +31,10 @@ export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBackT
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // In a real application, we would verify the code with the backend here.
-    // For now, we simulate a successful verification.
-    onSuccess();
+
+    // Hand the entered code up; the caller is responsible for the actual
+    // verify2FA network call and for deciding what happens on success/failure.
+    onSubmit(code);
   };
 
   const handleResend = () => {
@@ -65,8 +66,12 @@ export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBackT
         />
       </div>
 
-      <button type="submit" style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>
-        Verify
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: isSubmitting ? 'default' : 'pointer', fontWeight: 'bold', marginTop: '10px', opacity: isSubmitting ? 0.7 : 1 }}
+      >
+        {isSubmitting ? 'Verifying…' : 'Verify'}
       </button>
 
       <div style={{ textAlign: 'center', fontSize: '14px', marginTop: '10px' }}>
