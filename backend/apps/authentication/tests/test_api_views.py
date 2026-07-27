@@ -42,10 +42,10 @@ class TestAuthenticationApiViews:
             "refresh_token": "refresh-token",
         }
 
-    @patch("apps.authentication.api.views.print")
+    @patch("apps.authentication.api.views.send_email_task")
     @patch("apps.authentication.api.views.LoginUseCase")
-    def test_login_prints_two_factor_code_and_returns_temp_token(
-        self, use_case_class, debug_print
+    def test_login_emails_the_two_factor_code_and_returns_temp_token(
+        self, use_case_class, send_email_task
     ):
         use_case_class.return_value.execute.return_value = Requires2FA(
             email="nika@example.com", code="123456", temp_token="temporary-token"
@@ -62,7 +62,11 @@ class TestAuthenticationApiViews:
             "status": "2FA_REQUIRED",
             "temp_token": "temporary-token",
         }
-        debug_print.assert_called_once_with("DEBUG: 2FA Code is 123456")
+        send_email_task.delay.assert_called_once_with(
+            "nika@example.com",
+            "Your Discord-Sim verification code",
+            "Your two-factor authentication code is 123456. It will expire shortly.",
+        )
 
     @patch("apps.authentication.api.views._issue_jwt_pair")
     @patch("apps.authentication.api.views.LoginUseCase")

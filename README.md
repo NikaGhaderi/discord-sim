@@ -181,9 +181,10 @@ npm run stop     # equivalent: make down
 | --------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `nginx`   | built from `nginx/`   | Reverse proxy on port 80 — routes `/api/*` and `/admin/*` to `web`, `/ws/*` for WebSocket traffic, serves the built frontend (`frontend/dist`) and Django's static/media files. This is what your browser/frontend actually talks to; never hit `web` directly. |
 | `web`     | built from `backend/` | The Django app (via Daphne, ASGI) on an internal port (8000, not published to the host — only reachable through `nginx`). Runs migrations and collects static files on startup.                                                                                 |
-| `worker`  | same image as `web`   | Celery worker for background tasks (thumbnail generation, future email sending). Idle until a ticket that uses it lands.                                                                                                                                        |
+| `worker`  | same image as `web`   | Celery worker for background tasks — currently email sending (2FA codes), later thumbnail generation and scheduled messages.                                                                                                                                    |
 | `db`      | `postgres:16-alpine`  | The database. Data persists in the named volume `postgres_data`.                                                                                                                                                                                                |
 | `redis`   | `redis:7-alpine`      | Cache + Celery broker, and where 2FA challenge codes / temp tokens live (short-lived by design). Data persists in `redis_data`.                                                                                                                                 |
+| `mailpit` | `axllent/mailpit`     | Local-dev SMTP catcher — the app sends *real* email (2FA codes, later password reset) to it instead of a real provider. Web UI at **http://localhost:8025** shows everything sent, no credentials needed. Not used in production.                              |
 
 
 `docker-compose down` (what Ctrl+C / `npm run stop` runs) **stops and removes the containers and the network only** — it does **not** touch the named volumes (`postgres_data`, `redis_data`, `static_volume`, `media_volume`). Your database survives a stop/start cycle. A fully clean slate (wipe the database too) is a separate, explicit, destructive command, never run automatically:
@@ -199,8 +200,13 @@ docker-compose down -v
 ```bash
 docker-compose ps                    # what's actually running right now
 docker-compose logs -f web           # tail Django's logs
-docker-compose logs -f worker        # tail Celery worker logs
+docker-compose logs -f worker        # tail Celery worker logs (email sending happens here)
 docker-compose logs -f nginx         # tail Nginx access/error logs
+```
+
+Open **http://localhost:8025** to see every email the app has sent (2FA codes, etc.) — that's Mailpit's web UI, a local SMTP catcher, no real inbox or credentials involved.
+
+```bash
 
 make shell            # docker-compose exec web python manage.py shell
 make migrate          # apply migrations
