@@ -1,7 +1,14 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import apiClient from '@infrastructure/apiClient';
 import { setTokens } from '@infrastructure/tokenStorage';
-import { registerUser, loginUser, verify2FA, logoutUser } from '../api';
+import {
+  registerUser,
+  loginUser,
+  verify2FA,
+  logoutUser,
+  requestPasswordReset,
+  confirmPasswordReset,
+} from '../api';
 
 vi.mock('@infrastructure/apiClient', () => ({
   default: { post: vi.fn() },
@@ -69,6 +76,32 @@ describe('identity api (real)', () => {
 
     expect(mockedPost).toHaveBeenCalledWith('/api/auth/logout/', {
       refresh_token: 'stored-refresh',
+    });
+  });
+
+  test('requestPasswordReset posts { email } to /api/auth/password-reset/', async () => {
+    mockedPost.mockResolvedValue({
+      data: { message: 'If an account exists, a reset link has been sent.' },
+    });
+
+    const result = await requestPasswordReset('nika@example.com');
+
+    expect(mockedPost).toHaveBeenCalledWith('/api/auth/password-reset/', {
+      email: 'nika@example.com',
+    });
+    expect(result.message).toBe('If an account exists, a reset link has been sent.');
+  });
+
+  test('confirmPasswordReset posts { token, new_password } to /api/auth/password-reset/confirm/', async () => {
+    mockedPost.mockResolvedValue({
+      data: { message: 'Your password has been reset successfully.' },
+    });
+
+    await confirmPasswordReset('reset-token-123', 'NewPassw0rd!');
+
+    expect(mockedPost).toHaveBeenCalledWith('/api/auth/password-reset/confirm/', {
+      token: 'reset-token-123',
+      new_password: 'NewPassw0rd!',
     });
   });
 });

@@ -1,12 +1,19 @@
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../modules/identity/context';
 import { AuthPage } from '../modules/identity/pages/AuthPage';
+import { ResetPasswordPage } from '../modules/identity/pages/ResetPasswordPage';
 
 export function App() {
   return (
-    <AuthProvider>
-      <main>
-        <AuthPage />
-      </main>
-    </AuthProvider>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AuthProvider>
+        <main>
+          <Routes>
+            <Route path="/" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Routes>
+        </main>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

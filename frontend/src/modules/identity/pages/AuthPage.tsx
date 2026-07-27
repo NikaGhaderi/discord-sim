@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { ForgotPasswordForm } from '../components/ForgotPasswordForm';
 import { LoginForm } from '../components/LoginForm';
 import { RegisterForm } from '../components/RegisterForm';
 import { TwoFactorForm } from '../components/TwoFactorForm';
 import { useAuth } from '../context';
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'forgot-password';
 
 interface AuthPageProps {
   /**
@@ -20,6 +21,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
   const [mode, setMode] = useState<Mode>('login');
   const [force2FA, setForce2FA] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (auth.isAuthenticated) {
@@ -50,6 +52,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
     }
   };
 
+  const handleForgotPassword = async (email: string) => {
+    setError(null);
+    setForgotPasswordMessage(null);
+    try {
+      // Anti-enumeration: this resolves with the same message whether or
+      // not the email matches an account -- just display it, don't branch.
+      const message = await auth.requestPasswordReset(email);
+      setForgotPasswordMessage(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    }
+  };
+
   const handleVerify2FA = async (code: string) => {
     setError(null);
     try {
@@ -63,6 +78,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
     setMode('login');
     setForce2FA(false);
     setError(null);
+    setForgotPasswordMessage(null);
     void auth.logout();
   };
 
@@ -132,7 +148,44 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
                 Register
               </button>
             </p>
+            <p style={{ textAlign: 'center', marginTop: '10px', fontSize: '14px' }}>
+              <button
+                type="button"
+                onClick={() => { setError(null); setForgotPasswordMessage(null); setMode('forgot-password'); }}
+                style={{ background: 'none', border: 'none', color: '#5865F2', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}
+              >
+                Forgot password?
+              </button>
+            </p>
           </>
+        )}
+
+        {activeStep === 'LOGIN' && mode === 'forgot-password' && (
+          forgotPasswordMessage ? (
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: '#333' }}>{forgotPasswordMessage}</p>
+              <button
+                type="button"
+                onClick={() => { setForgotPasswordMessage(null); setMode('login'); }}
+                style={{ background: 'none', border: 'none', color: '#5865F2', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit', fontSize: '14px', marginTop: '10px' }}
+              >
+                Back to Login
+              </button>
+            </div>
+          ) : (
+            <>
+              <ForgotPasswordForm onSubmit={handleForgotPassword} isSubmitting={auth.isLoading} />
+              <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
+                <button
+                  type="button"
+                  onClick={() => { setError(null); setMode('login'); }}
+                  style={{ background: 'none', border: 'none', color: '#5865F2', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}
+                >
+                  Back to Login
+                </button>
+              </p>
+            </>
+          )
         )}
 
         {activeStep === 'LOGIN' && mode === 'register' && (

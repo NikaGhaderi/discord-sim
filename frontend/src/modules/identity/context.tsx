@@ -50,6 +50,15 @@ interface AuthContextValue {
   /** Verify the 2FA code using the temp token stored from the login step. */
   verifyTwoFactor: (code: string) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Request a password reset link. Resolves with the backend's message
+   * (identical whether or not the email matches an account, per the
+   * anti-enumeration rule) -- callers should just display it, never branch
+   * on it. Doesn't touch authStep at all.
+   */
+  requestPasswordReset: (email: string) => Promise<string>;
+  /** Confirm a password reset using the token from the emailed link. Resolves with a success message; rejects on an invalid/expired token or a weak password. */
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -138,6 +147,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [tempToken],
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setIsLoading(true);
+    try {
+      const res = await identityApi.requestPasswordReset(email);
+      return res.message;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const confirmPasswordReset = useCallback(
+    async (token: string, newPassword: string) => {
+      setIsLoading(true);
+      try {
+        const res = await identityApi.confirmPasswordReset(token, newPassword);
+        return res.message;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -162,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       verifyTwoFactor,
       logout,
+      requestPasswordReset,
+      confirmPasswordReset,
     }),
     [
       isAuthenticated,
@@ -171,6 +205,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       verifyTwoFactor,
       logout,
+      requestPasswordReset,
+      confirmPasswordReset,
     ],
   );
 

@@ -10,6 +10,8 @@ vi.mock('../index', () => ({
     loginUser: vi.fn(),
     verify2FA: vi.fn(),
     logoutUser: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    confirmPasswordReset: vi.fn(),
   },
 }));
 
@@ -18,6 +20,8 @@ const identityApi = identityModule.identityApi as {
   loginUser: ReturnType<typeof vi.fn>;
   verify2FA: ReturnType<typeof vi.fn>;
   logoutUser: ReturnType<typeof vi.fn>;
+  requestPasswordReset: ReturnType<typeof vi.fn>;
+  confirmPasswordReset: ReturnType<typeof vi.fn>;
 };
 
 function renderAuthPage() {
@@ -244,5 +248,38 @@ describe('AuthPage', () => {
       expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument(),
     );
     expect(identityApi.logoutUser).toHaveBeenCalledTimes(1);
+  });
+
+  test('the "Forgot password?" link switches to ForgotPasswordForm', () => {
+    renderAuthPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /forgot password\?/i }));
+
+    expect(screen.getByRole('heading', { name: /forgot password/i })).toBeInTheDocument();
+  });
+
+  test('requesting a password reset calls requestPasswordReset and shows the backend message', async () => {
+    identityApi.requestPasswordReset.mockResolvedValue({
+      message: 'If an account exists, a reset link has been sent.',
+    });
+    renderAuthPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /forgot password\?/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'nika@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/reset link has been sent/i)).toBeInTheDocument(),
+    );
+    expect(identityApi.requestPasswordReset).toHaveBeenCalledWith('nika@example.com');
+
+    // Same message shown regardless of whether the account exists -- this
+    // test only checks the UI displays whatever the backend/context
+    // resolved with, never branches on it (that anti-enumeration behavior
+    // itself is covered at the backend/context level).
+    fireEvent.click(screen.getByRole('button', { name: /back to login/i }));
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
   });
 });

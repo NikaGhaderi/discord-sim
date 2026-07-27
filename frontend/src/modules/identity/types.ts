@@ -58,6 +58,25 @@ export interface LogoutResponse {
   message: string;
 }
 
+/**
+ * Password reset request response. Per the doc's anti-enumeration business
+ * rule, this exact shape/message is returned whether or not the email
+ * matches an account -- never branch UI behavior on its content.
+ */
+export interface RequestPasswordResetResponse {
+  message: string;
+}
+
+/**
+ * Password reset confirm response. Not part of the doc's documented API
+ * contract (only the request step is documented) -- this shape matches the
+ * backend's ConfirmPasswordResetView, added so the emailed link leads
+ * somewhere usable.
+ */
+export interface ConfirmPasswordResetResponse {
+  message: string;
+}
+
 // ── Type guards ────────────────────────────────────────────────────────────────
 
 /** Distinguishes a "2FA required" login response from a direct-token one. */
@@ -74,4 +93,9 @@ export interface IdentityApi {
   loginUser(payload: LoginPayload): Promise<LoginResponse>;
   verify2FA(code: string, tempToken: string): Promise<Verify2FAResponse>;
   logoutUser(): Promise<LogoutResponse>;
+  requestPasswordReset(email: string): Promise<RequestPasswordResetResponse>;
+  confirmPasswordReset(
+    token: string,
+    newPassword: string,
+  ): Promise<ConfirmPasswordResetResponse>;
 }
