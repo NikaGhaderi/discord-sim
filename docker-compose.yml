@@ -32,6 +32,7 @@ services:
     depends_on:
       - db
       - redis
+      - mailpit
     restart: unless-stopped
 
   worker:
@@ -48,6 +49,7 @@ services:
       - web
       - db
       - redis
+      - mailpit
     restart: unless-stopped
 
   db:
@@ -70,6 +72,17 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
+
+  # Local dev SMTP catcher -- accepts real SMTP mail (2FA codes, later
+  # password-reset emails) without a real provider/credentials. Web UI at
+  # http://localhost:8025 shows everything sent. Not used in production
+  # (EMAIL_HOST/PORT get overridden to a real provider there).
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     restart: unless-stopped
 
 volumes:

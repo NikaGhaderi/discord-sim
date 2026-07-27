@@ -25,6 +25,7 @@ from apps.authentication.domain.exceptions import (
     RegistrationValidationError,
 )
 from apps.authentication.repositories import DjangoAuthRepository
+from core.tasks.email import send_email_task
 
 
 def _issue_jwt_pair(user_id: int) -> dict:
@@ -74,8 +75,12 @@ class LoginView(APIView):
             )
 
         if isinstance(result, Requires2FA):
-            # TECH DEBT: replace with a Celery send_2fa_email_task in a future sprint.
-            print(f"DEBUG: 2FA Code is {result.code}")
+            send_email_task.delay(
+                result.email,
+                "Your Discord-Sim verification code",
+                f"Your two-factor authentication code is {result.code}. "
+                "It will expire shortly.",
+            )
             return Response(
                 {"status": "2FA_REQUIRED", "temp_token": result.temp_token},
                 status=200,
