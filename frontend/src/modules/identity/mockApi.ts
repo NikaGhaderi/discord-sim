@@ -13,11 +13,13 @@
  */
 
 import type {
+  ConfirmPasswordResetResponse,
   LoginPayload,
   LoginResponse,
   LogoutResponse,
   RegisterPayload,
   RegisterResponse,
+  RequestPasswordResetResponse,
   Verify2FAResponse,
 } from "./types";
 
@@ -58,4 +60,21 @@ export const verify2FA = async (
 
 export const logoutUser = async (): Promise<LogoutResponse> => {
   return Promise.resolve({ message: "Successfully logged out." });
+};
+
+export const requestPasswordReset = async (
+  _email: string,
+): Promise<RequestPasswordResetResponse> => {
+  return Promise.resolve({
+    message: "If an account exists, a reset link has been sent.",
+  });
+};
+
+export const confirmPasswordReset = async (
+  _token: string,
+  _newPassword: string,
+): Promise<ConfirmPasswordResetResponse> => {
+  return Promise.resolve({
+    message: "Your password has been reset successfully.",
+  });
 };

@@ -11,6 +11,7 @@ class RedisAuthStore:
     """Redis persistence for short-lived 2FA challenges and token revocation."""
 
     challenge_ttl_seconds = 5 * 60
+    password_reset_ttl_seconds = 60 * 60
 
     def __init__(self, client=None):
         self.client = client or get_redis_client()
@@ -45,6 +46,22 @@ class RedisAuthStore:
         self.client.delete(key)
         return challenge.get("user_id")
 
+    def create_password_reset_token(self, user_id):
+        token = secrets.token_urlsafe(32)
+        self.client.setex(
+            self._password_reset_key(token), self.password_reset_ttl_seconds, user_id
+        )
+        return token
+
+    def consume_password_reset_token(self, token):
+        key = self._password_reset_key(token)
+        raw_value = self.client.get(key)
+        if raw_value is None:
+            return None
+
+        self.client.delete(key)  # one-time use
+        return int(raw_value)
+
     def blacklist_refresh_token(self, refresh_token, expires_at):
         now = datetime.now(timezone.utc).timestamp()
         ttl_seconds = max(1, int(expires_at - now))
@@ -56,6 +73,11 @@ class RedisAuthStore:
     @staticmethod
     def _challenge_key(temp_token):
         return f"authentication:2fa:{temp_token}"
+
+    @staticmethod
+    def _password_reset_key(token):
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        return f"authentication:password-reset:{digest}"
 
     @staticmethod
     def _blacklist_key(refresh_token):

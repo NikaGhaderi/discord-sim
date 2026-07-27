@@ -9,11 +9,13 @@
 import apiClient from "@infrastructure/apiClient";
 import { getRefreshToken } from "@infrastructure/tokenStorage";
 import type {
+  ConfirmPasswordResetResponse,
   LoginPayload,
   LoginResponse,
   LogoutResponse,
   RegisterPayload,
   RegisterResponse,
+  RequestPasswordResetResponse,
   Verify2FAResponse,
 } from "./types";
 
@@ -23,6 +25,8 @@ const ENDPOINTS = {
   login: "/api/auth/login/",
   logout: "/api/auth/logout/",
   verify2FA: "/api/auth/verify-2fa/",
+  passwordReset: "/api/auth/password-reset/",
+  passwordResetConfirm: "/api/auth/password-reset/confirm/",
 } as const;
 
 /** Register a new user. */
@@ -76,5 +80,36 @@ export const logoutUser = async (): Promise<LogoutResponse> => {
   const { data } = await apiClient.post<LogoutResponse>(ENDPOINTS.logout, {
     refresh_token: refreshToken,
   });
+  return data;
+};
+
+/**
+ * Request a password reset link. Per the doc's anti-enumeration business
+ * rule, the backend returns this exact response whether or not the email
+ * matches an account -- never branch UI behavior on it, just display it.
+ */
+export const requestPasswordReset = async (
+  email: string,
+): Promise<RequestPasswordResetResponse> => {
+  const { data } = await apiClient.post<RequestPasswordResetResponse>(
+    ENDPOINTS.passwordReset,
+    { email },
+  );
+  return data;
+};
+
+/**
+ * Confirm a password reset using the token from the emailed link. Not part
+ * of the doc's documented API contract (only the request step is
+ * documented) -- matches the backend's ConfirmPasswordResetView.
+ */
+export const confirmPasswordReset = async (
+  token: string,
+  newPassword: string,
+): Promise<ConfirmPasswordResetResponse> => {
+  const { data } = await apiClient.post<ConfirmPasswordResetResponse>(
+    ENDPOINTS.passwordResetConfirm,
+    { token, new_password: newPassword },
+  );
   return data;
 };

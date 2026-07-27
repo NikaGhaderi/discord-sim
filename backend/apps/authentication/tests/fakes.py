@@ -16,6 +16,7 @@ class InMemoryAuthRepository(AbstractAuthRepository):
         self._users_by_email: dict[str, UserEntity] = {}
         self._challenges_by_temp_token: dict[str, tuple[int, str]] = {}
         self._blacklisted_tokens: set[str] = set()
+        self._password_reset_tokens: dict[str, int] = {}
         self._next_id = 1
 
     def get_by_username(self, username: str) -> UserEntity | None:
@@ -53,3 +54,14 @@ class InMemoryAuthRepository(AbstractAuthRepository):
 
     def is_refresh_token_blacklisted(self, token: str) -> bool:
         return token in self._blacklisted_tokens
+
+    def create_password_reset_token(self, user_id: int) -> str:
+        token = secrets.token_urlsafe(16)
+        self._password_reset_tokens[token] = user_id
+        return token
+
+    def consume_password_reset_token(self, token: str) -> int | None:
+        return self._password_reset_tokens.pop(token, None)
+
+    def set_password(self, user_id: int, password_hash: str) -> None:
+        self._users_by_id[user_id].password_hash = password_hash

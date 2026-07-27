@@ -16,3 +16,11 @@ class RegistrationValidationError(Exception):
 
 class InvalidRefreshTokenError(Exception):
     """Raised when a refresh token fails signature/expiry validation."""
+
+
+class InvalidPasswordResetTokenError(Exception):
+    """Raised when a password-reset token is wrong, expired, or already used."""
+
+
+class PasswordResetValidationError(Exception):
+    """Raised when a password-reset's new password fails validation (too weak)."""

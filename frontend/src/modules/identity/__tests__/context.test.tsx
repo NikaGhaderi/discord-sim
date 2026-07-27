@@ -10,6 +10,8 @@ vi.mock('../index', () => ({
     loginUser: vi.fn(),
     verify2FA: vi.fn(),
     logoutUser: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    confirmPasswordReset: vi.fn(),
   },
 }));
 
@@ -18,16 +20,20 @@ const identityApi = identityModule.identityApi as {
   loginUser: ReturnType<typeof vi.fn>;
   verify2FA: ReturnType<typeof vi.fn>;
   logoutUser: ReturnType<typeof vi.fn>;
+  requestPasswordReset: ReturnType<typeof vi.fn>;
+  confirmPasswordReset: ReturnType<typeof vi.fn>;
 };
 
 function Probe() {
   const auth = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   return (
     <div>
       <span data-testid="step">{auth.authStep}</span>
       <span data-testid="authenticated">{String(auth.isAuthenticated)}</span>
       <span data-testid="error">{error ?? ''}</span>
+      <span data-testid="message">{message ?? ''}</span>
       <button onClick={() => auth.login({ username: 'nika', password: 'password123' })}>
         login
       </button>
@@ -39,6 +45,23 @@ function Probe() {
         verify
       </button>
       <button onClick={() => auth.logout()}>logout</button>
+      <button
+        onClick={() =>
+          auth.requestPasswordReset('nika@example.com').then(setMessage)
+        }
+      >
+        request-reset
+      </button>
+      <button
+        onClick={() =>
+          auth
+            .confirmPasswordReset('reset-token-1', 'NewPassw0rd!')
+            .then(setMessage)
+            .catch((err: Error) => setError(err.message))
+        }
+      >
+        confirm-reset
+      </button>
     </div>
   );
 }
@@ -167,5 +190,71 @@ describe('AuthProvider / useAuth', () => {
       expect(screen.getByTestId('step')).toHaveTextContent('LOGIN'),
     );
     expect(window.localStorage.getItem('access_token')).toBeNull();
+  });
+
+  test('requestPasswordReset resolves with the backend message and does not touch authStep', async () => {
+    identityApi.requestPasswordReset.mockResolvedValue({
+      message: 'If an account exists, a reset link has been sent.',
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      screen.getByText('request-reset').click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('message')).toHaveTextContent(/reset link has been sent/i),
+    );
+    expect(identityApi.requestPasswordReset).toHaveBeenCalledWith('nika@example.com');
+    expect(screen.getByTestId('step')).toHaveTextContent('LOGIN');
+  });
+
+  test('confirmPasswordReset resolves with the backend message on success', async () => {
+    identityApi.confirmPasswordReset.mockResolvedValue({
+      message: 'Your password has been reset successfully.',
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      screen.getByText('confirm-reset').click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('message')).toHaveTextContent(/reset successfully/i),
+    );
+    expect(identityApi.confirmPasswordReset).toHaveBeenCalledWith(
+      'reset-token-1',
+      'NewPassw0rd!',
+    );
+  });
+
+  test('confirmPasswordReset surfaces an error on an invalid/expired token', async () => {
+    identityApi.confirmPasswordReset.mockRejectedValue(
+      new Error('This password reset link is invalid or has expired.'),
+    );
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      screen.getByText('confirm-reset').click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent(/invalid or has expired/i),
+    );
   });
 });

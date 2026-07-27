@@ -44,3 +44,15 @@ class TestRedisAuthStore:
         store.blacklist_refresh_token("refresh-token", expires_at)
 
         assert store.is_refresh_token_blacklisted("refresh-token") is True
+
+    def test_password_reset_token_is_single_use(self):
+        store = RedisAuthStore(client=FakeRedis())
+        token = store.create_password_reset_token(user_id=42)
+
+        assert store.consume_password_reset_token(token) == 42
+        assert store.consume_password_reset_token(token) is None
+
+    def test_unknown_password_reset_token_returns_none(self):
+        store = RedisAuthStore(client=FakeRedis())
+
+        assert store.consume_password_reset_token("never-issued") is None

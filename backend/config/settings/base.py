@@ -126,6 +126,9 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")
 
+# --- Frontend (for building links embedded in emails, e.g. password reset) ---
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173")
+
 # --- Redis (shared by Celery, Channels, and core.redis_client) ---
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
