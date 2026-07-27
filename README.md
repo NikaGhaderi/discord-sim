@@ -131,87 +131,109 @@ discord-sim/
 
 ## Development
 
-Before opening a PR, read **[CONTRIBUTING.md](CONTRIBUTING.md)** . It defines the Definition of Ready/Done, the `type/JIRA-ID-description` branching convention, the `Closes: DSIM-###` PR requirement, and the migration-conflict protocol. All of it is enforced in code review and CI.
+Before opening a PR, read **[CONTRIBUTING.md](CONTRIBUTING.md)**. It defines the Definition of Ready/Done, the `type/JIRA-ID-description` branching convention, the `Closes: DSIM-###` PR requirement, and the migration-conflict protocol. All of it is enforced in code review and CI.
 
-Run these in order — steps 1–3 are the one-time setup for a fresh clone:
+### Prerequisites
 
-### 1. Clone and configure
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — running, not just installed. Start it and wait for "Engine running" before continuing.
+- [Node.js](https://nodejs.org/) 20+ (for the frontend, and for the bootstrap script below).
+
+Neither `make` nor `cmake` is required. This project doesn't use CMake at all, and `make` is only a thin convenience alias around the same npm scripts described here — everything works without it.
+
+### Start everything: one command
 
 ```bash
 git clone https://github.com/NikaGhaderi/discord-sim.git
 cd discord-sim
-cp .env.example .env
-# then fill in POSTGRES_USER, POSTGRES_PASSWORD, SECRET_KEY, etc. in .env
+npm run dev
+```
+
+(equivalent on a machine with `make` installed: `make run`)
+
+This single command:
+
+1. Creates `.env` from `.env.example` if it doesn't exist yet (safe local-dev defaults, no real secrets committed).
+2. Runs `docker-compose up -d --build`, bringing up the backend stack (see the table below).
+3. Creates `frontend/.env.local` from `frontend/.env.example` if it doesn't exist yet.
+4. Runs `npm install` in `frontend/` if `node_modules` is missing.
+5. Starts the Vite dev server in the foreground, streaming its logs to your terminal.
+
+Once it's up, open **[http://localhost:5173](http://localhost:5173)**.
+
+### Stop everything: one command
+
+Press **Ctrl+C** in the terminal running `npm run dev`. This stops the frontend dev server *and* runs `docker-compose down` — no separate teardown step, on Windows or Linux/Mac (verified on both).
+
+To stop the backend containers without going through `npm run dev` (e.g. they were started separately, or a previous run didn't shut down cleanly):
+
+```bash
+npm run stop     # equivalent: make down
 ```
 
 
 
-### 2. Build the frontend once
+### What gets built and removed, exactly
+
+`docker-compose up -d --build` builds/starts 5 containers (all defined in `docker-compose.yml`):
+
+
+| Container | Image                 | What it does                                                                                                                                                                                                                                                    |
+| --------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nginx`   | built from `nginx/`   | Reverse proxy on port 80 — routes `/api/*` and `/admin/*` to `web`, `/ws/*` for WebSocket traffic, serves the built frontend (`frontend/dist`) and Django's static/media files. This is what your browser/frontend actually talks to; never hit `web` directly. |
+| `web`     | built from `backend/` | The Django app (via Daphne, ASGI) on an internal port (8000, not published to the host — only reachable through `nginx`). Runs migrations and collects static files on startup.                                                                                 |
+| `worker`  | same image as `web`   | Celery worker for background tasks (thumbnail generation, future email sending). Idle until a ticket that uses it lands.                                                                                                                                        |
+| `db`      | `postgres:16-alpine`  | The database. Data persists in the named volume `postgres_data`.                                                                                                                                                                                                |
+| `redis`   | `redis:7-alpine`      | Cache + Celery broker, and where 2FA challenge codes / temp tokens live (short-lived by design). Data persists in `redis_data`.                                                                                                                                 |
+
+
+`docker-compose down` (what Ctrl+C / `npm run stop` runs) **stops and removes the containers and the network only** — it does **not** touch the named volumes (`postgres_data`, `redis_data`, `static_volume`, `media_volume`). Your database survives a stop/start cycle. A fully clean slate (wipe the database too) is a separate, explicit, destructive command, never run automatically:
 
 ```bash
-cd frontend
-npm install
-npm run build
-cd ..
-```
-
-> **Gotcha:** `docker-compose.yml` bind-mounts `frontend/dist` straight into nginx. If you skip this step and go straight to `make up`, Docker will silently create an empty `dist/` folder and nginx will serve a blank page at `/` — the API (`/api`, `/admin`) still works fine, it's just the SPA that's missing. Re-run `npm run build` any time the frontend changes and you want nginx to serve the new build.
-
-
-
-### 3. Run the stack
-
-```bash
-make up          # docker-compose up -d --build (nginx, web, worker, db, redis)
-make logs        # tail the web service logs
-make down        # stop everything
-```
-
-The app is served through nginx at `http://localhost` (`/api` and `/admin` proxy to Django, `/ws` proxies WebSocket traffic).
-
-### 4. Database migrations
-
-```bash
-make migrate          # apply migrations
-make makemigrations   # generate new migrations (announce in the team channel first — see CONTRIBUTING.md)
+docker-compose down -v
 ```
 
 
 
-### 5. Everyday backend work
+### Useful commands while it's running
 
 ```bash
+docker-compose ps                    # what's actually running right now
+docker-compose logs -f web           # tail Django's logs
+docker-compose logs -f worker        # tail Celery worker logs
+docker-compose logs -f nginx         # tail Nginx access/error logs
+
 make shell            # docker-compose exec web python manage.py shell
+make migrate          # apply migrations
+make makemigrations   # generate new migrations (announce in the team channel first -- see CONTRIBUTING.md)
+make test-backend     # docker-compose exec web pytest
+make test-frontend    # frontend unit tests via vitest
+
+docker-compose exec web black .    # formatting (also enforced by pre-commit + CI)
+docker-compose exec web flake8 .   # linting
 ```
 
-Formatting/linting (also enforced by `.pre-commit-config.yaml` and CI):
-
-```bash
-docker-compose exec web black .
-docker-compose exec web flake8 .
-```
-
-
-
-### 6. Frontend dev loop
+Frontend-only loop (if you'd rather run `npm run dev` inside `frontend/` directly instead of the root bootstrap — e.g. the backend's already running and you just want to restart the frontend):
 
 ```bash
 cd frontend
-npm run dev     # Vite dev server with hot reload on :5173
+npm run dev
 npm run lint
+npm test -- --run
 ```
 
 Husky runs `npm run lint` automatically on commit.
 
-### 7. Running tests
+### Manual setup (if you don't want the one-command bootstrap)
 
-```bash
-make test-backend     # docker-compose exec web pytest
-make test-frontend     # frontend unit tests via vitest
-```
+1. `cp .env.example .env` (Linux/Mac) or `Copy-Item .env.example .env` (PowerShell) — defaults work locally, no edits required.
+2. `docker-compose up -d --build`
+3. `cd frontend && cp .env.example .env.local` (or `Copy-Item .env.example .env.local`). It defaults to `VITE_API_BASE_URL=http://localhost` (no `/api` suffix — every endpoint path already includes it) and `VITE_USE_MOCK_API=false`; flip the latter to `true` to develop the UI without Docker running at all.
+4. `npm install && npm run dev`
+
+> **Production-style build note:** `docker-compose.yml` bind-mounts `frontend/dist` straight into `nginx`. That directory is only populated by `npm run build` (not by `npm run dev`, which runs its own dev server on :5173 instead). If you build for production and skip this, `nginx` serves a blank page at `/` — the API (`/api`, `/admin`) still works fine either way, it's just the static SPA bundle that's missing.
 
 
 
-### 8. CI
+### CI
 
 Every PR against `main`/`develop` runs `.github/workflows/pr-checks.yml`: backend lint + tests (`black`, `flake8`, `pytest`), frontend lint + tests (`eslint`, `vitest`), and a `docker-compose build` sanity check. A PR cannot merge unless all three jobs pass and it satisfies the Definition of Done in CONTRIBUTING.md.

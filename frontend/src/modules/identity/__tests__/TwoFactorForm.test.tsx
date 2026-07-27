@@ -13,7 +13,7 @@ describe('TwoFactorForm', () => {
   });
 
   test('renders a 6-digit code input with native validation attributes', () => {
-    render(<TwoFactorForm onSuccess={vi.fn()} onBackToLogin={vi.fn()} />);
+    render(<TwoFactorForm onSubmit={vi.fn()} onBackToLogin={vi.fn()} />);
 
     const codeInput = screen.getByLabelText(/verification code/i) as HTMLInputElement;
     expect(codeInput).toBeRequired();
@@ -22,7 +22,7 @@ describe('TwoFactorForm', () => {
   });
 
   test('shows a 60s countdown that ticks down once per second', () => {
-    render(<TwoFactorForm onSuccess={vi.fn()} onBackToLogin={vi.fn()} />);
+    render(<TwoFactorForm onSubmit={vi.fn()} onBackToLogin={vi.fn()} />);
 
     expect(screen.getByText(/resend code in 60s/i)).toBeInTheDocument();
 
@@ -34,7 +34,7 @@ describe('TwoFactorForm', () => {
   });
 
   test('replaces the countdown with a resend button once it reaches zero, and resend restarts it', () => {
-    render(<TwoFactorForm onSuccess={vi.fn()} onBackToLogin={vi.fn()} />);
+    render(<TwoFactorForm onSubmit={vi.fn()} onBackToLogin={vi.fn()} />);
 
     act(() => {
       vi.advanceTimersByTime(60_000);
@@ -57,24 +57,31 @@ describe('TwoFactorForm', () => {
     expect(screen.getByText(/resend code in 59s/i)).toBeInTheDocument();
   });
 
-  test('calls onSuccess on submit', () => {
-    const onSuccess = vi.fn();
-    render(<TwoFactorForm onSuccess={onSuccess} onBackToLogin={vi.fn()} />);
+  test('calls onSubmit with the entered code', () => {
+    const onSubmit = vi.fn();
+    render(<TwoFactorForm onSubmit={onSubmit} onBackToLogin={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/verification code/i), {
       target: { value: '123456' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
 
-    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith('123456');
   });
 
   test('calls onBackToLogin when the back link is clicked', () => {
     const onBackToLogin = vi.fn();
-    render(<TwoFactorForm onSuccess={vi.fn()} onBackToLogin={onBackToLogin} />);
+    render(<TwoFactorForm onSubmit={vi.fn()} onBackToLogin={onBackToLogin} />);
 
     fireEvent.click(screen.getByRole('button', { name: /back to login/i }));
 
     expect(onBackToLogin).toHaveBeenCalledTimes(1);
+  });
+
+  test('disables the submit button and shows a loading label while isSubmitting', () => {
+    render(<TwoFactorForm onSubmit={vi.fn()} onBackToLogin={vi.fn()} isSubmitting />);
+
+    const button = screen.getByRole('button', { name: /verifying/i });
+    expect(button).toBeDisabled();
   });
 });

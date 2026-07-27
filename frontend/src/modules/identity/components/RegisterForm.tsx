@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 
 interface RegisterFormProps {
-  onSuccess: () => void;
+  onSubmit: (payload: { username: string; email: string; password: string }) => void;
+  isSubmitting?: boolean;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, isSubmitting = false }) => {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -13,20 +15,33 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     // Prevent the default form submission behavior
     e.preventDefault();
 
-    // Perform password confirmation check before triggering success
+    // Perform password confirmation check before triggering submit
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
     }
 
-    // Trigger success callback only if all validations pass
-    onSuccess();
+    // Trigger submit only if all validations pass
+    onSubmit({ username, email, password });
   };
 
   return (
     <form onSubmit={handleSubmit} className="identity-form" style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '350px', margin: '0 auto' }}>
       <h2 style={{ textAlign: 'center' }}>Create Account</h2>
       <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>Fill in the details below to register.</p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <label htmlFor="reg-username" style={{ fontSize: '14px', fontWeight: 'bold' }}>Username</label>
+        <input
+          id="reg-username"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          placeholder="username"
+          style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
+        />
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
         <label htmlFor="reg-email" style={{ fontSize: '14px', fontWeight: 'bold' }}>Email</label>
@@ -69,8 +84,12 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         />
       </div>
 
-      <button type="submit" style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>
-        Register
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: isSubmitting ? 'default' : 'pointer', fontWeight: 'bold', marginTop: '10px', opacity: isSubmitting ? 0.7 : 1 }}
+      >
+        {isSubmitting ? 'Registering…' : 'Register'}
       </button>
     </form>
   );

@@ -1,5 +1,7 @@
 up:
 	docker-compose up -d --build
+run:
+	npm run dev
 down:
 	docker-compose down
 logs:

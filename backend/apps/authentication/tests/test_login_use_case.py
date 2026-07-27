@@ -45,6 +45,16 @@ def test_login_with_2fa_enabled_returns_requires_2fa_with_a_temp_token():
     assert repo.consume_two_factor_challenge(result.temp_token, result.code) == user.id
 
 
+def test_login_with_email_instead_of_username_succeeds():
+    repo = InMemoryAuthRepository()
+    _register(repo, is_2fa_enabled=False)
+
+    result = LoginUseCase(repo).execute(EMAIL, PASSWORD)
+
+    assert isinstance(result, AuthenticatedUser)
+    assert result.user.username == USERNAME
+
+
 def test_login_with_wrong_password_raises_invalid_credentials():
     repo = InMemoryAuthRepository()
     _register(repo)

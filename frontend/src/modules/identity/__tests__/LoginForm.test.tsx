@@ -4,7 +4,7 @@ import { LoginForm } from '../components/LoginForm';
 
 describe('LoginForm', () => {
   test('renders email and password fields with native validation attributes', () => {
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSubmit={vi.fn()} />);
 
     const email = screen.getByLabelText(/email/i) as HTMLInputElement;
     const password = screen.getByLabelText(/password/i) as HTMLInputElement;
@@ -16,7 +16,7 @@ describe('LoginForm', () => {
   });
 
   test('tracks input via controlled state', () => {
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSubmit={vi.fn()} />);
 
     const email = screen.getByLabelText(/email/i) as HTMLInputElement;
     fireEvent.change(email, { target: { value: 'nika@example.com' } });
@@ -24,9 +24,9 @@ describe('LoginForm', () => {
     expect(email.value).toBe('nika@example.com');
   });
 
-  test('calls onSuccess with the entered email on submit', () => {
-    const onSuccess = vi.fn();
-    render(<LoginForm onSuccess={onSuccess} />);
+  test('calls onSubmit with the entered credentials, keyed as username/password', () => {
+    const onSubmit = vi.fn();
+    render(<LoginForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'nika@example.com' },
@@ -36,6 +36,16 @@ describe('LoginForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
-    expect(onSuccess).toHaveBeenCalledWith('nika@example.com');
+    expect(onSubmit).toHaveBeenCalledWith({
+      username: 'nika@example.com',
+      password: 'password123',
+    });
+  });
+
+  test('disables the submit button and shows a loading label while isSubmitting', () => {
+    render(<LoginForm onSubmit={vi.fn()} isSubmitting />);
+
+    const button = screen.getByRole('button', { name: /logging in/i });
+    expect(button).toBeDisabled();
   });
 });

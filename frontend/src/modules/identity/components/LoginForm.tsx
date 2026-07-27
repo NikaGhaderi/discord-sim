@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 
 interface LoginFormProps {
-  onSuccess: (email: string) => void;
+  onSubmit: (payload: { username: string; password: string }) => void;
+  isSubmitting?: boolean;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isSubmitting = false }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     // Prevent the default form submission behavior (page reload)
-    e.preventDefault(); 
-    
-    // Trigger success callback only if native HTML5 validation passes
-    onSuccess(email);
+    e.preventDefault();
+
+    // Trigger submit only if native HTML5 validation passes. The backend
+    // accepts either a username or an email in this field, so the entered
+    // value is sent as `username` regardless of which one the user typed.
+    onSubmit({ username: email, password });
   };
 
   return (
@@ -48,8 +51,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         />
       </div>
 
-      <button type="submit" style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>
-        Login
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        style={{ padding: '12px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '4px', cursor: isSubmitting ? 'default' : 'pointer', fontWeight: 'bold', marginTop: '10px', opacity: isSubmitting ? 0.7 : 1 }}
+      >
+        {isSubmitting ? 'Logging in…' : 'Login'}
       </button>
     </form>
   );

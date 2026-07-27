@@ -7,13 +7,15 @@ describe('RegisterForm', () => {
     vi.restoreAllMocks();
   });
 
-  test('renders email, password, and confirm-password fields with native validation', () => {
-    render(<RegisterForm onSuccess={vi.fn()} />);
+  test('renders username, email, password, and confirm-password fields with native validation', () => {
+    render(<RegisterForm onSubmit={vi.fn()} />);
 
+    const username = screen.getByLabelText(/username/i) as HTMLInputElement;
     const email = screen.getByLabelText(/^email$/i) as HTMLInputElement;
     const password = screen.getByLabelText(/^password$/i) as HTMLInputElement;
     const confirm = screen.getByLabelText(/confirm password/i) as HTMLInputElement;
 
+    expect(username).toBeRequired();
     expect(email.type).toBe('email');
     expect(email).toBeRequired();
     expect(password.minLength).toBe(8);
@@ -21,10 +23,13 @@ describe('RegisterForm', () => {
   });
 
   test('blocks submission and alerts when passwords do not match', () => {
-    const onSuccess = vi.fn();
+    const onSubmit = vi.fn();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    render(<RegisterForm onSuccess={onSuccess} />);
+    render(<RegisterForm onSubmit={onSubmit} />);
 
+    fireEvent.change(screen.getByLabelText(/username/i), {
+      target: { value: 'nika' },
+    });
     fireEvent.change(screen.getByLabelText(/^email$/i), {
       target: { value: 'nika@example.com' },
     });
@@ -37,13 +42,16 @@ describe('RegisterForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
 
     expect(alertSpy).toHaveBeenCalledWith('Passwords do not match!');
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  test('calls onSuccess when passwords match', () => {
-    const onSuccess = vi.fn();
-    render(<RegisterForm onSuccess={onSuccess} />);
+  test('calls onSubmit with username/email/password when passwords match', () => {
+    const onSubmit = vi.fn();
+    render(<RegisterForm onSubmit={onSubmit} />);
 
+    fireEvent.change(screen.getByLabelText(/username/i), {
+      target: { value: 'nika' },
+    });
     fireEvent.change(screen.getByLabelText(/^email$/i), {
       target: { value: 'nika@example.com' },
     });
@@ -55,6 +63,17 @@ describe('RegisterForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
 
-    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith({
+      username: 'nika',
+      email: 'nika@example.com',
+      password: 'password123',
+    });
+  });
+
+  test('disables the submit button and shows a loading label while isSubmitting', () => {
+    render(<RegisterForm onSubmit={vi.fn()} isSubmitting />);
+
+    const button = screen.getByRole('button', { name: /registering/i });
+    expect(button).toBeDisabled();
   });
 });

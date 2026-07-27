@@ -1,9 +1,12 @@
+import { AuthProvider } from '../modules/identity/context';
 import { AuthPage } from '../modules/identity/pages/AuthPage';
 
 export function App() {
   return (
-    <main>
-      <AuthPage />
-    </main>
+    <AuthProvider>
+      <main>
+        <AuthPage />
+      </main>
+    </AuthProvider>
   );
 }

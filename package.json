@@ -1,0 +1,9 @@
+{
+  "name": "discord-sim",
+  "private": true,
+  "description": "One-command local dev bootstrap. See scripts/dev.mjs for what this actually does.",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "stop": "docker-compose down"
+  }
+}
