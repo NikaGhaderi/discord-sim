@@ -15,4 +15,14 @@ urlpatterns = [
     ),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path("refresh/", views.TokenRefreshView.as_view(), name="token_refresh"),
+    path(
+        "password-reset/",
+        views.RequestPasswordResetView.as_view(),
+        name="password-reset",
+    ),
+    path(
+        "password-reset/confirm/",
+        views.ConfirmPasswordResetView.as_view(),
+        name="password-reset-confirm",
+    ),
 ]

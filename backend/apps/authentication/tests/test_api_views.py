@@ -9,6 +9,13 @@ from apps.authentication.application.use_cases.login import (
     AuthenticatedUser,
     Requires2FA,
 )
+from apps.authentication.application.use_cases.request_password_reset import (
+    PasswordResetRequested,
+)
+from apps.authentication.domain.exceptions import (
+    InvalidPasswordResetTokenError,
+    PasswordResetValidationError,
+)
 from apps.authentication.domain.models import UserEntity
 
 
@@ -164,6 +171,95 @@ class TestAuthenticationApiViews:
         )
 
         assert response.status_code == 401
+
+    @patch("apps.authentication.api.views.send_email_task")
+    @patch("apps.authentication.api.views.RequestPasswordResetUseCase")
+    def test_password_reset_request_emails_a_link_when_the_account_exists(
+        self, use_case_class, send_email_task
+    ):
+        use_case_class.return_value.execute.return_value = PasswordResetRequested(
+            email="nika@example.com", token="reset-token-123"
+        )
+
+        response = APIClient().post(
+            "/api/auth/password-reset/",
+            {"email": "nika@example.com"},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "message": "If an account exists, a reset link has been sent."
+        }
+        args, _ = send_email_task.delay.call_args
+        assert args[0] == "nika@example.com"
+        assert "reset-token-123" in args[2]
+
+    @patch("apps.authentication.api.views.send_email_task")
+    @patch("apps.authentication.api.views.RequestPasswordResetUseCase")
+    def test_password_reset_request_returns_the_same_response_for_an_unknown_email(
+        self, use_case_class, send_email_task
+    ):
+        use_case_class.return_value.execute.return_value = None
+
+        response = APIClient().post(
+            "/api/auth/password-reset/",
+            {"email": "ghost@example.com"},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "message": "If an account exists, a reset link has been sent."
+        }
+        send_email_task.delay.assert_not_called()
+
+    @patch("apps.authentication.api.views.ConfirmPasswordResetUseCase")
+    def test_password_reset_confirm_succeeds_with_a_valid_token(self, use_case_class):
+        use_case_class.return_value.execute.return_value = None
+
+        response = APIClient().post(
+            "/api/auth/password-reset/confirm/",
+            {"token": "reset-token-123", "new_password": "Tr0ub4dor-2026"},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "message": "Your password has been reset successfully."
+        }
+
+    @patch("apps.authentication.api.views.ConfirmPasswordResetUseCase")
+    def test_password_reset_confirm_rejects_an_invalid_or_expired_token(
+        self, use_case_class
+    ):
+        use_case_class.return_value.execute.side_effect = (
+            InvalidPasswordResetTokenError(
+                "This password reset link is invalid or has expired."
+            )
+        )
+
+        response = APIClient().post(
+            "/api/auth/password-reset/confirm/",
+            {"token": "garbage", "new_password": "Tr0ub4dor-2026"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    @patch("apps.authentication.api.views.ConfirmPasswordResetUseCase")
+    def test_password_reset_confirm_rejects_a_weak_new_password(self, use_case_class):
+        use_case_class.return_value.execute.side_effect = PasswordResetValidationError(
+            "This password is too common."
+        )
+
+        response = APIClient().post(
+            "/api/auth/password-reset/confirm/",
+            {"token": "reset-token-123", "new_password": "password123"},
+            format="json",
+        )
+
+        assert response.status_code == 400
 
 
 class TestUserModel:

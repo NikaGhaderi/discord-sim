@@ -36,3 +36,15 @@ class AbstractAuthRepository(ABC):
 
     @abstractmethod
     def is_refresh_token_blacklisted(self, token: str) -> bool: ...
+
+    @abstractmethod
+    def create_password_reset_token(self, user_id: int) -> str: ...
+
+    @abstractmethod
+    def consume_password_reset_token(self, token: str) -> int | None:
+        """Returns the user_id on success (single-use), None if the token is
+        wrong, expired, or already used."""
+        ...
+
+    @abstractmethod
+    def set_password(self, user_id: int, password_hash: str) -> None: ...

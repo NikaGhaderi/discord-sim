@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -7,6 +8,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.authentication.application.use_cases.confirm_password_reset import (
+    ConfirmPasswordResetUseCase,
+)
 from apps.authentication.application.use_cases.login import (
     AuthenticatedUser,
     LoginUseCase,
@@ -14,14 +18,19 @@ from apps.authentication.application.use_cases.login import (
 )
 from apps.authentication.application.use_cases.logout import LogoutUseCase
 from apps.authentication.application.use_cases.register import RegisterUserUseCase
+from apps.authentication.application.use_cases.request_password_reset import (
+    RequestPasswordResetUseCase,
+)
 from apps.authentication.application.use_cases.verify_two_factor import (
     VerifyTwoFactorUseCase,
 )
 from apps.authentication.domain.exceptions import (
     DuplicateUserError,
     InvalidCredentialsError,
+    InvalidPasswordResetTokenError,
     InvalidRefreshTokenError,
     InvalidTwoFactorCodeError,
+    PasswordResetValidationError,
     RegistrationValidationError,
 )
 from apps.authentication.repositories import DjangoAuthRepository
@@ -119,6 +128,53 @@ class LogoutView(APIView):
             return Response({"detail": "The refresh token is invalid."}, status=400)
 
         return Response({"message": "Successfully logged out."}, status=200)
+
+
+class RequestPasswordResetView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        result = RequestPasswordResetUseCase(DjangoAuthRepository()).execute(
+            email=request.data.get("email", "")
+        )
+
+        if result is not None:
+            reset_link = (
+                f"{settings.FRONTEND_BASE_URL}/reset-password?token={result.token}"
+            )
+            send_email_task.delay(
+                result.email,
+                "Reset your Discord-Sim password",
+                f"Click the link below to reset your password:\n{reset_link}\n\n"
+                "If you didn't request this, you can safely ignore this email.",
+            )
+
+        # Anti-enumeration: this exact response is returned whether or not an
+        # account exists for the given email -- never branch the response on
+        # `result` here.
+        return Response(
+            {"message": "If an account exists, a reset link has been sent."},
+            status=200,
+        )
+
+
+class ConfirmPasswordResetView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            ConfirmPasswordResetUseCase(DjangoAuthRepository()).execute(
+                token=request.data.get("token", ""),
+                new_password=request.data.get("new_password", ""),
+            )
+        except InvalidPasswordResetTokenError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except PasswordResetValidationError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return Response(
+            {"message": "Your password has been reset successfully."}, status=200
+        )
 
 
 class TokenRefreshView(APIView):

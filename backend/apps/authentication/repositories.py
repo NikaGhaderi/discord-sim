@@ -72,3 +72,12 @@ class DjangoAuthRepository(AbstractAuthRepository):
 
     def is_refresh_token_blacklisted(self, token: str) -> bool:
         return self._auth_store.is_refresh_token_blacklisted(token)
+
+    def create_password_reset_token(self, user_id: int) -> str:
+        return self._auth_store.create_password_reset_token(user_id)
+
+    def consume_password_reset_token(self, token: str) -> int | None:
+        return self._auth_store.consume_password_reset_token(token)
+
+    def set_password(self, user_id: int, password_hash: str) -> None:
+        get_user_model().objects.filter(id=user_id).update(password=password_hash)
