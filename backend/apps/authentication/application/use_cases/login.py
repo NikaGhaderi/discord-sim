@@ -28,7 +28,13 @@ class LoginUseCase:
     def execute(
         self, username: str, raw_password: str
     ) -> AuthenticatedUser | Requires2FA:
-        user = self._repository.get_by_username(username)
+        # The login field accepts either a username or an email address (the
+        # frontend's field is labeled "Email" but the value is sent as
+        # `username` regardless) -- try an exact username match first, then
+        # fall back to treating it as an email.
+        user = self._repository.get_by_username(
+            username
+        ) or self._repository.get_by_email(username)
         if user is None or not check_password(raw_password, user.password_hash):
             raise InvalidCredentialsError("Invalid username or password.")
 
