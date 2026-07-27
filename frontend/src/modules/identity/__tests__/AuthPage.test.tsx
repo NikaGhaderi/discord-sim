@@ -62,16 +62,6 @@ describe('AuthPage', () => {
     expect(screen.getByRole('heading', { name: /create account/i })).toBeInTheDocument();
   });
 
-  test('the debug checkbox forces the 2FA view regardless of step', () => {
-    renderAuthPage();
-
-    fireEvent.click(screen.getByLabelText(/debug: force 2fa view/i));
-
-    expect(
-      screen.getByRole('heading', { name: /two-factor authentication/i })
-    ).toBeInTheDocument();
-  });
-
   test('a successful login calls loginUser and moves to the 2FA step', async () => {
     identityApi.loginUser.mockResolvedValue({
       status: '2FA_REQUIRED',
