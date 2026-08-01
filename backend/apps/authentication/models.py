@@ -13,4 +13,3 @@ class User(AbstractUser):
 
     email = models.EmailField(unique=True)
     is_2fa_enabled = models.BooleanField(default=True)
-    allow_group_invitations = models.BooleanField(default=True)
