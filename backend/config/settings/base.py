@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.authentication",
     "apps.permissions",
     "apps.users",
+    "apps.private_spaces",
     "apps.messaging",
     "apps.notifications",
 ]

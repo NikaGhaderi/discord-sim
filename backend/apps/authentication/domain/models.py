@@ -8,7 +8,7 @@ from datetime import datetime
 
 @dataclass
 class UserEntity:
-    """Mirrors the USER table in the ERD, plus the 2FA flag this module owns."""
+    """Mirrors the USER table in the ERD, + the 2FA flag this module owns."""
 
     username: str
     email: str
