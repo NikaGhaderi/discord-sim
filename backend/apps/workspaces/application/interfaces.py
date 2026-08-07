@@ -42,6 +42,9 @@ class AbstractChannelRepository(ABC):
     def create_topic(self, channel_id: int, title: str) -> TopicEntity: ...
 
     @abstractmethod
+    def list_topics(self, channel_id: int) -> list[TopicEntity]: ...
+
+    @abstractmethod
     def delete_topic(self, topic_id: int) -> None: ...
 
     @abstractmethod

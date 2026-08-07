@@ -85,6 +85,9 @@ class InMemoryChannelRepository(AbstractChannelRepository):
             raise TopicNotFoundError("Topic not found.")
         return topic
 
+    def list_topics(self, channel_id: int) -> list[TopicEntity]:
+        return [t for t in self._topics.values() if t.channel_id == channel_id]
+
     def list_channels_for_user(self, user_id: int) -> list[ChannelEntity]:
         member_channel_ids = {
             m.channel_id for m in self._members.values() if m.user_id == user_id

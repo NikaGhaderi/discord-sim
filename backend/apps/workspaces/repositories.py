@@ -134,6 +134,10 @@ class DjangoChannelRepository(AbstractChannelRepository):
             raise TopicNotFoundError("Topic not found.") from exc
         return _to_topic_entity(topic)
 
+    def list_topics(self, channel_id: int) -> list[TopicEntity]:
+        topics = Topic.objects.filter(channel_id=channel_id)
+        return [_to_topic_entity(t) for t in topics]
+
     def list_channels_for_user(self, user_id: int) -> list[ChannelEntity]:
         channels = Channel.objects.filter(members__user_id=user_id)
         return [_to_channel_entity(c) for c in channels]

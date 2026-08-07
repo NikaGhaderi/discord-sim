@@ -23,6 +23,7 @@ from apps.workspaces.application.use_cases.leave_channel import LeaveChannelUseC
 from apps.workspaces.application.use_cases.list_channels import ListChannelsUseCase
 from apps.workspaces.application.use_cases.list_members import ListMembersUseCase
 from apps.workspaces.application.use_cases.list_roles import ListRolesUseCase
+from apps.workspaces.application.use_cases.list_topics import ListTopicsUseCase
 from apps.workspaces.application.use_cases.update_channel import UpdateChannelUseCase
 from apps.workspaces.application.use_cases.update_member_nickname import (
     UpdateMemberNicknameUseCase,
@@ -148,7 +149,11 @@ class ChannelListView(APIView):
 class ChannelTopics(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, channel_id, topic_id):
+    def get(self, request, channel_id, topic_id=None):
+        if topic_id is None:
+            topics = ListTopicsUseCase(DjangoChannelRepository()).execute(channel_id)
+            return Response(TopicSerializer(topics, many=True).data, status=200)
+
         try:
             topic = GetTopicUseCase(DjangoChannelRepository()).execute(topic_id)
         except TopicNotFoundError:
