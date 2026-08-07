@@ -22,12 +22,19 @@ from apps.workspaces.application.use_cases.leave_channel import LeaveChannelUseC
 from apps.workspaces.application.use_cases.list_channels import ListChannelsUseCase
 from apps.workspaces.application.use_cases.update_channel import UpdateChannelUseCase
 from apps.workspaces.application.use_cases.update_role import UpdateRoleUseCase
+from apps.workspaces.application.use_cases.list_members import ListMembersUseCase
+from apps.workspaces.application.use_cases.list_roles import ListRolesUseCase
+from apps.workspaces.application.use_cases.update_member_nickname import (
+    UpdateMemberNicknameUseCase,
+)
 from apps.workspaces.domain.exceptions import (
     AlreadyChannelMemberError,
+    CannotKickChannelOwnerError,
     ChannelMemberNotFoundError,
     ChannelNotFoundError,
     ChannelRoleNotFoundError,
     DuplicateRoleNameError,
+    InsufficientPermissionsError,
     InvalidPermissionCodeError,
     LastTopicDeletionError,
     OwnerRoleImmutableError,
@@ -39,6 +46,17 @@ from apps.workspaces.tests.fakes import InMemoryChannelRepository
 
 def make_channel(repo, creator_id=1, name="general-chat"):
     return CreateChannelUseCase(repo).execute(creator_id=creator_id, name=name)
+
+
+def grant_role(repo, channel, user_id, permissions, requester_id=None, name=None):
+    """Create a role with the given permissions and assign it to user_id,
+    acting as the channel's owner (or an explicit requester) by default so
+    the grant itself doesn't trip the new subset check."""
+    requester_id = channel.creator_id if requester_id is None else requester_id
+    name = name or f"role-for-{user_id}-{'-'.join(sorted(permissions)) or 'none'}"
+    role = CreateRoleUseCase(repo).execute(channel.id, requester_id, name, permissions)
+    AssignRoleUseCase(repo).execute(channel.id, requester_id, user_id, role.id)
+    return role
 
 
 class TestCreateChannelUseCase:
@@ -241,7 +259,7 @@ class TestJoinChannelUseCase:
         channel = make_channel(repo, creator_id=1)
         everyone_role = repo.get_role_by_name(channel.id, EVERYONE_ROLE_NAME)
         UpdateRoleUseCase(repo).execute(
-            everyone_role.id, [PermissionCode.SEND_MEDIA.value]
+            everyone_role.id, 1, [PermissionCode.SEND_MEDIA.value]
         )
 
         JoinChannelUseCase(repo).execute(channel.id, user_id=2)
@@ -357,7 +375,10 @@ class TestCreateRoleUseCase:
         channel = make_channel(repo)
 
         role = CreateRoleUseCase(repo).execute(
-            channel.id, "Moderator", [PermissionCode.KICK_MEMBERS.value]
+            channel.id,
+            channel.creator_id,
+            "Moderator",
+            [PermissionCode.KICK_MEMBERS.value],
         )
 
         assert role.name == "Moderator"
@@ -368,7 +389,9 @@ class TestCreateRoleUseCase:
         channel = make_channel(repo)
 
         with pytest.raises(InvalidPermissionCodeError):
-            CreateRoleUseCase(repo).execute(channel.id, "Bad", ["NOT_REAL", "ALSO_BAD"])
+            CreateRoleUseCase(repo).execute(
+                channel.id, channel.creator_id, "Bad", ["NOT_REAL", "ALSO_BAD"]
+            )
 
     def test_rejects_partially_invalid_permission_list(self):
         repo = InMemoryChannelRepository()
@@ -377,6 +400,7 @@ class TestCreateRoleUseCase:
         with pytest.raises(InvalidPermissionCodeError):
             CreateRoleUseCase(repo).execute(
                 channel.id,
+                channel.creator_id,
                 "Mixed",
                 [PermissionCode.KICK_MEMBERS.value, "NOT_REAL"],
             )
@@ -384,30 +408,79 @@ class TestCreateRoleUseCase:
     def test_duplicate_role_name_in_same_channel_raises(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo)
-        CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        CreateRoleUseCase(repo).execute(channel.id, channel.creator_id, "Moderator", [])
 
         with pytest.raises(DuplicateRoleNameError):
-            CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+            CreateRoleUseCase(repo).execute(
+                channel.id, channel.creator_id, "Moderator", []
+            )
 
     def test_same_role_name_allowed_in_different_channels(self):
         repo = InMemoryChannelRepository()
         first = make_channel(repo, creator_id=1, name="a")
         second = make_channel(repo, creator_id=1, name="b")
-        CreateRoleUseCase(repo).execute(first.id, "Moderator", [])
+        CreateRoleUseCase(repo).execute(first.id, 1, "Moderator", [])
 
-        role = CreateRoleUseCase(repo).execute(second.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(second.id, 1, "Moderator", [])
 
         assert role.channel_id == second.id
+
+    def test_requester_without_the_permission_cannot_grant_it(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        # Give user 2 MANAGE_ROLES only -- not KICK_MEMBERS.
+        grant_role(repo, channel, 2, [PermissionCode.MANAGE_ROLES.value])
+
+        with pytest.raises(InsufficientPermissionsError):
+            CreateRoleUseCase(repo).execute(
+                channel.id, 2, "Escalated", [PermissionCode.KICK_MEMBERS.value]
+            )
+
+    def test_requester_holding_the_permission_can_grant_it(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(
+            repo,
+            channel,
+            2,
+            [PermissionCode.MANAGE_ROLES.value, PermissionCode.KICK_MEMBERS.value],
+        )
+
+        role = CreateRoleUseCase(repo).execute(
+            channel.id, 2, "Mod", [PermissionCode.KICK_MEMBERS.value]
+        )
+
+        assert role.permissions == [PermissionCode.KICK_MEMBERS.value]
+
+    def test_owner_can_create_role_with_any_subset(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+
+        role = CreateRoleUseCase(repo).execute(
+            channel.id,
+            channel.creator_id,
+            "Anything",
+            [PermissionCode.KICK_MEMBERS.value, PermissionCode.MANAGE_CHANNEL.value],
+        )
+
+        assert set(role.permissions) == {
+            PermissionCode.KICK_MEMBERS.value,
+            PermissionCode.MANAGE_CHANNEL.value,
+        }
 
 
 class TestUpdateRoleUseCase:
     def test_updates_permissions(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo)
-        role = CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(
+            channel.id, channel.creator_id, "Moderator", []
+        )
 
         updated = UpdateRoleUseCase(repo).execute(
-            role.id, [PermissionCode.DELETE_MESSAGES.value]
+            role.id, channel.creator_id, [PermissionCode.DELETE_MESSAGES.value]
         )
 
         assert updated.permissions == [PermissionCode.DELETE_MESSAGES.value]
@@ -415,26 +488,72 @@ class TestUpdateRoleUseCase:
     def test_rejects_fully_invalid_permission_list(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo)
-        role = CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(
+            channel.id, channel.creator_id, "Moderator", []
+        )
 
         with pytest.raises(InvalidPermissionCodeError):
-            UpdateRoleUseCase(repo).execute(role.id, ["NOT_REAL"])
+            UpdateRoleUseCase(repo).execute(role.id, channel.creator_id, ["NOT_REAL"])
 
     def test_rejects_partially_invalid_permission_list(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo)
-        role = CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(
+            channel.id, channel.creator_id, "Moderator", []
+        )
 
         with pytest.raises(InvalidPermissionCodeError):
             UpdateRoleUseCase(repo).execute(
-                role.id, [PermissionCode.KICK_MEMBERS.value, "NOT_REAL"]
+                role.id,
+                channel.creator_id,
+                [PermissionCode.KICK_MEMBERS.value, "NOT_REAL"],
             )
 
     def test_raises_for_unknown_role(self):
         repo = InMemoryChannelRepository()
 
         with pytest.raises(ChannelRoleNotFoundError):
-            UpdateRoleUseCase(repo).execute(999, [])
+            UpdateRoleUseCase(repo).execute(999, 1, [])
+
+    def test_requester_without_the_permission_cannot_grant_it_on_update(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(repo, channel, 2, [PermissionCode.MANAGE_ROLES.value])
+        role = CreateRoleUseCase(repo).execute(channel.id, 1, "Mod", [])
+
+        with pytest.raises(InsufficientPermissionsError):
+            UpdateRoleUseCase(repo).execute(
+                role.id, 2, [PermissionCode.KICK_MEMBERS.value]
+            )
+
+    def test_requester_holding_the_permission_can_grant_it_on_update(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(
+            repo,
+            channel,
+            2,
+            [PermissionCode.MANAGE_ROLES.value, PermissionCode.KICK_MEMBERS.value],
+        )
+        role = CreateRoleUseCase(repo).execute(channel.id, 1, "Mod", [])
+
+        updated = UpdateRoleUseCase(repo).execute(
+            role.id, 2, [PermissionCode.KICK_MEMBERS.value]
+        )
+
+        assert updated.permissions == [PermissionCode.KICK_MEMBERS.value]
+
+    def test_updating_owner_role_raises_immutable_regardless_of_requester(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+
+        # Even the owner themself, granting an empty (trivially satisfiable)
+        # permission set, cannot edit the Owner role.
+        with pytest.raises(OwnerRoleImmutableError):
+            UpdateRoleUseCase(repo).execute(owner_role.id, 1, [])
 
 
 class TestDeleteRoleUseCase:
@@ -459,7 +578,9 @@ class TestDeleteRoleUseCase:
     def test_allows_deleting_a_custom_role(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo)
-        role = CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(
+            channel.id, channel.creator_id, "Moderator", []
+        )
 
         DeleteRoleUseCase(repo).execute(role.id)
 
@@ -479,10 +600,10 @@ class TestAssignRoleUseCase:
         channel = make_channel(repo, creator_id=1)
         JoinChannelUseCase(repo).execute(channel.id, user_id=2)
         role = CreateRoleUseCase(repo).execute(
-            channel.id, "Moderator", [PermissionCode.KICK_MEMBERS.value]
+            channel.id, 1, "Moderator", [PermissionCode.KICK_MEMBERS.value]
         )
 
-        AssignRoleUseCase(repo).execute(channel.id, 2, role.id)
+        AssignRoleUseCase(repo).execute(channel.id, 1, 2, role.id)
 
         assert PermissionCode.KICK_MEMBERS.value in repo.get_user_permissions(
             channel.id, 2
@@ -491,20 +612,20 @@ class TestAssignRoleUseCase:
     def test_raises_for_non_member(self):
         repo = InMemoryChannelRepository()
         channel = make_channel(repo, creator_id=1)
-        role = CreateRoleUseCase(repo).execute(channel.id, "Moderator", [])
+        role = CreateRoleUseCase(repo).execute(channel.id, 1, "Moderator", [])
 
         with pytest.raises(ChannelMemberNotFoundError):
-            AssignRoleUseCase(repo).execute(channel.id, 999, role.id)
+            AssignRoleUseCase(repo).execute(channel.id, 1, 999, role.id)
 
     def test_raises_for_role_belonging_to_a_different_channel(self):
         repo = InMemoryChannelRepository()
         first = make_channel(repo, creator_id=1, name="a")
         second = make_channel(repo, creator_id=1, name="b")
         JoinChannelUseCase(repo).execute(second.id, user_id=2)
-        role_in_first = CreateRoleUseCase(repo).execute(first.id, "Moderator", [])
+        role_in_first = CreateRoleUseCase(repo).execute(first.id, 1, "Moderator", [])
 
         with pytest.raises(ChannelRoleNotFoundError):
-            AssignRoleUseCase(repo).execute(second.id, 2, role_in_first.id)
+            AssignRoleUseCase(repo).execute(second.id, 1, 2, role_in_first.id)
 
     def test_raises_for_unknown_role(self):
         repo = InMemoryChannelRepository()
@@ -512,7 +633,63 @@ class TestAssignRoleUseCase:
         JoinChannelUseCase(repo).execute(channel.id, user_id=2)
 
         with pytest.raises(ChannelRoleNotFoundError):
-            AssignRoleUseCase(repo).execute(channel.id, 2, 999)
+            AssignRoleUseCase(repo).execute(channel.id, 1, 2, 999)
+
+    def test_manage_roles_only_requester_cannot_assign_the_owner_role(self):
+        """The exact escalation vector this change closes: holding only
+        MANAGE_ROLES must not let you hand out the pre-existing, all-
+        permissions Owner role to anyone -- including yourself."""
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(repo, channel, 2, [PermissionCode.MANAGE_ROLES.value])
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+
+        with pytest.raises(InsufficientPermissionsError):
+            AssignRoleUseCase(repo).execute(channel.id, 2, 2, owner_role.id)
+
+    def test_manage_roles_only_requester_cannot_assign_owner_role_to_someone_else(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=3)
+        grant_role(repo, channel, 2, [PermissionCode.MANAGE_ROLES.value])
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+
+        with pytest.raises(InsufficientPermissionsError):
+            AssignRoleUseCase(repo).execute(channel.id, 2, 3, owner_role.id)
+
+    def test_manage_roles_only_requester_cannot_assign_role_with_permissions_they_lack(
+        self,
+    ):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(repo, channel, 2, [PermissionCode.MANAGE_ROLES.value])
+        kick_role = CreateRoleUseCase(repo).execute(
+            channel.id, 1, "Kicker", [PermissionCode.KICK_MEMBERS.value]
+        )
+
+        with pytest.raises(InsufficientPermissionsError):
+            AssignRoleUseCase(repo).execute(channel.id, 2, 2, kick_role.id)
+
+    def test_requester_holding_the_role_permissions_can_assign_it(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        grant_role(
+            repo,
+            channel,
+            2,
+            [PermissionCode.MANAGE_ROLES.value, PermissionCode.KICK_MEMBERS.value],
+        )
+        kick_role = CreateRoleUseCase(repo).execute(
+            channel.id, 1, "Kicker", [PermissionCode.KICK_MEMBERS.value]
+        )
+
+        result = AssignRoleUseCase(repo).execute(channel.id, 2, 2, kick_role.id)
+
+        assert result.role_id == kick_role.id
 
 
 class TestGetUserPermissionsUnion:
@@ -531,9 +708,9 @@ class TestGetUserPermissionsUnion:
         channel = make_channel(repo, creator_id=1)
         JoinChannelUseCase(repo).execute(channel.id, user_id=2)
         role = CreateRoleUseCase(repo).execute(
-            channel.id, "Moderator", [PermissionCode.KICK_MEMBERS.value]
+            channel.id, 1, "Moderator", [PermissionCode.KICK_MEMBERS.value]
         )
-        AssignRoleUseCase(repo).execute(channel.id, 2, role.id)
+        AssignRoleUseCase(repo).execute(channel.id, 1, 2, role.id)
         DeleteRoleUseCase(repo).execute(
             repo.get_role_by_name(channel.id, EVERYONE_ROLE_NAME).id
         )
@@ -548,16 +725,18 @@ class TestGetUserPermissionsUnion:
         JoinChannelUseCase(repo).execute(channel.id, user_id=2)
         role_a = CreateRoleUseCase(repo).execute(
             channel.id,
+            1,
             "RoleA",
             [PermissionCode.KICK_MEMBERS.value, PermissionCode.SEND_MEDIA.value],
         )
         role_b = CreateRoleUseCase(repo).execute(
             channel.id,
+            1,
             "RoleB",
             [PermissionCode.SEND_MEDIA.value, PermissionCode.DELETE_MESSAGES.value],
         )
-        AssignRoleUseCase(repo).execute(channel.id, 2, role_a.id)
-        AssignRoleUseCase(repo).execute(channel.id, 2, role_b.id)
+        AssignRoleUseCase(repo).execute(channel.id, 1, 2, role_a.id)
+        AssignRoleUseCase(repo).execute(channel.id, 1, 2, role_b.id)
         DeleteRoleUseCase(repo).execute(
             repo.get_role_by_name(channel.id, EVERYONE_ROLE_NAME).id
         )
@@ -572,3 +751,161 @@ class TestGetUserPermissionsUnion:
             }
         )
         assert len(result) == len(set(result))
+
+
+class TestOwnerRolePermissionsAreLive:
+    def test_get_role_always_returns_full_current_catalog(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+
+        # Mutate the stored permissions directly (bypassing update_role,
+        # which blocks Owner edits) to prove reads don't trust storage.
+        repo._roles[owner_role.id].permissions = []
+
+        refetched = repo.get_role(owner_role.id)
+        assert refetched.permissions == [code.value for code in PermissionCode]
+
+    def test_get_role_by_name_returns_full_current_catalog(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+        repo._roles[owner_role.id].permissions = []
+
+        refetched = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+        assert refetched.permissions == [code.value for code in PermissionCode]
+
+    def test_list_roles_returns_full_current_catalog_for_owner(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+        repo._roles[owner_role.id].permissions = []
+
+        roles = ListRolesUseCase(repo).execute(channel.id)
+
+        owner_from_list = next(r for r in roles if r.name == OWNER_ROLE_NAME)
+        assert owner_from_list.permissions == [code.value for code in PermissionCode]
+
+    def test_get_user_permissions_reflects_live_owner_permissions(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        owner_role = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+        repo._roles[owner_role.id].permissions = []
+
+        assert set(repo.get_user_permissions(channel.id, 1)) == {
+            code.value for code in PermissionCode
+        }
+
+
+class TestListMembersUseCase:
+    def test_returns_all_members_of_the_channel(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=3)
+
+        members = ListMembersUseCase(repo).execute(channel.id)
+
+        assert {m.user_id for m in members} == {1, 2, 3}
+
+    def test_returns_empty_list_for_channel_with_no_extra_members(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        repo.remove_member(channel.id, 1)
+
+        members = ListMembersUseCase(repo).execute(channel.id)
+
+        assert members == []
+
+    def test_does_not_include_members_of_other_channels(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1, name="a")
+        other = make_channel(repo, creator_id=9, name="b")
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+
+        members = ListMembersUseCase(repo).execute(other.id)
+
+        assert {m.user_id for m in members} == {9}
+
+
+class TestListRolesUseCase:
+    def test_returns_all_roles_for_the_channel(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        CreateRoleUseCase(repo).execute(channel.id, 1, "Moderator", [])
+
+        roles = ListRolesUseCase(repo).execute(channel.id)
+
+        assert {r.name for r in roles} == {
+            OWNER_ROLE_NAME,
+            EVERYONE_ROLE_NAME,
+            "Moderator",
+        }
+
+    def test_returns_empty_list_when_channel_has_no_deletable_roles_left(self):
+        """Owner is undeletable, so "no roles" in practice means "no roles
+        other than Owner" -- assert list_roles reflects deletions and still
+        surfaces the live Owner role."""
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        for role in list(ListRolesUseCase(repo).execute(channel.id)):
+            if role.name == OWNER_ROLE_NAME:
+                continue
+            DeleteRoleUseCase(repo).execute(role.id)
+
+        remaining = ListRolesUseCase(repo).execute(channel.id)
+        assert {r.name for r in remaining} == {OWNER_ROLE_NAME}
+
+    def test_does_not_include_roles_from_other_channels(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1, name="a")
+        other = make_channel(repo, creator_id=1, name="b")
+        CreateRoleUseCase(repo).execute(channel.id, 1, "OnlyInA", [])
+
+        roles = ListRolesUseCase(repo).execute(other.id)
+
+        assert "OnlyInA" not in {r.name for r in roles}
+
+
+class TestUpdateMemberNicknameUseCase:
+    def test_updates_and_persists_the_nickname(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+
+        updated = UpdateMemberNicknameUseCase(repo).execute(channel.id, 2, "new-nick")
+
+        assert updated.nickname_in_channel == "new-nick"
+        assert (
+            repo.list_members(channel.id)[
+                [m.user_id for m in repo.list_members(channel.id)].index(2)
+            ].nickname_in_channel
+            == "new-nick"
+        )
+
+    def test_raises_for_non_member(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+
+        with pytest.raises(ChannelMemberNotFoundError):
+            UpdateMemberNicknameUseCase(repo).execute(channel.id, 999, "nick")
+
+
+class TestKickMemberUseCaseOwnerProtection:
+    def test_cannot_kick_the_channel_creator(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+
+        with pytest.raises(CannotKickChannelOwnerError):
+            KickMemberUseCase(repo).execute(channel.id, 1)
+
+        assert repo.is_member(channel.id, 1)
+
+    def test_can_still_kick_a_non_creator_member(self):
+        repo = InMemoryChannelRepository()
+        channel = make_channel(repo, creator_id=1)
+        JoinChannelUseCase(repo).execute(channel.id, user_id=2)
+
+        KickMemberUseCase(repo).execute(channel.id, user_id=2)
+
+        assert not repo.is_member(channel.id, 2)

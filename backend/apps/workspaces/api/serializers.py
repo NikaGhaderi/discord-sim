@@ -67,3 +67,7 @@ class UserChannelRoleSerializer(serializers.Serializer):
 
 class AssignRoleSerializer(serializers.Serializer):
     role_id = serializers.IntegerField()
+
+
+class UpdateNicknameSerializer(serializers.Serializer):
+    nickname_in_channel = serializers.CharField(allow_blank=True)

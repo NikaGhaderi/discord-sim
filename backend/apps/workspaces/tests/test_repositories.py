@@ -1,6 +1,7 @@
 import pytest
 
 from apps.authentication.models import User
+from apps.permissions.domain.permissions import PermissionCode
 from apps.workspaces.domain.exceptions import (
     AlreadyChannelMemberError,
     ChannelMemberNotFoundError,
@@ -10,7 +11,7 @@ from apps.workspaces.domain.exceptions import (
     OwnerRoleImmutableError,
     TopicNotFoundError,
 )
-from apps.workspaces.domain.roles import OWNER_ROLE_NAME
+from apps.workspaces.domain.roles import EVERYONE_ROLE_NAME, OWNER_ROLE_NAME
 from apps.workspaces.repositories import DjangoChannelRepository
 
 
@@ -230,3 +231,138 @@ class TestRoles:
             {"KICK_MEMBERS", "SEND_MEDIA", "DELETE_MESSAGES"}
         )
         assert len(result) == len(set(result))
+
+    def test_update_role_blocks_owner_role(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        owner_role = repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+
+        with pytest.raises(OwnerRoleImmutableError):
+            repo.update_role(owner_role.id, ["KICK_MEMBERS"])
+
+
+@pytest.mark.django_db
+class TestOwnerRolePermissionsAreLive:
+    def test_get_role_ignores_stored_permissions_for_owner(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        # Persist an Owner row with a deliberately stale/empty permission
+        # list -- reads must still report the full, current catalog.
+        owner_role = repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+
+        refetched = repo.get_role(owner_role.id)
+
+        assert set(refetched.permissions) == {code.value for code in PermissionCode}
+
+    def test_get_role_by_name_ignores_stored_permissions_for_owner(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+
+        refetched = repo.get_role_by_name(channel.id, OWNER_ROLE_NAME)
+
+        assert set(refetched.permissions) == {code.value for code in PermissionCode}
+
+    def test_list_roles_reports_live_owner_permissions(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+        repo.create_role(channel.id, "Moderator", ["KICK_MEMBERS"])
+
+        roles = repo.list_roles(channel.id)
+
+        owner = next(r for r in roles if r.name == OWNER_ROLE_NAME)
+        moderator = next(r for r in roles if r.name == "Moderator")
+        assert set(owner.permissions) == {code.value for code in PermissionCode}
+        assert moderator.permissions == ["KICK_MEMBERS"]
+
+    def test_get_user_permissions_reports_live_owner_permissions(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        owner_role = repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+        repo.add_member(channel.id, users[0].id)
+        repo.assign_role(channel.id, users[0].id, owner_role.id)
+
+        result = repo.get_user_permissions(channel.id, users[0].id)
+
+        assert set(result) == {code.value for code in PermissionCode}
+
+    def test_non_owner_role_permissions_are_not_live(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        role = repo.create_role(channel.id, "Moderator", ["KICK_MEMBERS"])
+
+        refetched = repo.get_role(role.id)
+
+        assert refetched.permissions == ["KICK_MEMBERS"]
+
+
+@pytest.mark.django_db
+class TestListMembers:
+    def test_returns_all_members(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        repo.add_member(channel.id, users[0].id)
+        repo.add_member(channel.id, users[1].id)
+
+        members = repo.list_members(channel.id)
+
+        assert {m.user_id for m in members} == {users[0].id, users[1].id}
+
+    def test_returns_empty_list_for_channel_with_no_members(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+
+        assert repo.list_members(channel.id) == []
+
+    def test_does_not_include_members_of_other_channels(self, repo, users):
+        channel = repo.create_channel("a", users[0].id)
+        other = repo.create_channel("b", users[1].id)
+        repo.add_member(channel.id, users[0].id)
+        repo.add_member(other.id, users[1].id)
+
+        members = repo.list_members(channel.id)
+
+        assert {m.user_id for m in members} == {users[0].id}
+
+
+@pytest.mark.django_db
+class TestUpdateMemberNickname:
+    def test_updates_and_persists_nickname(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        repo.add_member(channel.id, users[0].id, "old-nick")
+
+        updated = repo.update_member_nickname(channel.id, users[0].id, "new-nick")
+
+        assert updated.nickname_in_channel == "new-nick"
+        refetched = repo.list_members(channel.id)[0]
+        assert refetched.nickname_in_channel == "new-nick"
+
+    def test_raises_for_non_member(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+
+        with pytest.raises(ChannelMemberNotFoundError):
+            repo.update_member_nickname(channel.id, users[1].id, "nick")
+
+
+@pytest.mark.django_db
+class TestListRoles:
+    def test_returns_all_roles_for_channel(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+        repo.create_role(channel.id, OWNER_ROLE_NAME, [])
+        repo.create_role(channel.id, EVERYONE_ROLE_NAME, [])
+        repo.create_role(channel.id, "Moderator", [])
+
+        roles = repo.list_roles(channel.id)
+
+        assert {r.name for r in roles} == {
+            OWNER_ROLE_NAME,
+            EVERYONE_ROLE_NAME,
+            "Moderator",
+        }
+
+    def test_returns_empty_list_when_channel_has_no_roles(self, repo, users):
+        channel = repo.create_channel("general", users[0].id)
+
+        assert repo.list_roles(channel.id) == []
+
+    def test_does_not_include_roles_from_other_channels(self, repo, users):
+        channel = repo.create_channel("a", users[0].id)
+        other = repo.create_channel("b", users[0].id)
+        repo.create_role(channel.id, "OnlyInA", [])
+
+        roles = repo.list_roles(other.id)
+
+        assert "OnlyInA" not in {r.name for r in roles}

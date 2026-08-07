@@ -27,6 +27,11 @@ urlpatterns = [
         name="channel-invite-join",
     ),
     path(
+        "api/channels/<int:channel_id>/members/",
+        views.ChannelMemberListView.as_view(),
+        name="channel-member-list",
+    ),
+    path(
         "api/channels/<int:channel_id>/members/<int:user_id>/",
         views.ChannelMemberDetailView.as_view(),
         name="channel-member-detail",

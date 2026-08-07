@@ -21,15 +21,22 @@ from apps.workspaces.application.use_cases.join_channel_by_invite_token import (
 from apps.workspaces.application.use_cases.kick_member import KickMemberUseCase
 from apps.workspaces.application.use_cases.leave_channel import LeaveChannelUseCase
 from apps.workspaces.application.use_cases.list_channels import ListChannelsUseCase
+from apps.workspaces.application.use_cases.list_members import ListMembersUseCase
+from apps.workspaces.application.use_cases.list_roles import ListRolesUseCase
 from apps.workspaces.application.use_cases.update_channel import UpdateChannelUseCase
+from apps.workspaces.application.use_cases.update_member_nickname import (
+    UpdateMemberNicknameUseCase,
+)
 from apps.workspaces.application.use_cases.update_role import UpdateRoleUseCase
 
 from apps.workspaces.domain.exceptions import (
     AlreadyChannelMemberError,
+    CannotKickChannelOwnerError,
     ChannelMemberNotFoundError,
     ChannelNotFoundError,
     ChannelRoleNotFoundError,
     DuplicateRoleNameError,
+    InsufficientPermissionsError,
     InvalidPermissionCodeError,
     LastTopicDeletionError,
     OwnerRoleImmutableError,
@@ -48,6 +55,7 @@ from .serializers import (
     JoinChannelSerializer,
     TopicSerializer,
     UpdateChannelSerializer,
+    UpdateNicknameSerializer,
     UpdateRoleSerializer,
     UserChannelRoleSerializer,
 )
@@ -229,6 +237,14 @@ class ChannelLeaveView(APIView):
         return Response(status=204)
 
 
+class ChannelMemberListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, channel_id):
+        members = ListMembersUseCase(DjangoChannelRepository()).execute(channel_id)
+        return Response(ChannelMemberSerializer(members, many=True).data, status=200)
+
+
 class ChannelMemberDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -241,12 +257,37 @@ class ChannelMemberDetailView(APIView):
             KickMemberUseCase(DjangoChannelRepository()).execute(channel_id, user_id)
         except ChannelMemberNotFoundError:
             return _member_not_found_response()
+        except CannotKickChannelOwnerError as exc:
+            return Response({"detail": str(exc)}, status=403)
 
         return Response(status=204)
+
+    def patch(self, request, channel_id, user_id):
+        # Self-service only -- a member may rename themselves, nobody else.
+        if request.user.id != user_id:
+            return Response(
+                {"detail": "You can only update your own nickname."}, status=403
+            )
+
+        serializer = UpdateNicknameSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            member = UpdateMemberNicknameUseCase(DjangoChannelRepository()).execute(
+                channel_id, user_id, **serializer.validated_data
+            )
+        except ChannelMemberNotFoundError:
+            return _member_not_found_response()
+
+        return Response(ChannelMemberSerializer(member).data, status=200)
 
 
 class ChannelRoleListView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, channel_id):
+        roles = ListRolesUseCase(DjangoChannelRepository()).execute(channel_id)
+        return Response(ChannelRoleSerializer(roles, many=True).data, status=200)
 
     @require_permission(
         code=PermissionCode.MANAGE_ROLES,
@@ -258,10 +299,12 @@ class ChannelRoleListView(APIView):
 
         try:
             role = CreateRoleUseCase(DjangoChannelRepository()).execute(
-                channel_id, **serializer.validated_data
+                channel_id, requester_id=request.user.id, **serializer.validated_data
             )
         except InvalidPermissionCodeError as exc:
             return Response({"detail": str(exc)}, status=400)
+        except InsufficientPermissionsError as exc:
+            return Response({"detail": str(exc)}, status=403)
         except DuplicateRoleNameError as exc:
             return Response({"detail": str(exc)}, status=409)
 
@@ -281,12 +324,16 @@ class ChannelRoleDetailView(APIView):
 
         try:
             role = UpdateRoleUseCase(DjangoChannelRepository()).execute(
-                role_id, **serializer.validated_data
+                role_id, requester_id=request.user.id, **serializer.validated_data
             )
         except ChannelRoleNotFoundError:
             return _role_not_found_response()
         except InvalidPermissionCodeError as exc:
             return Response({"detail": str(exc)}, status=400)
+        except InsufficientPermissionsError as exc:
+            return Response({"detail": str(exc)}, status=403)
+        except OwnerRoleImmutableError as exc:
+            return Response({"detail": str(exc)}, status=403)
 
         return Response(ChannelRoleSerializer(role).data, status=200)
 
@@ -318,11 +365,16 @@ class ChannelMemberRoleView(APIView):
 
         try:
             user_role = AssignRoleUseCase(DjangoChannelRepository()).execute(
-                channel_id, user_id, **serializer.validated_data
+                channel_id,
+                requester_id=request.user.id,
+                user_id=user_id,
+                **serializer.validated_data,
             )
         except ChannelMemberNotFoundError:
             return _member_not_found_response()
         except ChannelRoleNotFoundError:
             return _role_not_found_response()
+        except InsufficientPermissionsError as exc:
+            return Response({"detail": str(exc)}, status=403)
 
         return Response(UserChannelRoleSerializer(user_role).data, status=201)

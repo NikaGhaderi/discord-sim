@@ -65,6 +65,15 @@ class AbstractChannelRepository(ABC):
     @abstractmethod
     def is_member(self, channel_id: int, user_id: int) -> bool: ...
 
+    @abstractmethod
+    def list_members(self, channel_id: int) -> list[ChannelMemberEntity]: ...
+
+    @abstractmethod
+    def update_member_nickname(
+        self, channel_id: int, user_id: int, nickname_in_channel: str
+    ) -> ChannelMemberEntity:
+        """Raises ChannelMemberNotFoundError if user_id isn't a member."""
+
     # -- Roles --
 
     @abstractmethod
@@ -78,13 +87,16 @@ class AbstractChannelRepository(ABC):
         """Raises ChannelRoleNotFoundError if role_id doesn't exist."""
 
     @abstractmethod
+    def list_roles(self, channel_id: int) -> list[ChannelRoleEntity]: ...
+
+    @abstractmethod
     def get_role_by_name(
         self, channel_id: int, name: str
     ) -> ChannelRoleEntity | None: ...
 
     @abstractmethod
     def update_role(self, role_id: int, permissions: list[str]) -> ChannelRoleEntity:
-        """Raises ChannelRoleNotFoundError if role_id doesn't exist."""
+        """Raises ChannelRoleNotFoundError or OwnerRoleImmutableError."""
 
     @abstractmethod
     def delete_role(self, role_id: int) -> None:

@@ -31,6 +31,7 @@ from apps.workspaces.domain.models import (
     UserChannelRoleEntity,
 )
 from apps.workspaces.domain.roles import OWNER_ROLE_NAME
+from apps.permissions.domain.permissions import PermissionCode
 
 
 def _to_channel_entity(django_channel) -> ChannelEntity:
@@ -64,11 +65,18 @@ def _to_member_entity(django_member) -> ChannelMemberEntity:
 
 
 def _to_role_entity(django_role) -> ChannelRoleEntity:
+    # The Owner role always grants the full, CURRENT permission catalog --
+    # live, not whatever was stored at channel-creation time -- so adding a
+    # new PermissionCode later doesn't require backfilling every channel.
+    if django_role.name == OWNER_ROLE_NAME:
+        permissions = [code.value for code in PermissionCode]
+    else:
+        permissions = list(django_role.permissions)
     return ChannelRoleEntity(
         id=django_role.id,
         channel_id=django_role.channel_id,
         name=django_role.name,
-        permissions=list(django_role.permissions),
+        permissions=permissions,
     )
 
 
@@ -209,6 +217,24 @@ class DjangoChannelRepository(AbstractChannelRepository):
             channel_id=channel_id, user_id=user_id
         ).exists()
 
+    def list_members(self, channel_id: int) -> list[ChannelMemberEntity]:
+        members = ChannelMember.objects.filter(channel_id=channel_id)
+        return [_to_member_entity(m) for m in members]
+
+    def update_member_nickname(
+        self, channel_id: int, user_id: int, nickname_in_channel: str
+    ) -> ChannelMemberEntity:
+        try:
+            member = ChannelMember.objects.get(channel_id=channel_id, user_id=user_id)
+        except ChannelMember.DoesNotExist as exc:
+            raise ChannelMemberNotFoundError(
+                "User is not a member of this channel."
+            ) from exc
+
+        member.nickname_in_channel = nickname_in_channel
+        member.save(update_fields=["nickname_in_channel"])
+        return _to_member_entity(member)
+
     # -- Roles --
 
     def create_role(
@@ -235,11 +261,18 @@ class DjangoChannelRepository(AbstractChannelRepository):
         role = ChannelRole.objects.filter(channel_id=channel_id, name=name).first()
         return _to_role_entity(role) if role else None
 
+    def list_roles(self, channel_id: int) -> list[ChannelRoleEntity]:
+        roles = ChannelRole.objects.filter(channel_id=channel_id)
+        return [_to_role_entity(r) for r in roles]
+
     def update_role(self, role_id: int, permissions: list[str]) -> ChannelRoleEntity:
         try:
             role = ChannelRole.objects.get(id=role_id)
         except ChannelRole.DoesNotExist as exc:
             raise ChannelRoleNotFoundError("Role not found.") from exc
+
+        if role.name == OWNER_ROLE_NAME:
+            raise OwnerRoleImmutableError("The Owner role cannot be edited.")
 
         role.permissions = permissions
         role.save(update_fields=["permissions"])
@@ -275,5 +308,5 @@ class DjangoChannelRepository(AbstractChannelRepository):
         )
         permissions: set[str] = set()
         for role in roles:
-            permissions.update(role.permissions)
+            permissions.update(_to_role_entity(role).permissions)
         return list(permissions)

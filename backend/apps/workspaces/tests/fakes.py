@@ -1,3 +1,4 @@
+from apps.permissions.domain.permissions import PermissionCode
 from apps.workspaces.application.interfaces import AbstractChannelRepository
 from apps.workspaces.domain.exceptions import (
     AlreadyChannelMemberError,
@@ -16,6 +17,19 @@ from apps.workspaces.domain.models import (
     UserChannelRoleEntity,
 )
 from apps.workspaces.domain.roles import OWNER_ROLE_NAME
+
+
+def _live_role(role: ChannelRoleEntity) -> ChannelRoleEntity:
+    """Mirrors DjangoChannelRepository: Owner's permissions are always the
+    full, current catalog, not whatever was stored at creation time."""
+    if role.name == OWNER_ROLE_NAME:
+        return ChannelRoleEntity(
+            id=role.id,
+            channel_id=role.channel_id,
+            name=role.name,
+            permissions=[code.value for code in PermissionCode],
+        )
+    return role
 
 
 class InMemoryChannelRepository(AbstractChannelRepository):
@@ -149,6 +163,18 @@ class InMemoryChannelRepository(AbstractChannelRepository):
             for m in self._members.values()
         )
 
+    def list_members(self, channel_id: int) -> list[ChannelMemberEntity]:
+        return [m for m in self._members.values() if m.channel_id == channel_id]
+
+    def update_member_nickname(
+        self, channel_id: int, user_id: int, nickname_in_channel: str
+    ) -> ChannelMemberEntity:
+        for member in self._members.values():
+            if member.channel_id == channel_id and member.user_id == user_id:
+                member.nickname_in_channel = nickname_in_channel
+                return member
+        raise ChannelMemberNotFoundError("User is not a member of this channel.")
+
     # -- roles -----------------------------------------------------------
 
     def create_role(
@@ -172,16 +198,25 @@ class InMemoryChannelRepository(AbstractChannelRepository):
         role = self._roles.get(role_id)
         if role is None:
             raise ChannelRoleNotFoundError("Role not found.")
-        return role
+        return _live_role(role)
 
     def get_role_by_name(self, channel_id: int, name: str) -> ChannelRoleEntity | None:
         for role in self._roles.values():
             if role.channel_id == channel_id and role.name == name:
-                return role
+                return _live_role(role)
         return None
 
+    def list_roles(self, channel_id: int) -> list[ChannelRoleEntity]:
+        return [
+            _live_role(r) for r in self._roles.values() if r.channel_id == channel_id
+        ]
+
     def update_role(self, role_id: int, permissions: list[str]) -> ChannelRoleEntity:
-        role = self.get_role(role_id)
+        role = self._roles.get(role_id)
+        if role is None:
+            raise ChannelRoleNotFoundError("Role not found.")
+        if role.name == OWNER_ROLE_NAME:
+            raise OwnerRoleImmutableError("The Owner role cannot be edited.")
         role.permissions = list(permissions)
         return role
 
@@ -221,5 +256,5 @@ class InMemoryChannelRepository(AbstractChannelRepository):
         for role_id in role_ids:
             role = self._roles.get(role_id)
             if role is not None:
-                permissions.update(role.permissions)
+                permissions.update(_live_role(role).permissions)
         return list(permissions)

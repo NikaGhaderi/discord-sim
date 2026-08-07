@@ -36,3 +36,11 @@ class InvalidPermissionCodeError(Exception):
 
 class InvalidInviteTokenError(Exception):
     """Raised when a channel invite token doesn't match any channel."""
+
+
+class InsufficientPermissionsError(Exception):
+    """Raised when a user tries to grant/assign a permission they don't hold."""
+
+
+class CannotKickChannelOwnerError(Exception):
+    """Raised when a user tries to kick the channel's creator/Owner."""
