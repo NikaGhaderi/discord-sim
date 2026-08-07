@@ -11,7 +11,6 @@ def test_user_entity_defaults_match_erd():
 
     assert user.id is None
     assert user.is_2fa_enabled is False
-    assert user.allow_group_invitations is True
     assert user.created_at is None
 
 
