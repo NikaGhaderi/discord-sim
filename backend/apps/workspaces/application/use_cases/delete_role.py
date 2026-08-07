@@ -1,10 +1,10 @@
 from apps.workspaces.application.interfaces import AbstractChannelRepository
-from apps.workspaces.domain.models import TopicEntity
 
 
-class GetTopicUseCase:
+class DeleteRoleUseCase:
     def __init__(self, repository: AbstractChannelRepository) -> None:
         self._repository = repository
 
-    def execute(self, topic_id: int) -> TopicEntity:
-        return self._repository.get_topic(topic_id)
+    def execute(self, role_id: int) -> None:
+        # Raises ChannelRoleNotFoundError or OwnerRoleImmutableError.
+        self._repository.delete_role(role_id)
