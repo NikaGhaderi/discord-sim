@@ -76,6 +76,7 @@ pnpm-debug.log*
 # Docker
 # ==============================
 *.pid
+docker-compose.override.yml
 
 # ==============================
 # IDE / OS
