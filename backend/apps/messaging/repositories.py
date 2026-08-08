@@ -1,14 +1,11 @@
 from typing import BinaryIO
 
+from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db import transaction
 from django.db.models import QuerySet
 
 from apps.messaging.application.interfaces import AbstractMessagingRepository
-from apps.messaging.domain.exceptions import (
-    MessageDeleteForbiddenError,
-    MessageEditForbiddenError,
-    MessageNotFoundError,
-)
+from apps.messaging.domain.exceptions import MessageNotFoundError
 from apps.messaging.domain.models import MediaEntity, MessageEntity, MessagePage
 from apps.messaging.models import Media, Message, MessageHistory
 from apps.permissions.domain.checker import has_permission
@@ -141,13 +138,17 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         limit: int,
         offset: int,
     ) -> MessagePage:
-        queryset = self._messages().filter(
-            content__icontains=query,
-            **self._target_filter(
-                topic_id=topic_id,
-                group_id=group_id,
-                direct_chat_id=direct_chat_id,
-            ),
+        queryset = (
+            self._messages()
+            .annotate(search=SearchVector("content"))
+            .filter(
+                search=SearchQuery(query),
+                **self._target_filter(
+                    topic_id=topic_id,
+                    group_id=group_id,
+                    direct_chat_id=direct_chat_id,
+                ),
+            )
         )
         count = queryset.count()
         results = queryset[offset : offset + limit]
@@ -179,19 +180,19 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         )
         return _to_media_entity(media)
 
-    def edit_message_transactionally(
-        self, base_message_id: int, user_id: int, content: str
-    ) -> MessageEntity:
+    def get_message(self, base_message_id: int) -> MessageEntity:
+        message = Message.objects.filter(pk=base_message_id).first()
+        if message is None:
+            raise MessageNotFoundError("Message not found.")
+        return _to_message_entity(message)
+
+    def write_message_edit(self, base_message_id: int, content: str) -> MessageEntity:
         with transaction.atomic():
             message = (
                 Message.objects.select_for_update().filter(pk=base_message_id).first()
             )
             if message is None:
                 raise MessageNotFoundError("Message not found.")
-            if message.sender_id != user_id:
-                raise MessageEditForbiddenError(
-                    "Only the sender can edit this message."
-                )
             MessageHistory.objects.create(
                 base_message_id=base_message_id,
                 old_content=message.content,
@@ -201,26 +202,20 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
             message.save(update_fields=("content", "is_edited"))
         return _to_message_entity(self._messages().get(pk=base_message_id))
 
-    def delete_message(self, base_message_id: int, user_id: int) -> None:
-        message = Message.objects.filter(pk=base_message_id).first()
-        if message is None:
+    def delete_message(self, base_message_id: int) -> None:
+        deleted_count, _ = Message.objects.filter(pk=base_message_id).delete()
+        if deleted_count == 0:
             raise MessageNotFoundError("Message not found.")
-        if message.sender_id != user_id and not self._can_moderate(message, user_id):
-            raise MessageDeleteForbiddenError(
-                "You cannot delete this message globally."
-            )
-        message.delete()
 
-    def _can_moderate(self, message: Message, user_id: int) -> bool:
-        if message.topic_id is not None:
-            granted = self._channels.get_user_permissions(
-                message.topic.channel_id, user_id
-            )
-            return has_permission(granted, PermissionCode.DELETE_MESSAGES.value)
-        if message.group_id is not None:
-            return GroupMember.objects.filter(
-                group_id=message.group_id,
-                user_id=user_id,
-                is_admin=True,
-            ).exists()
-        return False
+    def get_permissions_for_topic(self, topic_id: int, user_id: int) -> list[str]:
+        topic = Topic.objects.filter(pk=topic_id).first()
+        if topic is None:
+            return []
+        return self._channels.get_user_permissions(topic.channel_id, user_id)
+
+    def is_group_admin(self, group_id: int, user_id: int) -> bool:
+        return GroupMember.objects.filter(
+            group_id=group_id,
+            user_id=user_id,
+            is_admin=True,
+        ).exists()

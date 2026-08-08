@@ -62,9 +62,26 @@ class AbstractMessagingRepository(ABC):
     def can_attach_media(self, base_message_id: int, user_id: int) -> bool: ...
 
     @abstractmethod
-    def edit_message_transactionally(
-        self, base_message_id: int, user_id: int, content: str
-    ) -> MessageEntity: ...
+    def get_message(self, base_message_id: int) -> MessageEntity: ...
 
     @abstractmethod
-    def delete_message(self, base_message_id: int, user_id: int) -> None: ...
+    def write_message_edit(self, base_message_id: int, content: str) -> MessageEntity:
+        """Transactionally records the old content to history, then updates
+        the message. No authorization check -- the caller decides who's
+        allowed to edit before calling this."""
+        ...
+
+    @abstractmethod
+    def delete_message(self, base_message_id: int) -> None:
+        """Unconditional hard delete. No authorization check -- the caller
+        decides who's allowed to delete before calling this."""
+        ...
+
+    @abstractmethod
+    def get_permissions_for_topic(self, topic_id: int, user_id: int) -> list[str]:
+        """Raw permission fact-lookup (resolves topic -> channel internally).
+        Does not decide anything -- callers apply has_permission() themselves."""
+        ...
+
+    @abstractmethod
+    def is_group_admin(self, group_id: int, user_id: int) -> bool: ...

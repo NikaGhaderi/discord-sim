@@ -2,8 +2,16 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from django.utils import timezone
+
 from apps.authentication.models import User
-from apps.messaging.models import BaseMessage, Media, Message, MessageHistory
+from apps.messaging.models import (
+    BaseMessage,
+    Media,
+    Message,
+    MessageHistory,
+    ScheduledMessage,
+)
 from apps.private_spaces.models import DirectChat, Group, GroupMember
 
 
@@ -47,6 +55,24 @@ def test_database_constraint_requires_exactly_one_target(users):
             content="also invalid",
             direct_chat=direct_chat,
             group=group,
+        )
+
+
+@pytest.mark.django_db
+def test_scheduled_message_shares_base_message_target_constraint(users):
+    scheduled = ScheduledMessage.objects.create(
+        sender=users[0],
+        content="reminder: standup",
+        group=Group.objects.create(name="Group", creator=users[0]),
+        scheduled_time=timezone.now(),
+    )
+
+    assert BaseMessage.objects.filter(pk=scheduled.pk).exists()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ScheduledMessage.objects.create(
+            sender=users[0],
+            content="invalid",
+            scheduled_time=timezone.now(),
         )
 
 

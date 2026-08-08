@@ -113,6 +113,29 @@ def test_history_is_scoped_paginated_and_includes_media(spaces):
         }
     ]
     assert first.id != second.id
+    # offset=1 + limit=1 reaches the end of a 2-item set: no next page, but
+    # there is a previous page (back to offset 0).
+    assert response.json()["next"] is None
+    assert "offset=1" not in response.json()["previous"]
+    assert "limit=1" in response.json()["previous"]
+
+
+@pytest.mark.django_db
+def test_history_pagination_next_link_points_past_the_current_page(spaces):
+    group = spaces["group"]
+    sender = spaces["sender"]
+    for index in range(3):
+        Message.objects.create(sender=sender, group=group, content=f"msg-{index}")
+
+    response = client_for(sender).get(
+        f"/api/messages/?group_id={group.id}&limit=1&offset=0"
+    )
+
+    assert response.json()["previous"] is None
+    next_url = response.json()["next"]
+    assert next_url is not None
+    assert "offset=1" in next_url
+    assert "limit=1" in next_url
 
 
 @pytest.mark.django_db
@@ -133,6 +156,30 @@ def test_search_only_returns_content_matches_in_authorized_space(spaces):
     assert response.json()["count"] == 1
     assert response.json()["results"][0]["content"] == "sprint backlog"
     assert rejected.status_code == 404
+
+
+@pytest.mark.django_db
+def test_search_matches_word_stems_not_just_substrings(spaces):
+    # Proves real Postgres full-text search is in use, not `icontains`:
+    # a search for "run" must match "running" (stemmed), and a search for
+    # "sprints" (plural) must match "sprint" -- neither is a literal
+    # substring match in the other direction.
+    group = spaces["group"]
+    sender = spaces["sender"]
+    Message.objects.create(sender=sender, group=group, content="running the migration")
+    Message.objects.create(sender=sender, group=group, content="sprint planning")
+
+    stem_match = client_for(sender).get(
+        f"/api/messages/search/?q=run&group_id={group.id}"
+    )
+    plural_match = client_for(sender).get(
+        f"/api/messages/search/?q=sprints&group_id={group.id}"
+    )
+
+    assert stem_match.json()["count"] == 1
+    assert stem_match.json()["results"][0]["content"] == "running the migration"
+    assert plural_match.json()["count"] == 1
+    assert plural_match.json()["results"][0]["content"] == "sprint planning"
 
 
 @pytest.mark.django_db
@@ -170,6 +217,32 @@ def test_only_sender_can_edit(spaces):
 
     assert response.status_code == 403
     assert MessageHistory.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_messages_permission_does_not_grant_edit_access(spaces):
+    channel = spaces["channel"]
+    moderator = spaces["moderator"]
+    role = ChannelRole.objects.create(
+        channel=channel,
+        name="Moderator",
+        permissions=["DELETE_MESSAGES"],
+    )
+    UserChannelRole.objects.create(channel=channel, user=moderator, role=role)
+    message = Message.objects.create(
+        sender=spaces["sender"],
+        topic=spaces["topic"],
+        content="old",
+    )
+
+    response = client_for(moderator).patch(
+        f"/api/messages/{message.id}/", {"content": "hijacked"}, format="json"
+    )
+
+    assert response.status_code == 403
+    assert MessageHistory.objects.count() == 0
+    message.refresh_from_db()
+    assert message.content == "old"
 
 
 @pytest.mark.django_db

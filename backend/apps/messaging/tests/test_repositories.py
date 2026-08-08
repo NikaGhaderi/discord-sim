@@ -33,9 +33,7 @@ def test_failed_history_insert_rolls_back_message_edit():
         ),
         pytest.raises(RuntimeError, match="audit storage failed"),
     ):
-        DjangoMessagingRepository().edit_message_transactionally(
-            message.id, sender.id, "must roll back"
-        )
+        DjangoMessagingRepository().write_message_edit(message.id, "must roll back")
 
     message.refresh_from_db()
     assert message.content == "original"

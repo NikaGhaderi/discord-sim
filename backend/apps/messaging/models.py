@@ -78,6 +78,13 @@ class Message(BaseMessage):
         ordering = ("sent_at", "id")
 
 
+class ScheduledMessage(BaseMessage):
+    scheduled_time = models.DateTimeField()
+
+    class Meta:
+        ordering = ("scheduled_time", "id")
+
+
 class Media(models.Model):
     base_message = models.ForeignKey(
         BaseMessage,

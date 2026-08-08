@@ -1,9 +1,13 @@
 from apps.messaging.application.interfaces import AbstractMessagingRepository
 from apps.messaging.domain.exceptions import (
     InvalidMessageTargetError,
+    MessageDeleteForbiddenError,
+    MessageEditForbiddenError,
     MessageTargetNotFoundError,
 )
 from apps.messaging.domain.models import MessageEntity, MessagePage
+from apps.permissions.domain.checker import has_permission
+from apps.permissions.domain.permissions import PermissionCode
 
 
 def validate_exactly_one_target(
@@ -118,9 +122,10 @@ class EditMessageUseCase:
     def execute(
         self, base_message_id: int, user_id: int, content: str
     ) -> MessageEntity:
-        return self._repository.edit_message_transactionally(
-            base_message_id, user_id, content
-        )
+        message = self._repository.get_message(base_message_id)
+        if message.sender_id != user_id:
+            raise MessageEditForbiddenError("Only the sender can edit this message.")
+        return self._repository.write_message_edit(base_message_id, content)
 
 
 class DeleteMessageUseCase:
@@ -128,4 +133,19 @@ class DeleteMessageUseCase:
         self._repository = repository
 
     def execute(self, base_message_id: int, user_id: int) -> None:
-        self._repository.delete_message(base_message_id, user_id)
+        message = self._repository.get_message(base_message_id)
+        if message.sender_id != user_id and not self._can_moderate(message, user_id):
+            raise MessageDeleteForbiddenError(
+                "You cannot delete this message globally."
+            )
+        self._repository.delete_message(base_message_id)
+
+    def _can_moderate(self, message: MessageEntity, user_id: int) -> bool:
+        if message.topic_id is not None:
+            granted = self._repository.get_permissions_for_topic(
+                message.topic_id, user_id
+            )
+            return has_permission(granted, PermissionCode.DELETE_MESSAGES.value)
+        if message.group_id is not None:
+            return self._repository.is_group_admin(message.group_id, user_id)
+        return False

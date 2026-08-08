@@ -1,6 +1,7 @@
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.utils.urls import remove_query_param, replace_query_param
 from rest_framework.views import APIView
 
 from apps.messaging.api.serializers import (
@@ -44,10 +45,28 @@ def _target_kwargs(validated_data):
     }
 
 
-def _page_response(page):
+def _page_response(request, page, limit, offset):
+    url = request.build_absolute_uri()
+
+    next_url = None
+    if offset + limit < page.count:
+        next_url = replace_query_param(url, "limit", limit)
+        next_url = replace_query_param(next_url, "offset", offset + limit)
+
+    previous_url = None
+    if offset > 0:
+        previous_offset = max(offset - limit, 0)
+        previous_url = replace_query_param(url, "limit", limit)
+        if previous_offset == 0:
+            previous_url = remove_query_param(previous_url, "offset")
+        else:
+            previous_url = replace_query_param(previous_url, "offset", previous_offset)
+
     return Response(
         {
             "count": page.count,
+            "next": next_url,
+            "previous": previous_url,
             "results": MessageHistorySerializer(page.results, many=True).data,
         },
         status=200,
@@ -70,7 +89,7 @@ class MessageListCreateView(APIView):
             )
         except MessageTargetNotFoundError as exc:
             return _detail(str(exc), 404)
-        return _page_response(page)
+        return _page_response(request, page, data["limit"], data["offset"])
 
     def post(self, request):
         serializer = CreateMessageSerializer(data=request.data)
@@ -104,7 +123,7 @@ class MessageSearchView(APIView):
             )
         except MessageTargetNotFoundError as exc:
             return _detail(str(exc), 404)
-        return _page_response(page)
+        return _page_response(request, page, data["limit"], data["offset"])
 
 
 class MessageDetailView(APIView):
