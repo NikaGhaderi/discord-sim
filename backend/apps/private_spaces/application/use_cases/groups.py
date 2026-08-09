@@ -14,6 +14,17 @@ class ListGroupsUseCase:
         return self._repository.list_groups_for_user(user_id)
 
 
+class GetGroupUseCase:
+    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+        self._repository = repository
+
+    def execute(self, group_id: int, user_id: int) -> GroupEntity:
+        group = self._repository.get_group_for_member(group_id, user_id)
+        if group is None:
+            raise GroupNotFoundError("Group not found.")
+        return group
+
+
 class CreateGroupUseCase:
     def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
         self._repository = repository

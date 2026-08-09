@@ -8,6 +8,7 @@ from apps.private_spaces.domain.models import (
     DirectChatEntity,
     GroupEntity,
     GroupInvitationEntity,
+    GroupInvitationPage,
 )
 from apps.private_spaces.models import DirectChat, Group, GroupInvitation, GroupMember
 
@@ -128,6 +129,18 @@ class DjangoPrivateSpacesRepository(AbstractPrivateSpacesRepository):
             )
             created = False
         return _to_invitation_entity(invitation), created
+
+    def list_pending_invitations_for_user(
+        self, user_id: int, *, limit: int, offset: int
+    ) -> GroupInvitationPage:
+        queryset = GroupInvitation.objects.filter(
+            invitee_id=user_id, status=GroupInvitation.Status.PENDING
+        ).order_by("-created_at", "-id")
+        count = queryset.count()
+        results = queryset[offset : offset + limit]
+        return GroupInvitationPage(
+            count=count, results=[_to_invitation_entity(i) for i in results]
+        )
 
     def respond_to_invitation_as_invitee(
         self, invitation_id: int, user_id: int, status: str

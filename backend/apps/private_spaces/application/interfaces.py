@@ -6,6 +6,7 @@ from apps.private_spaces.domain.models import (
     DirectChatEntity,
     GroupEntity,
     GroupInvitationEntity,
+    GroupInvitationPage,
 )
 
 
@@ -69,3 +70,8 @@ class AbstractPrivateSpacesRepository(ABC):
     def respond_to_invitation_as_invitee(
         self, invitation_id: int, user_id: int, status: str
     ) -> GroupInvitationEntity: ...
+
+    @abstractmethod
+    def list_pending_invitations_for_user(
+        self, user_id: int, *, limit: int, offset: int
+    ) -> GroupInvitationPage: ...

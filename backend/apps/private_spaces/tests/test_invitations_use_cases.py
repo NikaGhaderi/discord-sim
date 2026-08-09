@@ -1,6 +1,7 @@
 import pytest
 
 from apps.private_spaces.application.use_cases.invitations import (
+    ListMyInvitationsUseCase,
     RespondToInvitationUseCase,
     SendGroupInvitationUseCase,
 )
@@ -134,3 +135,49 @@ class TestRespondToInvitationUseCase:
             RespondToInvitationUseCase(repo).execute(
                 invitation_id=invitation.id, user_id=999, status="ACCEPTED"
             )
+
+
+class TestListMyInvitationsUseCase:
+    def test_lists_only_the_requesters_pending_invitations(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        repo.seed_user(30)
+        mine, _ = repo.create_or_get_invitation(1, 10, 20)
+        repo.create_or_get_invitation(1, 10, 30)  # someone else's invitation
+
+        page = ListMyInvitationsUseCase(repo).execute(user_id=20)
+
+        assert page.count == 1
+        assert [inv.id for inv in page.results] == [mine.id]
+
+    def test_excludes_already_responded_invitations(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        invitation, _ = repo.create_or_get_invitation(1, 10, 20)
+        RespondToInvitationUseCase(repo).execute(
+            invitation_id=invitation.id, user_id=20, status="ACCEPTED"
+        )
+
+        page = ListMyInvitationsUseCase(repo).execute(user_id=20)
+
+        assert page.count == 0
+        assert page.results == []
+
+    def test_respects_limit_and_offset(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        for group_id in range(1, 4):
+            repo.seed_group(group_id, f"Group {group_id}", creator_id=10)
+            repo.seed_membership(group_id, 10)
+            repo.create_or_get_invitation(group_id, 10, 20)
+
+        page = ListMyInvitationsUseCase(repo).execute(user_id=20, limit=1, offset=1)
+
+        assert page.count == 3
+        assert len(page.results) == 1
