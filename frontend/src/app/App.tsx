@@ -4,6 +4,7 @@ import { AuthPage } from '../modules/identity/pages/AuthPage';
 import { ResetPasswordPage } from '../modules/identity/pages/ResetPasswordPage';
 import { ProfilePage } from '../modules/profile/pages/ProfilePage';
 import { PrivateSpacesPage } from '../modules/private_spaces/pages/PrivateSpacesPage';
+import { ChannelThreadPage } from '../modules/messaging/pages/ChannelThreadPage';
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/private-spaces" element={<PrivateSpacesPage />} />
+            <Route path="/channels/demo" element={<ChannelThreadPage />} />
           </Routes>
         </main>
       </AuthProvider>

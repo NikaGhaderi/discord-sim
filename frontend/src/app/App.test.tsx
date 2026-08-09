@@ -75,4 +75,12 @@ describe('App Component', () => {
     expect(await screen.findByText('Direct Messages')).toBeInTheDocument();
     expect(screen.getByText('Groups')).toBeInTheDocument();
   });
+
+  test('renders the channel thread page when navigated to /channels/demo', () => {
+    window.history.pushState({}, 'Channel Thread Page', '/channels/demo');
+    render(<App />);
+
+    expect(screen.getByText('# general')).toBeInTheDocument();
+    expect(screen.getByText('Message content #1')).toBeInTheDocument();
+  });
 });
