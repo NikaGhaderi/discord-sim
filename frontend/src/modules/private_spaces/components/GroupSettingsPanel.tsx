@@ -1,31 +1,67 @@
 import React, { useState } from 'react';
+import { privateSpacesApi } from '../index';
 import { Group } from '../types';
 
 interface GroupSettingsPanelProps {
   group: Group;
+  /** Computed once by the parent from `group.creator_id === currentUserId`. */
+  isAdmin: boolean;
   onUpdateGroup?: (updatedGroup: Group) => void;
-  onDeleteOrLeave?: (groupId: string) => void;
+  onDeleteOrLeave?: (groupId: number) => void;
 }
 
 export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   group,
+  isAdmin,
   onUpdateGroup,
   onDeleteOrLeave,
 }) => {
   const [name, setName] = useState(group.name);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onUpdateGroup?.({ ...group, name: name.trim() });
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await privateSpacesApi.updateGroup(
+        group.group_id,
+        name.trim()
+      );
+      onUpdateGroup?.(updated);
+    } catch {
+      setError('Failed to save changes.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const actionButtonText = group.is_admin ? 'Delete Group' : 'Leave Group';
+  const handleDeleteOrLeave = async () => {
+    setIsRemoving(true);
+    setError(null);
+    try {
+      await privateSpacesApi.deleteOrLeaveGroup(
+        group.group_id,
+        isAdmin ? 'delete' : 'leave'
+      );
+      onDeleteOrLeave?.(group.group_id);
+    } catch {
+      setError('Failed to update group membership.');
+      setIsRemoving(false);
+    }
+  };
+
+  const actionButtonText = isAdmin ? 'Delete Group' : 'Leave Group';
 
   return (
     <div className="group-settings-panel">
       <h3>Group Settings: {group.name}</h3>
-      
+
+      {error && <p role="alert">{error}</p>}
+
       <form onSubmit={handleSave}>
         <label htmlFor="group-name-input">Group Name:</label>
         <input
@@ -35,14 +71,17 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           onChange={(e) => setName(e.target.value)}
           required
         />
-        <button type="submit">Save Changes</button>
+        <button type="submit" disabled={isSaving}>
+          Save Changes
+        </button>
       </form>
 
       <div className="danger-zone" style={{ marginTop: '20px' }}>
         <button
           type="button"
-          onClick={() => onDeleteOrLeave?.(group.id)}
+          onClick={() => void handleDeleteOrLeave()}
           className="btn-danger"
+          disabled={isRemoving}
         >
           {actionButtonText}
         </button>

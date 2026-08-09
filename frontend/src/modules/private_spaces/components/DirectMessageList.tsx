@@ -1,36 +1,81 @@
-import React, { useState } from 'react';
-import { DirectMessage } from '../types';
+import React, { useEffect, useState } from 'react';
+import { profileApi } from '../../profile';
+import { privateSpacesApi } from '../index';
+import { DirectChat } from '../types';
 
 interface DirectMessageListProps {
-  initialDms?: DirectMessage[];
-  onSelectDm?: (dm: DirectMessage) => void;
+  currentUserId: number;
+  onSelectDm?: (dm: DirectChat) => void;
 }
 
-const defaultDms: DirectMessage[] = [
-  { id: 'dm-1', recipient_username: 'parnia_dev', last_message: 'Hey, did you check the workspace ticket?', updated_at: '10:30 AM' },
-  { id: 'dm-2', recipient_username: 'nika_lead', last_message: 'PR looks good to merge!', updated_at: 'Yesterday' },
-];
-
-export const DirectMessageList: React.FC<DirectMessageListProps> = ({ initialDms = defaultDms, onSelectDm }) => {
-  const [dms, setDms] = useState<DirectMessage[]>(initialDms);
+export const DirectMessageList: React.FC<DirectMessageListProps> = ({
+  currentUserId,
+  onSelectDm,
+}) => {
+  const [dms, setDms] = useState<DirectChat[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const handleStartDm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUsername.trim()) return;
+  useEffect(() => {
+    let cancelled = false;
 
-    const newDm: DirectMessage = {
-      id: `dm-${Date.now()}`,
-      recipient_username: newUsername.trim(),
-      last_message: 'Started a new conversation',
-      updated_at: 'Just now',
+    const loadDms = async () => {
+      setIsLoading(true);
+      setError(false);
+      try {
+        const data = await privateSpacesApi.listDirectChats();
+        if (!cancelled) {
+          setDms(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
     };
 
-    setDms([newDm, ...dms]);
-    setNewUsername('');
-    setIsCreating(false);
+    void loadDms();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleStartDm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const username = newUsername.trim();
+    if (!username) return;
+
+    setStartError(null);
+    try {
+      // No endpoint resolves a raw user_id to a username, but the reverse
+      // (username -> user_id) IS resolvable via the public profile lookup,
+      // since PublicProfileSerializer includes user_id.
+      const profile = await profileApi.getPublicProfile(username);
+      const { chat } = await privateSpacesApi.createOrGetDirectChat(
+        profile.user_id
+      );
+      setDms((prev) =>
+        prev.some((dm) => dm.direct_chat_id === chat.direct_chat_id)
+          ? prev
+          : [chat, ...prev]
+      );
+      setNewUsername('');
+      setIsCreating(false);
+    } catch {
+      setStartError(`Couldn't find user "${username}".`);
+    }
   };
+
+  const otherParticipantId = (dm: DirectChat): number =>
+    dm.user1_id === currentUserId ? dm.user2_id : dm.user1_id;
 
   return (
     <div className="dm-list-container">
@@ -40,7 +85,7 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({ initialDms
           Start New DM
         </button>
       ) : (
-        <form onSubmit={handleStartDm} className="start-dm-form">
+        <form onSubmit={(e) => void handleStartDm(e)} className="start-dm-form">
           <input
             type="text"
             placeholder="Enter username..."
@@ -53,15 +98,25 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({ initialDms
         </form>
       )}
 
-      <ul className="dm-list">
-        {dms.map((dm) => (
-          <li key={dm.id} onClick={() => onSelectDm?.(dm)} className="dm-item">
-            <strong>@{dm.recipient_username}</strong>
-            <p>{dm.last_message}</p>
-            <small>{dm.updated_at}</small>
-          </li>
-        ))}
-      </ul>
+      {startError && <p role="alert">{startError}</p>}
+      {isLoading && <p>Loading direct messages…</p>}
+      {error && <p role="alert">Couldn&apos;t load direct messages.</p>}
+
+      {!isLoading && !error && (
+        <ul className="dm-list">
+          {dms.map((dm) => (
+            <li
+              key={dm.direct_chat_id}
+              onClick={() => onSelectDm?.(dm)}
+              className="dm-item"
+            >
+              {/* No endpoint resolves user_id -> username, so this is an
+                  honest fallback rather than a fabricated display name. */}
+              <strong>User #{otherParticipantId(dm)}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

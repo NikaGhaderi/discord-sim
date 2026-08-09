@@ -1,20 +1,47 @@
-export interface DirectMessage {
-    id: string;
-    recipient_username: string;
-    last_message: string;
-    updated_at: string;
-  }
-  
-  export interface Group {
-    id: string;
-    name: string;
-    is_admin: boolean;
-    member_count: number;
-  }
-  
-  export interface Invitation {
-    id: string;
-    group_name: string;
-    invited_by: string;
-    created_at: string;
-  }
+/**
+ * types — data contracts for the private_spaces module (DMs, groups, group
+ * invitations).
+ *
+ * Source: verified live against the running backend (SCRUM-58's new
+ * endpoints included) as part of SCRUM-35. These replace the SCRUM-34 mock
+ * types (`DirectMessage`, `Group` with `is_admin`/`member_count`,
+ * `Invitation`), which never matched the real API shapes.
+ */
+
+export interface DirectChat {
+  direct_chat_id: number;
+  user1_id: number;
+  user2_id: number;
+  created_at: string;
+}
+
+export interface Group {
+  group_id: number;
+  name: string;
+  creator_id: number;
+  created_at: string;
+}
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+
+export interface GroupInvitation {
+  invitation_id: number;
+  group_id: number;
+  inviter_id: number;
+  invitee_id: number;
+  status: InvitationStatus;
+  created_at: string;
+}
+
+export interface InvitationPage {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: GroupInvitation[];
+}
+
+/** Response of PATCH /api/invitations/{id}/ — intentionally smaller than GroupInvitation. */
+export interface InvitationStatusUpdate {
+  invitation_id: number;
+  status: string;
+}
