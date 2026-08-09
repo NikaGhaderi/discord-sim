@@ -23,6 +23,7 @@ def _to_media_entity(media: Media) -> MediaEntity:
         file_url=media.file.url,
         file_type=media.file_type,
         file_size=media.file_size,
+        thumbnail_url=media.thumbnail.url if media.thumbnail else None,
     )
 
 

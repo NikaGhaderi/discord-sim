@@ -348,8 +348,10 @@ def test_channel_media_requires_sender_and_send_media_permission(spaces, tmp_pat
         "file_url",
         "file_type",
         "file_size",
+        "thumbnail_url",
     }
     assert created.json()["file_type"] == "text/plain"
+    assert created.json()["thumbnail_url"] is None
 
 
 @pytest.mark.django_db

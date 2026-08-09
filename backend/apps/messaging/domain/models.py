@@ -11,6 +11,7 @@ class MediaEntity:
     file_url: str
     file_type: str
     file_size: int
+    thumbnail_url: str | None = None
 
 
 @dataclass
