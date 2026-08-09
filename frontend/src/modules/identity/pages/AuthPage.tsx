@@ -19,7 +19,6 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
   const auth = useAuth();
   const [mode, setMode] = useState<Mode>('login');
-  const [force2FA, setForce2FA] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null);
 
@@ -76,14 +75,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
 
   const handleLogout = () => {
     setMode('login');
-    setForce2FA(false);
     setError(null);
     setForgotPasswordMessage(null);
     void auth.logout();
   };
 
-  // Determine which step to render, respecting the debug override
-  const activeStep = force2FA ? '2FA' : auth.authStep;
+  const activeStep = auth.authStep;
 
   return (
     <div style={{
@@ -96,31 +93,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
       padding: '20px'
     }}>
-      {/* Temporary Debug Checkbox */}
-      <div style={{
-        marginBottom: '20px',
-        padding: '10px 15px',
-        backgroundColor: '#fff3cd',
-        border: '1px solid #ffeeba',
-        borderRadius: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '14px',
-        color: '#856404'
-      }}>
-        <input
-          id="debug-force-2fa"
-          type="checkbox"
-          checked={force2FA}
-          onChange={(e) => setForce2FA(e.target.checked)}
-          style={{ cursor: 'pointer' }}
-        />
-        <label htmlFor="debug-force-2fa" style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-          Debug: Force 2FA View
-        </label>
-      </div>
-
       <div style={{
         backgroundColor: '#fff',
         padding: '40px',
@@ -209,7 +181,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
             onSubmit={handleVerify2FA}
             isSubmitting={auth.isLoading}
             onBackToLogin={() => {
-              setForce2FA(false); // Turn off debug mode when going back
               setError(null);
               setMode('login');
             }}

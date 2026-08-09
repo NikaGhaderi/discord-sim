@@ -1,7 +1,7 @@
 import { UserProfile, UpdateProfilePayload } from './api';
 
 const mockProfileDatabase: UserProfile = {
-  user_id: 'usr_123456',
+  user_id: 123456,
   username: 'ftm_roosta',
   display_name: 'Fatemeh Roosta',
   avatar_url: 'https://via.placeholder.com/150',

@@ -134,3 +134,33 @@ Example: `feat(messaging): add typing indicator broadcast (DSIM-58)`
 - Rotate `SECRET_KEY` and database credentials between local, staging, and production; they must never be shared across environments.
 - Report suspected secret leaks immediately to the team lead so the credential can be rotated, regardless of whether the commit has been pushed.
 
+## 10. Local Dev Environment Troubleshooting
+
+### Windows: `docker-compose up` fails to bind Redis's port 6379
+
+Symptom:
+
+```
+Error response from daemon: ports are not available: exposing port TCP 0.0.0.0:6379 -> 127.0.0.1:0:
+listen tcp 0.0.0.0:6379: bind: An attempt was made to access a socket in a way forbidden by its access permissions.
+```
+
+Cause: on Windows with Hyper-V/WSL2, the OS reserves ranges of ports that nothing else is allowed to bind to; even if nothing is actually listening on them (`netstat`/`Get-NetTCPConnection` will show 6379 as free). Check with:
+
+```powershell
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+If `6379` falls inside one of the listed ranges, that's it. This is host-level, not a project misconfiguration, and not something to "fix" in the repo's `docker-compose.yml` for everyone.
+
+Fix (per-developer, no shared config changes needed): create a **git-ignored** `docker-compose.override.yml` in the repo root that remaps just the host side of Redis's port:
+
+```yaml
+services:
+  redis:
+    ports: !override
+      - "16379:6379"
+```
+
+The `!override` tag is required; Compose merges (concatenates) `ports` arrays across files by default, so without it you'd end up requesting both `6379` *and* `16379` and still fail on the excluded one. Django/Celery are unaffected either way since they talk to Redis via the internal Docker network name (`redis://redis:6379`), never through the host-mapped port.
+
