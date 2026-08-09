@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { profileApi } from '../../profile';
+import { Avatar } from '@shared/components/Avatar';
+import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { Group, GroupMember } from '../types';
 
@@ -22,8 +23,8 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
-  const [memberNamesById, setMemberNamesById] = useState<
-    Record<number, string>
+  const [memberProfilesById, setMemberProfilesById] = useState<
+    Record<number, PublicProfile>
   >({});
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [membersError, setMembersError] = useState(false);
@@ -44,8 +45,8 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           data.map((m) => m.user_id)
         );
         if (!cancelled) {
-          setMemberNamesById(
-            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          setMemberProfilesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p]))
           );
         }
       } catch {
@@ -127,12 +128,18 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         {membersError && <p role="alert">Couldn&apos;t load members.</p>}
         {!isLoadingMembers && !membersError && (
           <ul>
-            {members.map((member) => (
-              <li key={member.user_id}>
-                {memberNamesById[member.user_id] ?? `User #${member.user_id}`}
-                {member.is_admin && ' (admin)'}
-              </li>
-            ))}
+            {members.map((member) => {
+              const memberProfile = memberProfilesById[member.user_id];
+              const memberLabel =
+                memberProfile?.username ?? `User #${member.user_id}`;
+              return (
+                <li key={member.user_id}>
+                  <Avatar avatarUrl={memberProfile?.avatar_url} label={memberLabel} size={20} />
+                  {memberLabel}
+                  {member.is_admin && ' (admin)'}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

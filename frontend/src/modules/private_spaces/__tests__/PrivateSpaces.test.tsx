@@ -74,7 +74,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
           user_id: 500,
           username: 'samyar_l',
           display_name: 'Samyar Lajevardi',
-          avatar_url: null,
+          avatar_url: 'https://storage/avatars/samyar.jpg',
           bio: '',
         },
       ]);
@@ -90,6 +90,10 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         expect(profileApi.listPublicProfilesByIds).toHaveBeenCalledWith([500]);
       });
       expect(await screen.findByText(/From samyar_l/)).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'samyar_l' })).toHaveAttribute(
+        'src',
+        'https://storage/avatars/samyar.jpg'
+      );
 
       fireEvent.click(screen.getByRole('button', { name: /accept/i }));
 
@@ -195,7 +199,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
           user_id: 222,
           username: 'teammate',
           display_name: 'Teammate',
-          avatar_url: null,
+          avatar_url: 'https://storage/avatars/teammate.jpg',
           bio: '',
         },
       ]);
@@ -204,6 +208,10 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
       expect(await screen.findByText(/me \(admin\)/)).toBeInTheDocument();
       expect(screen.getByText('teammate')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'teammate' })).toHaveAttribute(
+        'src',
+        'https://storage/avatars/teammate.jpg'
+      );
       expect(privateSpacesApi.listGroupMembers).toHaveBeenCalledWith(1);
     });
 
@@ -239,7 +247,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
           user_id: 777,
           username: 'ftm_roosta',
           display_name: 'Fatemeh Roosta',
-          avatar_url: null,
+          avatar_url: 'https://storage/avatars/fatemeh.jpg',
           bio: '',
         },
       ]);
@@ -248,6 +256,31 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
       expect(await screen.findByText('ftm_roosta')).toBeInTheDocument();
       expect(profileApi.listPublicProfilesByIds).toHaveBeenCalledWith([777]);
+      expect(screen.getByRole('img', { name: 'ftm_roosta' })).toHaveAttribute(
+        'src',
+        'https://storage/avatars/fatemeh.jpg'
+      );
+    });
+
+    it('falls back to the placeholder avatar when the participant has no avatar_url', async () => {
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
+        { direct_chat_id: 1, user1_id: currentUserId, user2_id: 778, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        {
+          user_id: 778,
+          username: 'no_avatar_user',
+          display_name: 'No Avatar',
+          avatar_url: null,
+          bio: '',
+        },
+      ]);
+
+      render(<DirectMessageList currentUserId={currentUserId} />);
+
+      expect(
+        await screen.findByRole('img', { name: 'no_avatar_user' })
+      ).toHaveAttribute('src', 'https://via.placeholder.com/150');
     });
 
     it('falls back to "User #id" when the other participant cannot be resolved', async () => {

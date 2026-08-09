@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { profileApi } from '../../profile';
+import { Avatar } from '@shared/components/Avatar';
+import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { Group, GroupInvitation } from '../types';
 
@@ -10,8 +11,8 @@ interface InvitationWithGroup {
 
 export const InvitationList: React.FC = () => {
   const [items, setItems] = useState<InvitationWithGroup[]>([]);
-  const [inviterNamesById, setInviterNamesById] = useState<
-    Record<number, string>
+  const [inviterProfilesById, setInviterProfilesById] = useState<
+    Record<number, PublicProfile>
   >({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -44,8 +45,8 @@ export const InvitationList: React.FC = () => {
         );
         const profiles = await profileApi.listPublicProfilesByIds(inviterIds);
         if (!cancelled) {
-          setInviterNamesById(
-            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          setInviterProfilesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p]))
           );
         }
       } catch {
@@ -91,16 +92,20 @@ export const InvitationList: React.FC = () => {
         <p>No pending invitations.</p>
       ) : (
         <ul className="invitation-list">
-          {items.map(({ invitation, group }) => (
+          {items.map(({ invitation, group }) => {
+            const inviterProfile = inviterProfilesById[invitation.inviter_id];
+            const inviterLabel =
+              inviterProfile?.username ?? `User #${invitation.inviter_id}`;
+            return (
             <li key={invitation.invitation_id} className="invitation-item">
               <div>
                 <strong>{group ? group.name : `Group #${invitation.group_id}`}</strong>
-                {/* Falls back to the raw id only if the bulk lookup didn't
-                    resolve it (e.g. the inviter was deleted). */}
+                {/* Falls back to the raw id (and a placeholder avatar) only
+                    if the bulk lookup didn't resolve it, e.g. the inviter
+                    was deleted. */}
                 <p>
-                  From{' '}
-                  {inviterNamesById[invitation.inviter_id] ??
-                    `User #${invitation.inviter_id}`}
+                  <Avatar avatarUrl={inviterProfile?.avatar_url} label={inviterLabel} size={20} />
+                  From {inviterLabel}
                 </p>
               </div>
               <div className="invitation-actions">
@@ -118,7 +123,8 @@ export const InvitationList: React.FC = () => {
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

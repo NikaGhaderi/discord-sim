@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { profileApi } from '../../profile';
+import { Avatar } from '@shared/components/Avatar';
+import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { DirectChat } from '../types';
 
@@ -16,9 +17,9 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
   onSelectDm,
 }) => {
   const [dms, setDms] = useState<DirectChat[]>([]);
-  const [usernamesById, setUsernamesById] = useState<Record<number, string>>(
-    {}
-  );
+  const [profilesById, setProfilesById] = useState<
+    Record<number, PublicProfile>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const [newUsername, setNewUsername] = useState('');
@@ -36,15 +37,16 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
         if (cancelled) return;
         setDms(data);
 
-        // Bulk-resolve every other participant's username in one request
-        // rather than one lookup per DM.
+        // Bulk-resolve every other participant's profile (username + avatar,
+        // per the doc's §8-3-1 "profile pictures must be shown" rule) in one
+        // request rather than one lookup per DM.
         const otherIds = Array.from(
           new Set(data.map((dm) => otherParticipantId(dm, currentUserId)))
         );
         const profiles = await profileApi.listPublicProfilesByIds(otherIds);
         if (!cancelled) {
-          setUsernamesById(
-            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          setProfilesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p]))
           );
         }
       } catch {
@@ -120,15 +122,19 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
         <ul className="dm-list">
           {dms.map((dm) => {
             const otherId = otherParticipantId(dm, currentUserId);
+            const otherProfile = profilesById[otherId];
+            const label = otherProfile?.username ?? `User #${otherId}`;
             return (
               <li
                 key={dm.direct_chat_id}
                 onClick={() => onSelectDm?.(dm)}
                 className="dm-item"
               >
-                {/* Falls back to the raw id only if the bulk lookup didn't
-                    resolve it (e.g. the other user was deleted). */}
-                <strong>{usernamesById[otherId] ?? `User #${otherId}`}</strong>
+                {/* Falls back to the raw id (and a placeholder avatar) only
+                    if the bulk lookup didn't resolve it, e.g. the other
+                    user was deleted. */}
+                <Avatar avatarUrl={otherProfile?.avatar_url} label={label} />
+                <strong>{label}</strong>
               </li>
             );
           })}
