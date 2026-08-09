@@ -18,6 +18,27 @@ class PublicProfileSerializer(serializers.Serializer):
     bio = serializers.CharField(read_only=True)
 
 
+class UserIdsQuerySerializer(serializers.Serializer):
+    """Parses `?ids=1,2,3` for the bulk by-id lookup endpoint."""
+
+    ids = serializers.CharField()
+
+    def validate_ids(self, value: str) -> list[int]:
+        raw_ids = [part.strip() for part in value.split(",") if part.strip()]
+        if not raw_ids:
+            raise serializers.ValidationError("At least one id is required.")
+        if len(raw_ids) > 100:
+            raise serializers.ValidationError(
+                "At most 100 ids may be requested at once."
+            )
+        try:
+            return [int(raw_id) for raw_id in raw_ids]
+        except ValueError as exc:
+            raise serializers.ValidationError(
+                "ids must be a comma-separated list of integers."
+            ) from exc
+
+
 class UpdateProfileSerializer(serializers.Serializer):
     display_name = serializers.CharField(
         required=False,

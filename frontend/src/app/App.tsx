@@ -3,6 +3,7 @@ import { AuthProvider } from '../modules/identity/context';
 import { AuthPage } from '../modules/identity/pages/AuthPage';
 import { ResetPasswordPage } from '../modules/identity/pages/ResetPasswordPage';
 import { ProfilePage } from '../modules/profile/pages/ProfilePage';
+import { PrivateSpacesPage } from '../modules/private_spaces/pages/PrivateSpacesPage';
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
             <Route path="/" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/private-spaces" element={<PrivateSpacesPage />} />
           </Routes>
         </main>
       </AuthProvider>

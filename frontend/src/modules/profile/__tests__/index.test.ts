@@ -16,6 +16,7 @@ describe('Profile module selector (index.ts)', () => {
     expect(profileApi.getMyProfile).toBe(mockApi.getMyProfile);
     expect(profileApi.updateProfile).toBe(mockApi.updateProfile);
     expect(profileApi.getPublicProfile).toBe(mockApi.getPublicProfile);
+    expect(profileApi.listPublicProfilesByIds).toBe(mockApi.listPublicProfilesByIds);
   });
 
   it('serves the real api functions when VITE_USE_MOCK_API is not "true"', async () => {
@@ -28,5 +29,6 @@ describe('Profile module selector (index.ts)', () => {
     expect(profileApi.getMyProfile).toBe(realApi.getMyProfile);
     expect(profileApi.updateProfile).toBe(realApi.updateProfile);
     expect(profileApi.getPublicProfile).toBe(realApi.getPublicProfile);
+    expect(profileApi.listPublicProfilesByIds).toBe(realApi.listPublicProfilesByIds);
   });
 });

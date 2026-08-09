@@ -1,5 +1,6 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.utils.urls import remove_query_param, replace_query_param
 from rest_framework.views import APIView
 
 from apps.private_spaces.api.serializers import (
@@ -8,7 +9,9 @@ from apps.private_spaces.api.serializers import (
     CreateInvitationSerializer,
     DirectChatSerializer,
     GroupInvitationSerializer,
+    GroupMemberSerializer,
     GroupSerializer,
+    InvitationQuerySerializer,
     InvitationResponseSerializer,
     RespondInvitationSerializer,
     UpdateGroupSerializer,
@@ -21,11 +24,14 @@ from apps.private_spaces.application.use_cases.direct_chats import (
 from apps.private_spaces.application.use_cases.groups import (
     CreateGroupUseCase,
     DeleteGroupUseCase,
+    GetGroupUseCase,
     LeaveGroupUseCase,
+    ListGroupMembersUseCase,
     ListGroupsUseCase,
     UpdateGroupUseCase,
 )
 from apps.private_spaces.application.use_cases.invitations import (
+    ListMyInvitationsUseCase,
     RespondToInvitationUseCase,
     SendGroupInvitationUseCase,
 )
@@ -46,6 +52,34 @@ from apps.users.repositories import DjangoProfileRepository
 
 def _detail(message, status_code):
     return Response({"detail": message}, status=status_code)
+
+
+def _page_response(request, page, limit, offset):
+    url = request.build_absolute_uri()
+
+    next_url = None
+    if offset + limit < page.count:
+        next_url = replace_query_param(url, "limit", limit)
+        next_url = replace_query_param(next_url, "offset", offset + limit)
+
+    previous_url = None
+    if offset > 0:
+        previous_offset = max(offset - limit, 0)
+        previous_url = replace_query_param(url, "limit", limit)
+        if previous_offset == 0:
+            previous_url = remove_query_param(previous_url, "offset")
+        else:
+            previous_url = replace_query_param(previous_url, "offset", previous_offset)
+
+    return Response(
+        {
+            "count": page.count,
+            "next": next_url,
+            "previous": previous_url,
+            "results": GroupInvitationSerializer(page.results, many=True).data,
+        },
+        status=200,
+    )
 
 
 class DirectChatListCreateView(APIView):
@@ -110,6 +144,15 @@ class GroupListCreateView(APIView):
 class GroupDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, group_id):
+        try:
+            group = GetGroupUseCase(DjangoPrivateSpacesRepository()).execute(
+                group_id=group_id, user_id=request.user.id
+            )
+        except GroupNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(GroupSerializer(group).data, status=200)
+
     def patch(self, request, group_id):
         serializer = UpdateGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -131,6 +174,19 @@ class GroupDetailView(APIView):
         except GroupNotFoundError as exc:
             return _detail(str(exc), 404)
         return Response(status=204)
+
+
+class GroupMemberListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, group_id):
+        try:
+            members = ListGroupMembersUseCase(DjangoPrivateSpacesRepository()).execute(
+                group_id=group_id, user_id=request.user.id
+            )
+        except GroupNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(GroupMemberSerializer(members, many=True).data, status=200)
 
 
 class LeaveGroupView(APIView):
@@ -195,3 +251,19 @@ class GroupInvitationResponseView(APIView):
             return _detail(str(exc), 404)
 
         return Response(InvitationResponseSerializer(invitation).data, status=200)
+
+
+class InvitationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = InvitationQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        page = ListMyInvitationsUseCase(DjangoPrivateSpacesRepository()).execute(
+            request.user.id,
+            limit=data["limit"],
+            offset=data["offset"],
+        )
+        return _page_response(request, page, data["limit"], data["offset"])

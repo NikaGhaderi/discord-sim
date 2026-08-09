@@ -6,10 +6,12 @@ from apps.users.api.serializers import (
     OwnProfileSerializer,
     PublicProfileSerializer,
     UpdateProfileSerializer,
+    UserIdsQuerySerializer,
 )
 from apps.users.application.use_cases.get_profile import (
     GetOwnProfileUseCase,
     GetPublicProfileUseCase,
+    ListPublicProfilesByIdsUseCase,
 )
 from apps.users.application.use_cases.update_profile import UpdateProfileUseCase
 from apps.users.domain.exceptions import ProfileNotFoundError
@@ -57,3 +59,25 @@ class PublicProfileView(APIView):
         except ProfileNotFoundError:
             return _profile_not_found_response()
         return Response(PublicProfileSerializer(profile).data, status=200)
+
+
+class UsersByIdsView(APIView):
+    """Bulk-resolves raw user ids to public profiles: `?ids=1,2,3`.
+
+    Not in the Phase 1 doc's contract -- added so callers that only carry
+    user ids (private_spaces' DMs, group invitations, group members) can
+    resolve usernames without a lookup per id. Ids that don't resolve to a
+    real user are silently omitted from the response, not errored -- this
+    is a batch-resolve endpoint, not an existence check.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserIdsQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        profiles = ListPublicProfilesByIdsUseCase(DjangoProfileRepository()).execute(
+            serializer.validated_data["ids"]
+        )
+        return Response(PublicProfileSerializer(profiles, many=True).data, status=200)

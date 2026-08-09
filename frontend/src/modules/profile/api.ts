@@ -15,13 +15,22 @@ export interface UpdateProfilePayload {
   allow_group_invitations?: boolean;
 }
 
+export type PublicProfile = Omit<UserProfile, 'allow_group_invitations'>;
+
 /** Shared contract for both implementations (real and mock). */
 export interface ProfileApi {
   getMyProfile(): Promise<UserProfile>;
   updateProfile(payload: UpdateProfilePayload): Promise<UserProfile>;
-  getPublicProfile(
-    username: string
-  ): Promise<Omit<UserProfile, 'allow_group_invitations'>>;
+  getPublicProfile(username: string): Promise<PublicProfile>;
+  /**
+   * Bulk-resolves raw user ids to public profiles. Backs the username
+   * displays in private_spaces (DM participants, group members, invitation
+   * senders) -- those only ever carry a user_id, and before this endpoint
+   * existed there was no way to turn that into a username at all.
+   * Ids that don't resolve to a real user are simply absent from the
+   * result, not errored.
+   */
+  listPublicProfilesByIds(userIds: number[]): Promise<PublicProfile[]>;
 }
 
 export const getMyProfile = async (): Promise<UserProfile> => {
@@ -38,9 +47,21 @@ export const updateProfile = async (
 
 export const getPublicProfile = async (
   username: string
-): Promise<Omit<UserProfile, 'allow_group_invitations'>> => {
-  const response = await apiClient.get<Omit<UserProfile, 'allow_group_invitations'>>(
+): Promise<PublicProfile> => {
+  const response = await apiClient.get<PublicProfile>(
     `/api/users/${username}/profile/`
   );
+  return response.data;
+};
+
+export const listPublicProfilesByIds = async (
+  userIds: number[]
+): Promise<PublicProfile[]> => {
+  if (userIds.length === 0) {
+    return [];
+  }
+  const response = await apiClient.get<PublicProfile[]>('/api/users/by-ids/', {
+    params: { ids: userIds.join(',') },
+  });
   return response.data;
 };

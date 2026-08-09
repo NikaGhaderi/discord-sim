@@ -121,6 +121,39 @@ class TestGroups:
         assert deleted.status_code == 204
         assert not Group.objects.filter(pk=group.id).exists()
 
+    def test_get_detail_requires_membership(self, users):
+        member, outsider = users[:2]
+        group = Group.objects.create(name="Original", creator=member)
+        GroupMember.objects.create(group=group, user=member, is_admin=True)
+
+        fetched = authenticated_client(member).get(f"/api/groups/{group.id}/")
+        rejected = authenticated_client(outsider).get(f"/api/groups/{group.id}/")
+        missing = authenticated_client(member).get("/api/groups/999999/")
+
+        assert fetched.status_code == 200
+        assert fetched.json()["group_id"] == group.id
+        assert fetched.json()["name"] == "Original"
+        assert rejected.status_code == 404
+        assert missing.status_code == 404
+
+    def test_member_list_shows_admin_flag_non_member_gets_404(self, users):
+        creator, member, outsider = users[:3]
+        group = Group.objects.create(name="Original", creator=creator)
+        GroupMember.objects.create(group=group, user=creator, is_admin=True)
+        GroupMember.objects.create(group=group, user=member, is_admin=False)
+
+        listed = authenticated_client(member).get(f"/api/groups/{group.id}/members/")
+        rejected = authenticated_client(outsider).get(
+            f"/api/groups/{group.id}/members/"
+        )
+
+        assert listed.status_code == 200
+        by_id = {m["user_id"]: m for m in listed.json()}
+        assert by_id[creator.id]["is_admin"] is True
+        assert by_id[member.id]["is_admin"] is False
+        assert set(by_id) == {creator.id, member.id}
+        assert rejected.status_code == 404
+
 
 @pytest.mark.django_db
 class TestGroupInvitations:
@@ -158,7 +191,10 @@ class TestGroupInvitations:
         )
 
         assert created.status_code == 201
-        assert created.json() == {
+        body = created.json()
+        created_at = body.pop("created_at")
+        assert created_at
+        assert body == {
             "invitation_id": invitation_id,
             "group_id": group.id,
             "inviter_id": inviter.id,
@@ -192,3 +228,42 @@ class TestGroupInvitations:
         assert response.status_code == 200
         assert response.json()["status"] == "DECLINED"
         assert not GroupMember.objects.filter(group=group, user=invitee).exists()
+
+
+@pytest.mark.django_db
+class TestInvitationList:
+    def test_lists_only_my_pending_invitations(self, users):
+        inviter, invitee, other_invitee = users[:3]
+        group = Group.objects.create(name="Private", creator=inviter)
+        GroupMember.objects.create(group=group, user=inviter, is_admin=True)
+        mine = GroupInvitation.objects.create(
+            group=group, inviter=inviter, invitee=invitee
+        )
+        GroupInvitation.objects.create(
+            group=group, inviter=inviter, invitee=other_invitee
+        )
+
+        response = authenticated_client(invitee).get("/api/invitations/")
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 1
+        assert response.json()["results"][0]["invitation_id"] == mine.id
+        assert response.json()["results"][0]["created_at"]
+
+    def test_excludes_already_responded_invitations(self, users):
+        inviter, invitee = users[:2]
+        group = Group.objects.create(name="Private", creator=inviter)
+        GroupMember.objects.create(group=group, user=inviter, is_admin=True)
+        invitation = GroupInvitation.objects.create(
+            group=group, inviter=inviter, invitee=invitee
+        )
+        authenticated_client(invitee).patch(
+            f"/api/invitations/{invitation.id}/",
+            {"status": "ACCEPTED"},
+            format="json",
+        )
+
+        response = authenticated_client(invitee).get("/api/invitations/")
+
+        assert response.json()["count"] == 0
+        assert response.json()["results"] == []

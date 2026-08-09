@@ -5,7 +5,7 @@ from apps.private_spaces.domain.exceptions import (
     InvitationsDisabledError,
     InviteeNotFoundError,
 )
-from apps.private_spaces.domain.models import GroupInvitationEntity
+from apps.private_spaces.domain.models import GroupInvitationEntity, GroupInvitationPage
 from apps.users.application.interfaces import AbstractProfileRepository
 
 
@@ -48,4 +48,20 @@ class RespondToInvitationUseCase:
     ) -> GroupInvitationEntity:
         return self._repository.respond_to_invitation_as_invitee(
             invitation_id, user_id, status
+        )
+
+
+class ListMyInvitationsUseCase:
+    """Read-only -- the allow_group_invitations privacy flag only gates
+    *sending* an invitation (SendGroupInvitationUseCase), not viewing ones
+    already sent to you."""
+
+    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+        self._repository = repository
+
+    def execute(
+        self, user_id: int, *, limit: int = 50, offset: int = 0
+    ) -> GroupInvitationPage:
+        return self._repository.list_pending_invitations_for_user(
+            user_id, limit=limit, offset=offset
         )
