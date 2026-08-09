@@ -1,15 +1,8 @@
 export interface Message {
-    id: string;
-    channel_id?: string;
-    sender_id: string;
-    sender_username: string;
-    sender_avatar_url?: string | null;
-    content: string;
-    media_url?: string | null;
-    created_at: string;
-  }
-  
-  export interface SearchFilter {
-    query: string;
-  }
-  
+  base_message_id: number;
+  sender_id: number;
+  sender_username: string;
+  content: string;
+  sent_at: string;
+  is_edited: boolean;
+}

@@ -1,20 +1,14 @@
 import React, { useState, useRef, useLayoutEffect, UIEvent } from 'react';
-
-export interface Message {
-  id: string;
-  sender: string;
-  body: string;
-  timestamp: string;
-  is_edited?: boolean;
-}
+import { Message } from '../types';
 
 const MOCK_ALL_MESSAGES: Message[] = Array.from({ length: 60 }, (_, index) => {
   const msgNum = 60 - index;
   return {
-    id: `msg-${msgNum}`,
-    sender: msgNum % 2 === 0 ? 'Nika Lead' : 'Fatemeh',
-    body: `Message content #${msgNum}`,
-    timestamp: '12:34 PM',
+    base_message_id: msgNum,
+    sender_id: msgNum % 2 === 0 ? 1 : 2,
+    sender_username: msgNum % 2 === 0 ? 'nika_lead' : 'ftm_roosta',
+    content: `Message content #${msgNum}`,
+    sent_at: '12:34 PM',
     is_edited: msgNum % 3 === 0,
   };
 });
@@ -83,6 +77,7 @@ export const MessageThread: React.FC = () => {
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      data-testid="message-thread-scroll"
       className="flex-1 overflow-y-auto p-4 space-y-4"
       style={{ maxHeight: 'calc(100vh - 120px)' }}
     >
@@ -99,15 +94,15 @@ export const MessageThread: React.FC = () => {
       )}
 
       {messages.map((msg) => (
-        <div key={msg.id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
+        <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">{msg.sender}</span>
-            <span className="text-xs text-gray-400">{msg.timestamp}</span>
+            <span className="font-semibold text-white">{msg.sender_username}</span>
+            <span className="text-xs text-gray-400">{msg.sent_at}</span>
             {msg.is_edited && (
               <span className="text-xs text-gray-500 italic">(edited)</span>
             )}
           </div>
-          <p className="text-gray-200 mt-1">{msg.body}</p>
+          <p className="text-gray-200 mt-1">{msg.content}</p>
         </div>
       ))}
     </div>
