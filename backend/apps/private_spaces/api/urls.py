@@ -25,6 +25,11 @@ urlpatterns = [
         name="group-invitation-create",
     ),
     path(
+        "invitations/",
+        views.InvitationListView.as_view(),
+        name="invitation-list",
+    ),
+    path(
         "invitations/<int:invitation_id>/",
         views.GroupInvitationResponseView.as_view(),
         name="group-invitation-response",

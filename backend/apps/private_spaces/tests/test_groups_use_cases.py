@@ -3,6 +3,7 @@ import pytest
 from apps.private_spaces.application.use_cases.groups import (
     CreateGroupUseCase,
     DeleteGroupUseCase,
+    GetGroupUseCase,
     LeaveGroupUseCase,
     ListGroupsUseCase,
     UpdateGroupUseCase,
@@ -23,6 +24,31 @@ class TestCreateGroupUseCase:
         assert group.name == "Weekend CTF"
         assert group.creator_id == 1
         assert repo.is_group_member(group.id, 1) is True
+
+
+class TestGetGroupUseCase:
+    def test_member_can_fetch_group_detail(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10)
+        repo.seed_membership(1, 10)
+
+        group = GetGroupUseCase(repo).execute(group_id=1, user_id=10)
+
+        assert group.name == "Original"
+
+    def test_non_member_gets_not_found(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10)
+        repo.seed_membership(1, 10)
+
+        with pytest.raises(GroupNotFoundError):
+            GetGroupUseCase(repo).execute(group_id=1, user_id=999)
+
+    def test_unknown_group_gets_not_found(self):
+        repo = InMemoryPrivateSpacesRepository()
+
+        with pytest.raises(GroupNotFoundError):
+            GetGroupUseCase(repo).execute(group_id=999, user_id=10)
 
 
 class TestUpdateGroupUseCase:

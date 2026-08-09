@@ -4,6 +4,7 @@ from apps.private_spaces.domain.models import (
     DirectChatEntity,
     GroupEntity,
     GroupInvitationEntity,
+    GroupInvitationPage,
 )
 
 
@@ -141,3 +142,14 @@ class InMemoryPrivateSpacesRepository(AbstractPrivateSpacesRepository):
         if status == "ACCEPTED":
             self._memberships.setdefault(invitation.group_id, set()).add(user_id)
         return invitation
+
+    def list_pending_invitations_for_user(self, user_id, *, limit, offset):
+        matches = [
+            inv
+            for inv in self._invitations.values()
+            if inv.invitee_id == user_id and inv.status == "PENDING"
+        ]
+        matches.sort(key=lambda inv: inv.id, reverse=True)
+        return GroupInvitationPage(
+            count=len(matches), results=matches[offset : offset + limit]
+        )

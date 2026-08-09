@@ -30,3 +30,9 @@ class GroupInvitationEntity:
     status: str
     id: int | None = None
     created_at: datetime | None = None
+
+
+@dataclass
+class GroupInvitationPage:
+    count: int
+    results: list[GroupInvitationEntity]

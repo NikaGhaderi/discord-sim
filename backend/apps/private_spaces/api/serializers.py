@@ -50,7 +50,15 @@ class GroupInvitationSerializer(serializers.ModelSerializer):
             "inviter_id",
             "invitee_id",
             "status",
+            "created_at",
         )
+
+
+class InvitationQuerySerializer(serializers.Serializer):
+    limit = serializers.IntegerField(
+        required=False, default=50, min_value=1, max_value=100
+    )
+    offset = serializers.IntegerField(required=False, default=0, min_value=0)
 
 
 class RespondInvitationSerializer(serializers.Serializer):
