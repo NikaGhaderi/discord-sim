@@ -9,6 +9,7 @@ from apps.private_spaces.domain.models import (
     GroupEntity,
     GroupInvitationEntity,
     GroupInvitationPage,
+    GroupMemberEntity,
 )
 from apps.private_spaces.models import DirectChat, Group, GroupInvitation, GroupMember
 
@@ -109,6 +110,17 @@ class DjangoPrivateSpacesRepository(AbstractPrivateSpacesRepository):
 
     def is_group_member(self, group_id: int, user_id: int) -> bool:
         return GroupMember.objects.filter(group_id=group_id, user_id=user_id).exists()
+
+    def list_group_members(self, group_id: int) -> list[GroupMemberEntity]:
+        memberships = GroupMember.objects.filter(group_id=group_id).order_by(
+            "joined_at", "id"
+        )
+        return [
+            GroupMemberEntity(
+                user_id=m.user_id, is_admin=m.is_admin, joined_at=m.joined_at
+            )
+            for m in memberships
+        ]
 
     # -- invitations -------------------------------------------------------
 

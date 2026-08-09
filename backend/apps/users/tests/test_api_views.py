@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.users.api.views import OwnProfileView, PublicProfileView
+from apps.users.api.views import OwnProfileView, PublicProfileView, UsersByIdsView
 from apps.users.domain.exceptions import ProfileNotFoundError
 from apps.users.domain.models import UserProfileEntity
 
@@ -122,3 +122,48 @@ class TestPublicProfileView:
 
         assert response.status_code == 404
         assert response.data == {"detail": "Profile not found."}
+
+
+class TestUsersByIdsView:
+    @patch("apps.users.api.views.ListPublicProfilesByIdsUseCase")
+    def test_returns_public_profiles_for_valid_ids(self, use_case_class):
+        use_case_class.return_value.execute.return_value = [
+            _profile(user_id=1),
+            _profile(user_id=2, username="samyar_l"),
+        ]
+        request = _authenticate(
+            APIRequestFactory().get("/api/users/by-ids/", {"ids": "1,2,999"})
+        )
+
+        response = UsersByIdsView.as_view()(request)
+
+        assert response.status_code == 200
+        assert [p["user_id"] for p in response.data] == [1, 2]
+        assert "allow_group_invitations" not in response.data[0]
+        use_case_class.return_value.execute.assert_called_once_with([1, 2, 999])
+
+    def test_missing_ids_param_returns_400(self):
+        request = _authenticate(APIRequestFactory().get("/api/users/by-ids/"))
+
+        response = UsersByIdsView.as_view()(request)
+
+        assert response.status_code == 400
+
+    def test_non_integer_ids_returns_400(self):
+        request = _authenticate(
+            APIRequestFactory().get("/api/users/by-ids/", {"ids": "1,abc"})
+        )
+
+        response = UsersByIdsView.as_view()(request)
+
+        assert response.status_code == 400
+
+    def test_too_many_ids_returns_400(self):
+        ids = ",".join(str(i) for i in range(101))
+        request = _authenticate(
+            APIRequestFactory().get("/api/users/by-ids/", {"ids": ids})
+        )
+
+        response = UsersByIdsView.as_view()(request)
+
+        assert response.status_code == 400

@@ -28,6 +28,12 @@ class DjangoProfileRepository(AbstractProfileRepository):
         )
         return _to_entity(profile) if profile else None
 
+    def list_by_user_ids(self, user_ids: list[int]) -> list[UserProfileEntity]:
+        if not user_ids:
+            return []
+        profiles = Profile.objects.select_related("user").filter(user_id__in=user_ids)
+        return [_to_entity(p) for p in profiles]
+
     def update_profile(self, user_id: int, **fields) -> UserProfileEntity:
         try:
             profile = Profile.objects.select_related("user").get(user_id=user_id)

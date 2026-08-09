@@ -1,33 +1,68 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { privateSpacesApi } from '../index';
 import { Group } from '../types';
 
 interface GroupListProps {
-  initialGroups?: Group[];
   onSelectGroup?: (group: Group) => void;
 }
 
-const defaultGroups: Group[] = [
-  { id: 'grp-1', name: 'Frontend Team', is_admin: true, member_count: 5 },
-  { id: 'grp-2', name: 'General Chat', is_admin: false, member_count: 12 },
-];
-
-export const GroupList: React.FC<GroupListProps> = ({ initialGroups = defaultGroups, onSelectGroup }) => {
-  const [groups, setGroups] = useState<Group[]>(initialGroups);
+export const GroupList: React.FC<GroupListProps> = ({ onSelectGroup }) => {
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [memberCounts, setMemberCounts] = useState<Record<number, number>>(
+    {}
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleCreateGroup = (e: React.FormEvent) => {
+  const loadMemberCount = async (groupId: number) => {
+    try {
+      const members = await privateSpacesApi.listGroupMembers(groupId);
+      setMemberCounts((prev) => ({ ...prev, [groupId]: members.length }));
+    } catch {
+      // Non-fatal -- the group itself still renders, just without a count.
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGroups = async () => {
+      setIsLoading(true);
+      setError(false);
+      try {
+        const data = await privateSpacesApi.listGroups();
+        if (cancelled) return;
+        setGroups(data);
+        // Member counts are fetched per group in parallel and don't block
+        // the group list itself from rendering.
+        void Promise.all(data.map((g) => loadMemberCount(g.group_id)));
+      } catch {
+        if (!cancelled) {
+          setError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadGroups();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName.trim()) return;
 
-    const newGroup: Group = {
-      id: `grp-${Date.now()}`,
-      name: groupName.trim(),
-      is_admin: true,
-      member_count: 1,
-    };
-
-    setGroups([...groups, newGroup]);
+    const newGroup = await privateSpacesApi.createGroup(groupName.trim());
+    setGroups((prev) => [...prev, newGroup]);
+    void loadMemberCount(newGroup.group_id);
     setGroupName('');
     setIsCreating(false);
   };
@@ -40,7 +75,7 @@ export const GroupList: React.FC<GroupListProps> = ({ initialGroups = defaultGro
           Create Group
         </button>
       ) : (
-        <form onSubmit={handleCreateGroup} className="create-group-form">
+        <form onSubmit={(e) => void handleCreateGroup(e)} className="create-group-form">
           <input
             type="text"
             placeholder="Group Name"
@@ -53,14 +88,29 @@ export const GroupList: React.FC<GroupListProps> = ({ initialGroups = defaultGro
         </form>
       )}
 
-      <ul className="group-list">
-        {groups.map((group) => (
-          <li key={group.id} onClick={() => onSelectGroup?.(group)} className="group-item">
-            <span>{group.name}</span>
-            <small>({group.member_count} members)</small>
-          </li>
-        ))}
-      </ul>
+      {isLoading && <p>Loading groups…</p>}
+      {error && <p role="alert">Couldn&apos;t load groups.</p>}
+
+      {!isLoading && !error && (
+        <ul className="group-list">
+          {groups.map((group) => (
+            <li
+              key={group.group_id}
+              onClick={() => onSelectGroup?.(group)}
+              className="group-item"
+            >
+              <span>{group.name}</span>
+              {memberCounts[group.group_id] !== undefined && (
+                <span className="group-member-count">
+                  {' '}
+                  ({memberCounts[group.group_id]}{' '}
+                  {memberCounts[group.group_id] === 1 ? 'member' : 'members'})
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

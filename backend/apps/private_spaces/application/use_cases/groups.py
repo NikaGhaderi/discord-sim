@@ -3,7 +3,7 @@ from apps.private_spaces.domain.exceptions import (
     GroupMembershipNotFoundError,
     GroupNotFoundError,
 )
-from apps.private_spaces.domain.models import GroupEntity
+from apps.private_spaces.domain.models import GroupEntity, GroupMemberEntity
 
 
 class ListGroupsUseCase:
@@ -60,6 +60,24 @@ class DeleteGroupUseCase:
         if group is None:
             raise GroupNotFoundError("Group not found.")
         self._repository.delete_group(group_id)
+
+
+class ListGroupMembersUseCase:
+    """Not in the Phase 1 doc's §8-3 contract -- added because the private
+    spaces UI (SCRUM-34/35) needs to show who's in a group and who's admin,
+    and there was previously no way to get that at all. Gated the same way
+    as GetGroupUseCase: a non-member gets GroupNotFoundError (404), not a
+    403, matching this codebase's "hide existence" convention rather than
+    leaking that the group exists.
+    """
+
+    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+        self._repository = repository
+
+    def execute(self, group_id: int, user_id: int) -> list[GroupMemberEntity]:
+        if not self._repository.is_group_member(group_id, user_id):
+            raise GroupNotFoundError("Group not found.")
+        return self._repository.list_group_members(group_id)
 
 
 class LeaveGroupUseCase:
