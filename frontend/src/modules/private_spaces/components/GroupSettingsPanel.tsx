@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { profileApi } from '../../profile';
 import { privateSpacesApi } from '../index';
-import { Group } from '../types';
+import { Group, GroupMember } from '../types';
 
 interface GroupSettingsPanelProps {
   group: Group;
@@ -20,6 +21,50 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [memberNamesById, setMemberNamesById] = useState<
+    Record<number, string>
+  >({});
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [membersError, setMembersError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setName(group.name);
+
+    const loadMembers = async () => {
+      setIsLoadingMembers(true);
+      setMembersError(false);
+      try {
+        const data = await privateSpacesApi.listGroupMembers(group.group_id);
+        if (cancelled) return;
+        setMembers(data);
+
+        const profiles = await profileApi.listPublicProfilesByIds(
+          data.map((m) => m.user_id)
+        );
+        if (!cancelled) {
+          setMemberNamesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setMembersError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMembers(false);
+        }
+      }
+    };
+
+    void loadMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [group.group_id, group.name]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +120,22 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           Save Changes
         </button>
       </form>
+
+      <div className="group-members" style={{ marginTop: '20px' }}>
+        <h4>Members</h4>
+        {isLoadingMembers && <p>Loading members…</p>}
+        {membersError && <p role="alert">Couldn&apos;t load members.</p>}
+        {!isLoadingMembers && !membersError && (
+          <ul>
+            {members.map((member) => (
+              <li key={member.user_id}>
+                {memberNamesById[member.user_id] ?? `User #${member.user_id}`}
+                {member.is_admin && ' (admin)'}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="danger-zone" style={{ marginTop: '20px' }}>
         <button

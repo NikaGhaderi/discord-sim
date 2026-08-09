@@ -7,6 +7,7 @@ from apps.private_spaces.domain.models import (
     GroupEntity,
     GroupInvitationEntity,
     GroupInvitationPage,
+    GroupMemberEntity,
 )
 
 
@@ -58,6 +59,9 @@ class AbstractPrivateSpacesRepository(ABC):
 
     @abstractmethod
     def is_group_member(self, group_id: int, user_id: int) -> bool: ...
+
+    @abstractmethod
+    def list_group_members(self, group_id: int) -> list[GroupMemberEntity]: ...
 
     # -- Invitations -------------------------------------------------------
 

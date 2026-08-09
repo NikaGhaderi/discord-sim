@@ -45,3 +45,14 @@ export interface InvitationStatusUpdate {
   invitation_id: number;
   status: string;
 }
+
+/**
+ * A single group's membership row. Not in the Phase 1 doc's contract, but
+ * needed to actually show who's in a group and who's admin -- there was no
+ * way to get this at all before the members endpoint was added.
+ */
+export interface GroupMember {
+  user_id: number;
+  is_admin: boolean;
+  joined_at: string;
+}

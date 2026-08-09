@@ -8,11 +8,17 @@ interface DirectMessageListProps {
   onSelectDm?: (dm: DirectChat) => void;
 }
 
+const otherParticipantId = (dm: DirectChat, currentUserId: number): number =>
+  dm.user1_id === currentUserId ? dm.user2_id : dm.user1_id;
+
 export const DirectMessageList: React.FC<DirectMessageListProps> = ({
   currentUserId,
   onSelectDm,
 }) => {
   const [dms, setDms] = useState<DirectChat[]>([]);
+  const [usernamesById, setUsernamesById] = useState<Record<number, string>>(
+    {}
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const [newUsername, setNewUsername] = useState('');
@@ -27,8 +33,19 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
       setError(false);
       try {
         const data = await privateSpacesApi.listDirectChats();
+        if (cancelled) return;
+        setDms(data);
+
+        // Bulk-resolve every other participant's username in one request
+        // rather than one lookup per DM.
+        const otherIds = Array.from(
+          new Set(data.map((dm) => otherParticipantId(dm, currentUserId)))
+        );
+        const profiles = await profileApi.listPublicProfilesByIds(otherIds);
         if (!cancelled) {
-          setDms(data);
+          setUsernamesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          );
         }
       } catch {
         if (!cancelled) {
@@ -46,7 +63,7 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentUserId]);
 
   const handleStartDm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,9 +90,6 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
       setStartError(`Couldn't find user "${username}".`);
     }
   };
-
-  const otherParticipantId = (dm: DirectChat): number =>
-    dm.user1_id === currentUserId ? dm.user2_id : dm.user1_id;
 
   return (
     <div className="dm-list-container">
@@ -104,17 +118,20 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
 
       {!isLoading && !error && (
         <ul className="dm-list">
-          {dms.map((dm) => (
-            <li
-              key={dm.direct_chat_id}
-              onClick={() => onSelectDm?.(dm)}
-              className="dm-item"
-            >
-              {/* No endpoint resolves user_id -> username, so this is an
-                  honest fallback rather than a fabricated display name. */}
-              <strong>User #{otherParticipantId(dm)}</strong>
-            </li>
-          ))}
+          {dms.map((dm) => {
+            const otherId = otherParticipantId(dm, currentUserId);
+            return (
+              <li
+                key={dm.direct_chat_id}
+                onClick={() => onSelectDm?.(dm)}
+                className="dm-item"
+              >
+                {/* Falls back to the raw id only if the bulk lookup didn't
+                    resolve it (e.g. the other user was deleted). */}
+                <strong>{usernamesById[otherId] ?? `User #${otherId}`}</strong>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

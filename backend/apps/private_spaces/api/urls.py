@@ -15,6 +15,11 @@ urlpatterns = [
         name="group-detail",
     ),
     path(
+        "groups/<int:group_id>/members/",
+        views.GroupMemberListView.as_view(),
+        name="group-member-list",
+    ),
+    path(
         "groups/<int:group_id>/leave/",
         views.LeaveGroupView.as_view(),
         name="group-leave",

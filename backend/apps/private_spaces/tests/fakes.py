@@ -5,6 +5,7 @@ from apps.private_spaces.domain.models import (
     GroupEntity,
     GroupInvitationEntity,
     GroupInvitationPage,
+    GroupMemberEntity,
 )
 
 
@@ -108,6 +109,15 @@ class InMemoryPrivateSpacesRepository(AbstractPrivateSpacesRepository):
 
     def is_group_member(self, group_id: int, user_id: int) -> bool:
         return user_id in self._memberships.get(group_id, set())
+
+    def list_group_members(self, group_id: int) -> list[GroupMemberEntity]:
+        return [
+            GroupMemberEntity(
+                user_id=uid,
+                is_admin=(uid == self._groups[group_id].creator_id),
+            )
+            for uid in sorted(self._memberships.get(group_id, set()))
+        ]
 
     # -- invitations ----------------------------------------------------------
 

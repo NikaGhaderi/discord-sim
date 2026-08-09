@@ -2,6 +2,7 @@ import {
   DirectChat,
   Group,
   GroupInvitation,
+  GroupMember,
   InvitationPage,
   InvitationStatusUpdate,
 } from './types';
@@ -40,6 +41,24 @@ const mockGroups: Group[] = [
     created_at: '2026-07-22T08:00:00Z',
   },
 ];
+
+const mockGroupMembers: Record<number, GroupMember[]> = {
+  1: [
+    {
+      user_id: MOCK_CURRENT_USER_ID,
+      is_admin: true,
+      joined_at: '2026-07-20T12:00:00Z',
+    },
+  ],
+  2: [
+    { user_id: 3001, is_admin: true, joined_at: '2026-07-22T08:00:00Z' },
+    {
+      user_id: MOCK_CURRENT_USER_ID,
+      is_admin: false,
+      joined_at: '2026-07-23T09:00:00Z',
+    },
+  ],
+};
 
 let nextInvitationId = 2;
 const mockInvitations: GroupInvitation[] = [
@@ -103,7 +122,16 @@ export const createGroup = async (name: string): Promise<Group> => {
     created_at: new Date().toISOString(),
   };
   mockGroups.push(group);
+  mockGroupMembers[group.group_id] = [
+    { user_id: MOCK_CURRENT_USER_ID, is_admin: true, joined_at: group.created_at },
+  ];
   return delay(group);
+};
+
+export const listGroupMembers = async (
+  groupId: number
+): Promise<GroupMember[]> => {
+  return delay([...(mockGroupMembers[groupId] ?? [])]);
 };
 
 export const getGroup = async (groupId: number): Promise<Group> => {
@@ -128,11 +156,21 @@ export const updateGroup = async (
 
 export const deleteOrLeaveGroup = async (
   groupId: number,
-  _mode: 'delete' | 'leave'
+  mode: 'delete' | 'leave'
 ): Promise<void> => {
-  const index = mockGroups.findIndex((g) => g.group_id === groupId);
-  if (index !== -1) {
-    mockGroups.splice(index, 1);
+  if (mode === 'delete') {
+    const index = mockGroups.findIndex((g) => g.group_id === groupId);
+    if (index !== -1) {
+      mockGroups.splice(index, 1);
+    }
+    delete mockGroupMembers[groupId];
+  } else {
+    const members = mockGroupMembers[groupId];
+    if (members) {
+      mockGroupMembers[groupId] = members.filter(
+        (m) => m.user_id !== MOCK_CURRENT_USER_ID
+      );
+    }
   }
   return delay(undefined);
 };
@@ -173,6 +211,16 @@ export const respondToInvitation = async (
     throw new Error(`Mock invitation ${invitationId} not found`);
   }
   invitation.status = status;
+  if (status === 'ACCEPTED') {
+    const members = (mockGroupMembers[invitation.group_id] ??= []);
+    if (!members.some((m) => m.user_id === invitation.invitee_id)) {
+      members.push({
+        user_id: invitation.invitee_id,
+        is_admin: false,
+        joined_at: new Date().toISOString(),
+      });
+    }
+  }
   return delay({ invitation_id: invitation.invitation_id, status: invitation.status });
 };
 

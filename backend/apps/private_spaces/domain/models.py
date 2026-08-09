@@ -36,3 +36,10 @@ class GroupInvitationEntity:
 class GroupInvitationPage:
     count: int
     results: list[GroupInvitationEntity]
+
+
+@dataclass
+class GroupMemberEntity:
+    user_id: int
+    is_admin: bool
+    joined_at: datetime | None = None

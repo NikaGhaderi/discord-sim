@@ -16,6 +16,7 @@ vi.mock('../index', () => ({
     listGroups: vi.fn(),
     createGroup: vi.fn(),
     getGroup: vi.fn(),
+    listGroupMembers: vi.fn(),
     updateGroup: vi.fn(),
     deleteOrLeaveGroup: vi.fn(),
     sendGroupInvitation: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('../../profile', () => ({
     getMyProfile: vi.fn(),
     updateProfile: vi.fn(),
     getPublicProfile: vi.fn(),
+    listPublicProfilesByIds: vi.fn(),
   },
 }));
 
@@ -37,10 +39,15 @@ const currentUserId = 111;
 describe('Private Spaces (SCRUM-35 network wiring)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Safe defaults so components that call these as a side detail (not
+    // the thing under test in a given case) don't blow up on an
+    // unmocked-returns-undefined call.
+    vi.mocked(privateSpacesApi.listGroupMembers).mockResolvedValue([]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([]);
   });
 
   describe('InvitationList', () => {
-    it('fetches invitations, resolves group names, and removes on accept/decline', async () => {
+    it('fetches invitations, resolves group + inviter names, and removes on accept/decline', async () => {
       vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
         count: 1,
         next: null,
@@ -62,6 +69,15 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         creator_id: 500,
         created_at: '2026-01-01T00:00:00Z',
       });
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        {
+          user_id: 500,
+          username: 'samyar_l',
+          display_name: 'Samyar Lajevardi',
+          avatar_url: null,
+          bio: '',
+        },
+      ]);
       vi.mocked(privateSpacesApi.respondToInvitation).mockResolvedValueOnce({
         invitation_id: 1,
         status: 'ACCEPTED',
@@ -70,7 +86,10 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       render(<InvitationList />);
 
       expect(await screen.findByText('Backend Devs')).toBeInTheDocument();
-      expect(screen.getByText('From User #500')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(profileApi.listPublicProfilesByIds).toHaveBeenCalledWith([500]);
+      });
+      expect(await screen.findByText(/From samyar_l/)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /accept/i }));
 
@@ -80,6 +99,36 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       await waitFor(() => {
         expect(screen.queryByText('Backend Devs')).not.toBeInTheDocument();
       });
+    });
+
+    it('falls back to "User #id" when the inviter cannot be resolved', async () => {
+      vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
+        count: 1,
+        next: null,
+        previous: null,
+        results: [
+          {
+            invitation_id: 1,
+            group_id: 2,
+            inviter_id: 999,
+            invitee_id: currentUserId,
+            status: 'PENDING',
+            created_at: '2026-08-08T00:00:00Z',
+          },
+        ],
+      });
+      vi.mocked(privateSpacesApi.getGroup).mockResolvedValueOnce({
+        group_id: 2,
+        name: 'Backend Devs',
+        creator_id: 999,
+        created_at: '2026-01-01T00:00:00Z',
+      });
+      // Deleted/unresolvable inviter -- the bulk lookup returns nothing for it.
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([]);
+
+      render(<InvitationList />);
+
+      expect(await screen.findByText(/From User #999/)).toBeInTheDocument();
     });
   });
 
@@ -91,16 +140,20 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       created_at: '2026-01-01T00:00:00Z',
     };
 
-    it('displays "Delete Group" label for admin users', () => {
+    it('displays "Delete Group" label for admin users', async () => {
       render(<GroupSettingsPanel group={group} isAdmin={true} />);
 
-      expect(screen.getByRole('button', { name: /delete group/i })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: /delete group/i })
+      ).toBeInTheDocument();
     });
 
-    it('displays "Leave Group" label for non-admin users', () => {
+    it('displays "Leave Group" label for non-admin users', async () => {
       render(<GroupSettingsPanel group={group} isAdmin={false} />);
 
-      expect(screen.getByRole('button', { name: /leave group/i })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: /leave group/i })
+      ).toBeInTheDocument();
     });
 
     it('calls deleteOrLeaveGroup with mode "delete" for admins', async () => {
@@ -124,13 +177,84 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         expect(privateSpacesApi.deleteOrLeaveGroup).toHaveBeenCalledWith(1, 'leave');
       });
     });
+
+    it('fetches and displays members with resolved usernames and an admin badge', async () => {
+      vi.mocked(privateSpacesApi.listGroupMembers).mockResolvedValueOnce([
+        { user_id: currentUserId, is_admin: true, joined_at: '2026-01-01T00:00:00Z' },
+        { user_id: 222, is_admin: false, joined_at: '2026-01-02T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        {
+          user_id: currentUserId,
+          username: 'me',
+          display_name: 'Me',
+          avatar_url: null,
+          bio: '',
+        },
+        {
+          user_id: 222,
+          username: 'teammate',
+          display_name: 'Teammate',
+          avatar_url: null,
+          bio: '',
+        },
+      ]);
+
+      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+
+      expect(await screen.findByText(/me \(admin\)/)).toBeInTheDocument();
+      expect(screen.getByText('teammate')).toBeInTheDocument();
+      expect(privateSpacesApi.listGroupMembers).toHaveBeenCalledWith(1);
+    });
+
+    it('falls back to "User #id" for members that cannot be resolved', async () => {
+      vi.mocked(privateSpacesApi.listGroupMembers).mockResolvedValueOnce([
+        { user_id: 333, is_admin: false, joined_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([]);
+
+      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+
+      expect(await screen.findByText('User #333')).toBeInTheDocument();
+    });
+
+    it('shows an error message if members fail to load', async () => {
+      vi.mocked(privateSpacesApi.listGroupMembers).mockRejectedValueOnce(
+        new Error('boom')
+      );
+
+      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+
+      expect(await screen.findByText(/couldn't load members/i)).toBeInTheDocument();
+    });
   });
 
   describe('DirectMessageList', () => {
-    it('renders fetched DMs with the honest "User #id" fallback', async () => {
+    it('renders fetched DMs with the resolved username', async () => {
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
         { direct_chat_id: 1, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' },
       ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        {
+          user_id: 777,
+          username: 'ftm_roosta',
+          display_name: 'Fatemeh Roosta',
+          avatar_url: null,
+          bio: '',
+        },
+      ]);
+
+      render(<DirectMessageList currentUserId={currentUserId} />);
+
+      expect(await screen.findByText('ftm_roosta')).toBeInTheDocument();
+      expect(profileApi.listPublicProfilesByIds).toHaveBeenCalledWith([777]);
+    });
+
+    it('falls back to "User #id" when the other participant cannot be resolved', async () => {
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
+        { direct_chat_id: 1, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([]);
 
       render(<DirectMessageList currentUserId={currentUserId} />);
 
@@ -150,6 +274,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         chat: { direct_chat_id: 9, user1_id: currentUserId, user2_id: 42, created_at: '2026-01-01T00:00:00Z' },
         created: true,
       });
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([]);
 
       render(<DirectMessageList currentUserId={currentUserId} />);
       await waitFor(() => expect(privateSpacesApi.listDirectChats).toHaveBeenCalled());
@@ -170,10 +295,22 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
   });
 
   describe('GroupList', () => {
-    it('renders fetched groups without a member count and allows creating a new group', async () => {
+    it('renders fetched groups with a resolved member count and allows creating a new group', async () => {
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
         { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
       ]);
+      vi.mocked(privateSpacesApi.listGroupMembers).mockImplementation(async (groupId) => {
+        if (groupId === 1) {
+          return [
+            { user_id: currentUserId, is_admin: true, joined_at: '2026-01-01T00:00:00Z' },
+            { user_id: 222, is_admin: false, joined_at: '2026-01-02T00:00:00Z' },
+          ];
+        }
+        if (groupId === 2) {
+          return [{ user_id: currentUserId, is_admin: true, joined_at: '2026-01-01T00:00:00Z' }];
+        }
+        return [];
+      });
       vi.mocked(privateSpacesApi.createGroup).mockResolvedValueOnce({
         group_id: 2,
         name: 'New Test Group',
@@ -184,7 +321,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       render(<GroupList />);
 
       expect(await screen.findByText('Frontend Team')).toBeInTheDocument();
-      expect(screen.queryByText(/members\)/i)).not.toBeInTheDocument();
+      expect(await screen.findByText(/2 members/)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /create group/i }));
       const input = screen.getByPlaceholderText(/group name/i);
@@ -193,6 +330,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
       expect(await screen.findByText('New Test Group')).toBeInTheDocument();
       expect(privateSpacesApi.createGroup).toHaveBeenCalledWith('New Test Group');
+      expect(await screen.findByText(/1 member\)/)).toBeInTheDocument();
     });
   });
 

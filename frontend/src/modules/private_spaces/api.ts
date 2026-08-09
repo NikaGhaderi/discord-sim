@@ -3,6 +3,7 @@ import {
   DirectChat,
   Group,
   GroupInvitation,
+  GroupMember,
   InvitationPage,
   InvitationStatusUpdate,
 } from './types';
@@ -17,6 +18,7 @@ export interface PrivateSpacesApi {
   listGroups(): Promise<Group[]>;
   createGroup(name: string): Promise<Group>;
   getGroup(groupId: number): Promise<Group>;
+  listGroupMembers(groupId: number): Promise<GroupMember[]>;
   updateGroup(groupId: number, name: string): Promise<Group>;
   deleteOrLeaveGroup(
     groupId: number,
@@ -63,6 +65,15 @@ export const createGroup = async (name: string): Promise<Group> => {
 
 export const getGroup = async (groupId: number): Promise<Group> => {
   const response = await apiClient.get<Group>(`/api/groups/${groupId}/`);
+  return response.data;
+};
+
+export const listGroupMembers = async (
+  groupId: number
+): Promise<GroupMember[]> => {
+  const response = await apiClient.get<GroupMember[]>(
+    `/api/groups/${groupId}/members/`
+  );
   return response.data;
 };
 

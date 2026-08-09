@@ -136,6 +136,24 @@ class TestGroups:
         assert rejected.status_code == 404
         assert missing.status_code == 404
 
+    def test_member_list_shows_admin_flag_non_member_gets_404(self, users):
+        creator, member, outsider = users[:3]
+        group = Group.objects.create(name="Original", creator=creator)
+        GroupMember.objects.create(group=group, user=creator, is_admin=True)
+        GroupMember.objects.create(group=group, user=member, is_admin=False)
+
+        listed = authenticated_client(member).get(f"/api/groups/{group.id}/members/")
+        rejected = authenticated_client(outsider).get(
+            f"/api/groups/{group.id}/members/"
+        )
+
+        assert listed.status_code == 200
+        by_id = {m["user_id"]: m for m in listed.json()}
+        assert by_id[creator.id]["is_admin"] is True
+        assert by_id[member.id]["is_admin"] is False
+        assert set(by_id) == {creator.id, member.id}
+        assert rejected.status_code == 404
+
 
 @pytest.mark.django_db
 class TestGroupInvitations:

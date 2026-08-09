@@ -9,6 +9,7 @@ from apps.private_spaces.api.serializers import (
     CreateInvitationSerializer,
     DirectChatSerializer,
     GroupInvitationSerializer,
+    GroupMemberSerializer,
     GroupSerializer,
     InvitationQuerySerializer,
     InvitationResponseSerializer,
@@ -25,6 +26,7 @@ from apps.private_spaces.application.use_cases.groups import (
     DeleteGroupUseCase,
     GetGroupUseCase,
     LeaveGroupUseCase,
+    ListGroupMembersUseCase,
     ListGroupsUseCase,
     UpdateGroupUseCase,
 )
@@ -172,6 +174,19 @@ class GroupDetailView(APIView):
         except GroupNotFoundError as exc:
             return _detail(str(exc), 404)
         return Response(status=204)
+
+
+class GroupMemberListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, group_id):
+        try:
+            members = ListGroupMembersUseCase(DjangoPrivateSpacesRepository()).execute(
+                group_id=group_id, user_id=request.user.id
+            )
+        except GroupNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(GroupMemberSerializer(members, many=True).data, status=200)
 
 
 class LeaveGroupView(APIView):

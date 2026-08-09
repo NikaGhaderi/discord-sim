@@ -87,6 +87,19 @@ describe('Private Spaces API (SCRUM-35)', () => {
       expect(result).toEqual(group);
     });
 
+    it('listGroupMembers requests GET /api/groups/:id/members/', async () => {
+      const members = [
+        { user_id: 1, is_admin: true, joined_at: '2026-01-01T00:00:00Z' },
+        { user_id: 2, is_admin: false, joined_at: '2026-01-02T00:00:00Z' },
+      ];
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ data: members });
+
+      const result = await realApi.listGroupMembers(1);
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/groups/1/members/');
+      expect(result).toEqual(members);
+    });
+
     it('updateGroup PATCHes /api/groups/:id/', async () => {
       const group = { group_id: 1, name: 'New Name', creator_id: 1, created_at: '2026-01-01T00:00:00Z' };
       vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: group });
@@ -198,13 +211,50 @@ describe('Private Spaces API (SCRUM-35)', () => {
       expect(chats[0]).not.toHaveProperty('recipient_username');
     });
 
-    it('listGroups mock returns the real Group shape without member_count', async () => {
+    it('listGroups mock returns the real Group shape (member counts come from listGroupMembers, not an inline field)', async () => {
       const groups = await mockApi.listGroups();
       expect(groups.length).toBeGreaterThan(0);
       expect(groups[0]).toHaveProperty('group_id');
       expect(groups[0]).toHaveProperty('creator_id');
       expect(groups[0]).not.toHaveProperty('member_count');
       expect(groups[0]).not.toHaveProperty('is_admin');
+    });
+
+    it('listGroupMembers mock returns the seeded creator as admin for group 1', async () => {
+      const members = await mockApi.listGroupMembers(1);
+      expect(members.length).toBeGreaterThan(0);
+      expect(members[0]).toHaveProperty('user_id');
+      expect(members[0]).toHaveProperty('is_admin');
+      expect(members[0]).toHaveProperty('joined_at');
+    });
+
+    it('listGroupMembers mock returns an empty list for an unknown group', async () => {
+      const members = await mockApi.listGroupMembers(999999);
+      expect(members).toEqual([]);
+    });
+
+    it('createGroup mock seeds the creator as the sole admin member', async () => {
+      const group = await mockApi.createGroup('Fresh Group');
+      const members = await mockApi.listGroupMembers(group.group_id);
+
+      expect(members).toHaveLength(1);
+      expect(members[0].is_admin).toBe(true);
+    });
+
+    it('respondToInvitation mock adds the invitee as a member on ACCEPTED', async () => {
+      const { invitation } = await mockApi.sendGroupInvitation(2, 7777);
+      await mockApi.respondToInvitation(invitation.invitation_id, 'ACCEPTED');
+
+      const members = await mockApi.listGroupMembers(2);
+      expect(members.some((m) => m.user_id === 7777 && !m.is_admin)).toBe(true);
+    });
+
+    it('respondToInvitation mock does NOT add a member on DECLINED', async () => {
+      const { invitation } = await mockApi.sendGroupInvitation(2, 6666);
+      await mockApi.respondToInvitation(invitation.invitation_id, 'DECLINED');
+
+      const members = await mockApi.listGroupMembers(2);
+      expect(members.some((m) => m.user_id === 6666)).toBe(false);
     });
   });
 });

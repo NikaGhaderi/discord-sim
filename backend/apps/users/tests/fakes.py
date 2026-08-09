@@ -17,6 +17,13 @@ class InMemoryProfileRepository(AbstractProfileRepository):
     def get_by_username(self, username: str) -> UserProfileEntity | None:
         return self._profiles_by_username.get(username)
 
+    def list_by_user_ids(self, user_ids: list[int]) -> list[UserProfileEntity]:
+        return [
+            self._profiles_by_user_id[uid]
+            for uid in user_ids
+            if uid in self._profiles_by_user_id
+        ]
+
     def update_profile(self, user_id: int, **fields) -> UserProfileEntity:
         profile = self.get_by_user_id(user_id)
         if profile is None:

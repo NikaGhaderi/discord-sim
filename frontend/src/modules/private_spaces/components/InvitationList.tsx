@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { profileApi } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { Group, GroupInvitation } from '../types';
 
@@ -9,6 +10,9 @@ interface InvitationWithGroup {
 
 export const InvitationList: React.FC = () => {
   const [items, setItems] = useState<InvitationWithGroup[]>([]);
+  const [inviterNamesById, setInviterNamesById] = useState<
+    Record<number, string>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -32,8 +36,17 @@ export const InvitationList: React.FC = () => {
             }
           })
         );
+        if (cancelled) return;
+        setItems(withGroups);
+
+        const inviterIds = Array.from(
+          new Set(page.results.map((inv) => inv.inviter_id))
+        );
+        const profiles = await profileApi.listPublicProfilesByIds(inviterIds);
         if (!cancelled) {
-          setItems(withGroups);
+          setInviterNamesById(
+            Object.fromEntries(profiles.map((p) => [p.user_id, p.username]))
+          );
         }
       } catch {
         if (!cancelled) {
@@ -82,9 +95,13 @@ export const InvitationList: React.FC = () => {
             <li key={invitation.invitation_id} className="invitation-item">
               <div>
                 <strong>{group ? group.name : `Group #${invitation.group_id}`}</strong>
-                {/* No endpoint resolves user_id -> username, so this is an
-                    honest fallback rather than a fabricated display name. */}
-                <p>From User #{invitation.inviter_id}</p>
+                {/* Falls back to the raw id only if the bulk lookup didn't
+                    resolve it (e.g. the inviter was deleted). */}
+                <p>
+                  From{' '}
+                  {inviterNamesById[invitation.inviter_id] ??
+                    `User #${invitation.inviter_id}`}
+                </p>
               </div>
               <div className="invitation-actions">
                 <button
