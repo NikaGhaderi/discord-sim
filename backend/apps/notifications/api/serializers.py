@@ -7,3 +7,7 @@ class NotificationSerializer(serializers.Serializer):
     payload = serializers.JSONField(read_only=True)
     is_read = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+
+
+class UpdateNotificationSerializer(serializers.Serializer):
+    is_read = serializers.BooleanField()

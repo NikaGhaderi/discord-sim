@@ -131,3 +131,83 @@ def test_sending_a_message_creates_a_retrievable_notification_for_the_other_memb
     assert member_notifications[0]["payload"]["base_message_id"] == message_id
     # The sender doesn't get notified of their own message.
     assert sender_notifications == []
+
+
+@pytest.mark.django_db
+def test_mark_notification_read_requires_authentication():
+    response = APIClient().patch("/api/notifications/1/", {"is_read": True}, format="json")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_owner_can_mark_their_own_notification_read(users):
+    owner, _other = users
+    notification = Notification.objects.create(
+        recipient=owner, event_type="NEW_MESSAGE", payload={"base_message_id": 1}
+    )
+
+    response = client_for(owner).patch(
+        f"/api/notifications/{notification.id}/", {"is_read": True}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_read"] is True
+    notification.refresh_from_db()
+    assert notification.is_read is True
+
+
+@pytest.mark.django_db
+def test_marking_read_can_be_reversed_to_unread(users):
+    owner, _other = users
+    notification = Notification.objects.create(
+        recipient=owner, event_type="NEW_MESSAGE", payload={"base_message_id": 1}, is_read=True
+    )
+
+    response = client_for(owner).patch(
+        f"/api/notifications/{notification.id}/", {"is_read": False}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_read"] is False
+
+
+@pytest.mark.django_db
+def test_marking_a_nonexistent_notification_read_returns_404(users):
+    owner, _other = users
+
+    response = client_for(owner).patch(
+        "/api/notifications/999999/", {"is_read": True}, format="json"
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_a_user_cannot_mark_someone_elses_notification_read(users):
+    owner, other = users
+    notification = Notification.objects.create(
+        recipient=other, event_type="NEW_MESSAGE", payload={"base_message_id": 1}
+    )
+
+    response = client_for(owner).patch(
+        f"/api/notifications/{notification.id}/", {"is_read": True}, format="json"
+    )
+
+    assert response.status_code == 404
+    notification.refresh_from_db()
+    assert notification.is_read is False
+
+
+@pytest.mark.django_db
+def test_mark_read_without_an_is_read_field_is_a_validation_error(users):
+    owner, _other = users
+    notification = Notification.objects.create(
+        recipient=owner, event_type="NEW_MESSAGE", payload={"base_message_id": 1}
+    )
+
+    response = client_for(owner).patch(
+        f"/api/notifications/{notification.id}/", {}, format="json"
+    )
+
+    assert response.status_code == 400
