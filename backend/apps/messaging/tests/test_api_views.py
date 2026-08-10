@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 import pytest
@@ -346,5 +348,132 @@ def test_channel_media_requires_sender_and_send_media_permission(spaces, tmp_pat
         "file_url",
         "file_type",
         "file_size",
+        "thumbnail_url",
     }
     assert created.json()["file_type"] == "text/plain"
+    assert created.json()["thumbnail_url"] is None
+
+
+@pytest.mark.django_db
+def test_oversized_media_upload_is_rejected(spaces, tmp_path):
+    sender = spaces["sender"]
+    channel = spaces["channel"]
+    message = Message.objects.create(
+        sender=sender,
+        topic=spaces["topic"],
+        content="attachment",
+    )
+    role = ChannelRole.objects.create(
+        channel=channel,
+        name="Uploader",
+        permissions=["SEND_MEDIA"],
+    )
+    UserChannelRole.objects.create(channel=channel, user=sender, role=role)
+    client = client_for(sender)
+
+    oversized_content = b"x" * (25 * 1024 * 1024 + 1)
+    with override_settings(MEDIA_ROOT=tmp_path):
+        response = client.post(
+            f"/api/messages/{message.id}/media/",
+            {"file": SimpleUploadedFile("big.txt", oversized_content, "text/plain")},
+            format="multipart",
+        )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_disallowed_content_type_upload_is_rejected(spaces, tmp_path):
+    sender = spaces["sender"]
+    channel = spaces["channel"]
+    message = Message.objects.create(
+        sender=sender,
+        topic=spaces["topic"],
+        content="attachment",
+    )
+    role = ChannelRole.objects.create(
+        channel=channel,
+        name="Uploader",
+        permissions=["SEND_MEDIA"],
+    )
+    UserChannelRole.objects.create(channel=channel, user=sender, role=role)
+    client = client_for(sender)
+
+    with override_settings(MEDIA_ROOT=tmp_path):
+        response = client.post(
+            f"/api/messages/{message.id}/media/",
+            {
+                "file": SimpleUploadedFile(
+                    "malware.bin", b"payload", "application/x-executable"
+                )
+            },
+            format="multipart",
+        )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_image_upload_triggers_thumbnail_task(spaces, tmp_path):
+    sender = spaces["sender"]
+    channel = spaces["channel"]
+    message = Message.objects.create(
+        sender=sender,
+        topic=spaces["topic"],
+        content="attachment",
+    )
+    role = ChannelRole.objects.create(
+        channel=channel,
+        name="Uploader",
+        permissions=["SEND_MEDIA"],
+    )
+    UserChannelRole.objects.create(channel=channel, user=sender, role=role)
+    client = client_for(sender)
+
+    with (
+        override_settings(MEDIA_ROOT=tmp_path),
+        mock.patch(
+            "apps.messaging.application.use_cases.media.generate_thumbnail_task"
+        ) as mock_task,
+    ):
+        response = client.post(
+            f"/api/messages/{message.id}/media/",
+            {"file": SimpleUploadedFile("pic.png", b"pngdata", "image/png")},
+            format="multipart",
+        )
+
+    assert response.status_code == 201
+    mock_task.delay.assert_called_once_with(response.json()["media_id"])
+
+
+@pytest.mark.django_db
+def test_non_image_upload_does_not_trigger_thumbnail_task(spaces, tmp_path):
+    sender = spaces["sender"]
+    channel = spaces["channel"]
+    message = Message.objects.create(
+        sender=sender,
+        topic=spaces["topic"],
+        content="attachment",
+    )
+    role = ChannelRole.objects.create(
+        channel=channel,
+        name="Uploader",
+        permissions=["SEND_MEDIA"],
+    )
+    UserChannelRole.objects.create(channel=channel, user=sender, role=role)
+    client = client_for(sender)
+
+    with (
+        override_settings(MEDIA_ROOT=tmp_path),
+        mock.patch(
+            "apps.messaging.application.use_cases.media.generate_thumbnail_task"
+        ) as mock_task,
+    ):
+        response = client.post(
+            f"/api/messages/{message.id}/media/",
+            {"file": SimpleUploadedFile("notes.txt", b"notes", "text/plain")},
+            format="multipart",
+        )
+
+    assert response.status_code == 201
+    mock_task.delay.assert_not_called()

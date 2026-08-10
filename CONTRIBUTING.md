@@ -164,3 +164,35 @@ services:
 
 The `!override` tag is required; Compose merges (concatenates) `ports` arrays across files by default, so without it you'd end up requesting both `6379` *and* `16379` and still fail on the excluded one. Django/Celery are unaffected either way since they talk to Redis via the internal Docker network name (`redis://redis:6379`), never through the host-mapped port.
 
+### Celery task changes need `web` *and* `worker` rebuilt — not just `web`
+
+Symptom: a new or changed Celery task (anything under `core/tasks/`, or a new dependency in `requirements.txt`) works fine when called directly, but `.delay()` calls silently vanish — no error surfaces to the caller. The only evidence is in the worker's own logs:
+
+```
+Received unregistered task of type 'core.some_task'.
+The message has been ignored and discarded.
+```
+
+Cause: `web` and `worker` build from **separately-tagged images** (`discord-sim/web:latest` vs `discord-sim/worker:latest`) even though they share the same Dockerfile/context, and a running Celery worker caches its task registry at process startup — it does not hot-reload new task modules that show up later, the same way `web`'s daphne process doesn't hot-reload code changes. Rebuilding/restarting only `web` leaves `worker` running stale code (and missing any new dependency, like Pillow for `core/tasks/media.py`).
+
+Fix: after touching `core/tasks/` or `requirements.txt`, rebuild and restart **both**:
+
+```bash
+docker-compose build web worker
+docker-compose up -d --force-recreate web worker
+```
+
+Verify the fix actually landed before trusting it:
+
+```bash
+docker-compose exec worker celery -A config inspect registered
+```
+
+### `worker` can't see files `web` just wrote (`FileNotFoundError` reading `media/...`)
+
+Symptom: an async task that reads a file uploaded moments earlier by a request (e.g. thumbnail generation) fails with `FileNotFoundError: [Errno 2] No such file or directory: '/app/media/...'`, even though the same path clearly exists — you can `docker-compose exec web ls /app/media/...` and see it right there.
+
+Cause: `docker-compose.yml`'s `web` service mounts `media_volume:/app/media` (a Docker-managed named volume) *on top of* its broader `./backend:/app` bind mount, so uploads actually land in that named volume, not on the host filesystem. If another service's `volumes:` list doesn't also declare `media_volume:/app/media`, that service's `/app/media` resolves to whatever's on the plain `./backend:/app` bind mount instead — a completely different, effectively-empty location. `web` and `worker` silently disagreeing about where `MEDIA_ROOT` physically lives.
+
+Fix: any service that needs to read/write uploaded media must declare the same `media_volume:/app/media` mount `web` has. Check `docker-compose.yml` for the service in question; if it's missing, add it, then `docker-compose up -d --force-recreate <service>`.
+

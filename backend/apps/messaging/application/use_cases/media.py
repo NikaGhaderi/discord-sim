@@ -6,22 +6,9 @@ from apps.messaging.domain.exceptions import (
     MediaAttachmentForbiddenError,
 )
 from apps.messaging.domain.models import MediaEntity
-
-
-MAX_MEDIA_FILE_SIZE = 25 * 1024 * 1024
-ALLOWED_MEDIA_TYPES = {
-    "application/pdf",
-    "audio/mpeg",
-    "audio/ogg",
-    "audio/wav",
-    "image/gif",
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "text/plain",
-    "video/mp4",
-    "video/webm",
-}
+from apps.shared.domain.exceptions import InvalidFileError
+from apps.shared.domain.validators import validate_file
+from core.tasks.media import generate_thumbnail_task
 
 
 class AttachMediaUseCase:
@@ -36,17 +23,20 @@ class AttachMediaUseCase:
         file_type: str,
         file_size: int,
     ) -> MediaEntity:
-        if file_size <= 0 or file_size > MAX_MEDIA_FILE_SIZE:
-            raise InvalidMediaError("File size must be between 1 byte and 25 MiB.")
-        if file_type not in ALLOWED_MEDIA_TYPES:
-            raise InvalidMediaError("This file type is not allowed.")
+        try:
+            validate_file(file_size, file_type)
+        except InvalidFileError as exc:
+            raise InvalidMediaError(str(exc)) from exc
         if not self._repository.can_attach_media(base_message_id, user_id):
             raise MediaAttachmentForbiddenError(
                 "You cannot attach media to this message."
             )
-        return self._repository.attach_media(
+        media_entity = self._repository.attach_media(
             base_message_id,
             uploaded_file,
             file_type,
             file_size,
         )
+        if file_type.startswith("image/"):
+            generate_thumbnail_task.delay(media_entity.media_id)
+        return media_entity

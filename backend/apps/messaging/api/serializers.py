@@ -52,6 +52,7 @@ class MediaSerializer(serializers.Serializer):
     file_url = serializers.CharField(read_only=True)
     file_type = serializers.CharField(read_only=True)
     file_size = serializers.IntegerField(read_only=True)
+    thumbnail_url = serializers.CharField(read_only=True, allow_null=True)
 
 
 class MediaSummarySerializer(serializers.Serializer):

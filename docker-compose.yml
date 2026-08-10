@@ -45,6 +45,7 @@ services:
       - .env
     volumes:
       - ./backend:/app
+      - media_volume:/app/media
     depends_on:
       - web
       - db
