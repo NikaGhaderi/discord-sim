@@ -8,7 +8,7 @@ from apps.messaging.application.use_cases.messages import (
     SendMessageUseCase,
 )
 from apps.messaging.domain.exceptions import MessageDeleteForbiddenError
-from apps.messaging.domain.models import MessageEntity
+from apps.messaging.domain.models import MediaEntity, MessageEntity
 
 
 def _message(**overrides) -> MessageEntity:
@@ -46,8 +46,37 @@ def test_send_message_notifies_the_topic_group_on_success():
             "content": "hello",
             "sent_at": "2026-01-01T00:00:00+00:00",
             "is_edited": False,
+            "media": [],
         },
     )
+
+
+def test_send_message_notification_payload_includes_attached_media():
+    message = _message(
+        topic_id=5,
+        media=[
+            MediaEntity(
+                media_id=1,
+                base_message_id=1,
+                file_url="/media/message_media/notes.txt",
+                file_type="text/plain",
+                file_size=42,
+            )
+        ],
+    )
+    repository = Mock()
+    repository.can_access_target.return_value = True
+    repository.create_message.return_value = message
+    notifier = Mock()
+
+    SendMessageUseCase(repository, notifier).execute(
+        sender_id=10, content="hello", topic_id=5
+    )
+
+    payload = notifier.notify.call_args.args[2]
+    assert payload["media"] == [
+        {"file_url": "/media/message_media/notes.txt", "file_type": "text/plain"}
+    ]
 
 
 def test_send_message_notifies_the_group_or_direct_chat_group_correctly():
@@ -149,6 +178,7 @@ def test_send_message_records_a_notification_for_every_other_member():
             "content": "hello",
             "sent_at": "2026-01-01T00:00:00+00:00",
             "is_edited": False,
+            "media": [],
         },
     )
 

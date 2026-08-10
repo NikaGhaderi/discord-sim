@@ -45,6 +45,9 @@ def _message_payload(message: MessageEntity) -> dict:
         "content": message.content,
         "sent_at": message.sent_at.isoformat(),
         "is_edited": message.is_edited,
+        "media": [
+            {"file_url": m.file_url, "file_type": m.file_type} for m in message.media
+        ],
     }
 
 
