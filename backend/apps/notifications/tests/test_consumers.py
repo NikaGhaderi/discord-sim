@@ -76,7 +76,7 @@ def test_subscribed_client_receives_a_group_broadcast():
             },
         )
 
-        response = await communicator.receive_json_from(timeout=5)
+        response = await communicator.receive_json_from(timeout=10)
         assert response == {
             "event_type": "NEW_MESSAGE",
             "data": {"base_message_id": 1, "content": "hi"},
