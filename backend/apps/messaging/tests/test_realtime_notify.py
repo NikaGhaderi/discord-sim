@@ -182,7 +182,9 @@ def test_delete_message_records_a_notification_after_the_delete_succeeds():
     repository.list_target_member_ids.assert_called_once_with(
         topic_id=5, group_id=None, direct_chat_id=None, user_id=10
     )
-    recorder.record.assert_called_once_with([11, 12], "MESSAGE_DELETED", {"base_message_id": 1})
+    recorder.record.assert_called_once_with(
+        [11, 12], "MESSAGE_DELETED", {"base_message_id": 1}
+    )
 
 
 def test_delete_message_does_not_record_when_the_delete_is_forbidden():

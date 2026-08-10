@@ -1,5 +1,6 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
+
 class NotificationConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         if not self.scope["user"].is_authenticated:
@@ -20,4 +21,6 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(group, self.channel_name)
 
     async def broadcast_event(self, event):
-        await self.send_json({"event_type": event["event_type"], "data": event["payload"]})
+        await self.send_json(
+            {"event_type": event["event_type"], "data": event["payload"]}
+        )

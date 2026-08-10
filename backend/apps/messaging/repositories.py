@@ -232,9 +232,13 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
             topic = Topic.objects.filter(pk=topic_id).first()
             if topic is None:
                 return []
-            member_ids = [m.user_id for m in self._channels.list_members(topic.channel_id)]
+            member_ids = [
+                m.user_id for m in self._channels.list_members(topic.channel_id)
+            ]
         elif group_id is not None:
-            member_ids = [m.user_id for m in self._private_spaces.list_group_members(group_id)]
+            member_ids = [
+                m.user_id for m in self._private_spaces.list_group_members(group_id)
+            ]
         elif direct_chat_id is not None:
             chat = self._private_spaces.get_direct_chat_for_participant(
                 direct_chat_id, user_id

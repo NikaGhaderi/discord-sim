@@ -107,4 +107,6 @@ class AbstractRealtimeNotifier(ABC):
 
 class AbstractNotificationRecorder(ABC):
     @abstractmethod
-    def record(self, recipient_ids: list[int], event_type: str, payload: dict) -> None: ...
+    def record(
+        self, recipient_ids: list[int], event_type: str, payload: dict
+    ) -> None: ...

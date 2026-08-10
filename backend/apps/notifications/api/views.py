@@ -24,10 +24,12 @@ class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = ListNotificationsUseCase(DjangoNotificationsRepository()).execute(
-            request.user.id
+        notifications = ListNotificationsUseCase(
+            DjangoNotificationsRepository()
+        ).execute(request.user.id)
+        return Response(
+            NotificationSerializer(notifications, many=True).data, status=200
         )
-        return Response(NotificationSerializer(notifications, many=True).data, status=200)
 
 
 class NotificationDetailView(APIView):

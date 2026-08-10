@@ -30,7 +30,9 @@ def test_mark_notification_read_delegates_to_the_repository():
 
 def test_mark_notification_read_propagates_not_found():
     repository = Mock()
-    repository.mark_read.side_effect = NotificationNotFoundError("Notification not found.")
+    repository.mark_read.side_effect = NotificationNotFoundError(
+        "Notification not found."
+    )
 
     with pytest.raises(NotificationNotFoundError):
         MarkNotificationReadUseCase(repository).execute(

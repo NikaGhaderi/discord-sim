@@ -38,15 +38,11 @@ def test_connect_is_rejected_with_an_invalid_token():
 
 @pytest.mark.django_db(transaction=True)
 def test_connect_succeeds_with_a_valid_token():
-    user = User.objects.create_user(
-        username="ws-user", email="ws-user@example.com"
-    )
+    user = User.objects.create_user(username="ws-user", email="ws-user@example.com")
     token = _access_token_for(user)
 
     async def scenario():
-        communicator = WebsocketCommunicator(
-            application, f"/ws/stream/?token={token}"
-        )
+        communicator = WebsocketCommunicator(application, f"/ws/stream/?token={token}")
         connected, _ = await communicator.connect()
         assert connected is True
         await communicator.disconnect()
@@ -62,13 +58,13 @@ def test_subscribed_client_receives_a_group_broadcast():
     token = _access_token_for(user)
 
     async def scenario():
-        communicator = WebsocketCommunicator(
-            application, f"/ws/stream/?token={token}"
-        )
+        communicator = WebsocketCommunicator(application, f"/ws/stream/?token={token}")
         connected, _ = await communicator.connect()
         assert connected is True
 
-        await communicator.send_json_to({"action": "subscribe", "group": "test-group-a"})
+        await communicator.send_json_to(
+            {"action": "subscribe", "group": "test-group-a"}
+        )
 
         layer = get_channel_layer()
         await layer.group_send(
@@ -99,9 +95,7 @@ def test_client_does_not_receive_broadcasts_for_groups_it_never_subscribed_to():
     token = _access_token_for(user)
 
     async def scenario():
-        communicator = WebsocketCommunicator(
-            application, f"/ws/stream/?token={token}"
-        )
+        communicator = WebsocketCommunicator(application, f"/ws/stream/?token={token}")
         connected, _ = await communicator.connect()
         assert connected is True
         # Deliberately never subscribes to anything.
@@ -130,12 +124,12 @@ def test_disconnect_stops_further_delivery_to_that_socket():
     token = _access_token_for(user)
 
     async def scenario():
-        communicator = WebsocketCommunicator(
-            application, f"/ws/stream/?token={token}"
-        )
+        communicator = WebsocketCommunicator(application, f"/ws/stream/?token={token}")
         connected, _ = await communicator.connect()
         assert connected is True
-        await communicator.send_json_to({"action": "subscribe", "group": "test-group-b"})
+        await communicator.send_json_to(
+            {"action": "subscribe", "group": "test-group-b"}
+        )
         await communicator.disconnect()
 
         layer = get_channel_layer()

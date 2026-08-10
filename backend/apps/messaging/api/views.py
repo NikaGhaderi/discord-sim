@@ -156,9 +156,7 @@ class MessageDetailView(APIView):
                 DjangoMessagingRepository(),
                 ChannelsRealtimeNotifier(),
                 DjangoNotificationRecorder(),
-            ).execute(
-                base_message_id, request.user.id
-            )
+            ).execute(base_message_id, request.user.id)
         except MessageNotFoundError as exc:
             return _detail(str(exc), 404)
         except MessageDeleteForbiddenError as exc:

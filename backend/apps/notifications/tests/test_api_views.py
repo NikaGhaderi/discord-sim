@@ -135,7 +135,9 @@ def test_sending_a_message_creates_a_retrievable_notification_for_the_other_memb
 
 @pytest.mark.django_db
 def test_mark_notification_read_requires_authentication():
-    response = APIClient().patch("/api/notifications/1/", {"is_read": True}, format="json")
+    response = APIClient().patch(
+        "/api/notifications/1/", {"is_read": True}, format="json"
+    )
 
     assert response.status_code == 401
 
@@ -161,7 +163,10 @@ def test_owner_can_mark_their_own_notification_read(users):
 def test_marking_read_can_be_reversed_to_unread(users):
     owner, _other = users
     notification = Notification.objects.create(
-        recipient=owner, event_type="NEW_MESSAGE", payload={"base_message_id": 1}, is_read=True
+        recipient=owner,
+        event_type="NEW_MESSAGE",
+        payload={"base_message_id": 1},
+        is_read=True,
     )
 
     response = client_for(owner).patch(

@@ -97,7 +97,9 @@ class SendMessageUseCase:
                     direct_chat_id=direct_chat_id,
                     user_id=sender_id,
                 )
-                self._notification_recorder.record(recipient_ids, "NEW_MESSAGE", payload)
+                self._notification_recorder.record(
+                    recipient_ids, "NEW_MESSAGE", payload
+                )
         return message
 
 

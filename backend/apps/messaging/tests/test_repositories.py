@@ -45,7 +45,9 @@ def test_failed_history_insert_rolls_back_message_edit():
 @pytest.fixture
 def three_users(db):
     return [
-        User.objects.create_user(username=f"recipient-{i}", email=f"recipient-{i}@example.com")
+        User.objects.create_user(
+            username=f"recipient-{i}", email=f"recipient-{i}@example.com"
+        )
         for i in range(3)
     ]
 
