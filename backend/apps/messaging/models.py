@@ -92,6 +92,9 @@ class Media(models.Model):
         related_name="media",
     )
     file = models.FileField(upload_to="message_media/%Y/%m/%d")
+    thumbnail = models.ImageField(
+        upload_to="message_media_thumbnails/%Y/%m/%d", null=True, blank=True
+    )
     file_type = models.CharField(max_length=255)
     file_size = models.PositiveBigIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
