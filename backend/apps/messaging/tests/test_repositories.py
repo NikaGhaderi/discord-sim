@@ -22,7 +22,7 @@ def test_failed_history_insert_rolls_back_message_edit():
     message = Message.objects.create(
         sender=sender,
         direct_chat=direct_chat,
-        content="original",
+        body="original",
     )
 
     with (
@@ -36,6 +36,6 @@ def test_failed_history_insert_rolls_back_message_edit():
         DjangoMessagingRepository().write_message_edit(message.id, "must roll back")
 
     message.refresh_from_db()
-    assert message.content == "original"
+    assert message.body == "original"
     assert message.is_edited is False
     assert MessageHistory.objects.count() == 0

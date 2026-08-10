@@ -1,24 +1,16 @@
 from apps.messaging.application.interfaces import AbstractMessagingRepository
 from apps.messaging.domain.exceptions import (
-    InvalidMessageTargetError,
     MessageDeleteForbiddenError,
     MessageEditForbiddenError,
     MessageTargetNotFoundError,
 )
-from apps.messaging.domain.models import MessageEntity, MessagePage
+from apps.messaging.domain.models import (
+    MessageEntity,
+    MessagePage,
+    validate_exactly_one_target,
+)
 from apps.permissions.domain.checker import has_permission
 from apps.permissions.domain.permissions import PermissionCode
-
-
-def validate_exactly_one_target(
-    topic_id: int | None,
-    group_id: int | None,
-    direct_chat_id: int | None,
-) -> None:
-    if sum(value is not None for value in (topic_id, group_id, direct_chat_id)) != 1:
-        raise InvalidMessageTargetError(
-            "Exactly one of topic_id, group_id, or direct_chat_id must be set."
-        )
 
 
 class SendMessageUseCase:
