@@ -85,3 +85,8 @@ class AbstractMessagingRepository(ABC):
 
     @abstractmethod
     def is_group_admin(self, group_id: int, user_id: int) -> bool: ...
+
+
+class AbstractRealtimeNotifier(ABC):
+    @abstractmethod
+    def notify(self, group_name: str, event_type: str, payload: dict) -> None: ...
