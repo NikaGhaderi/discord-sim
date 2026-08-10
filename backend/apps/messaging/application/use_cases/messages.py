@@ -1,4 +1,8 @@
-from apps.messaging.application.interfaces import AbstractMessagingRepository, AbstractRealtimeNotifier
+from apps.messaging.application.interfaces import (
+    AbstractMessagingRepository,
+    AbstractNotificationRecorder,
+    AbstractRealtimeNotifier,
+)
 from apps.messaging.domain.exceptions import (
     InvalidMessageTargetError,
     MessageDeleteForbiddenError,
@@ -49,9 +53,11 @@ class SendMessageUseCase:
         self,
         repository: AbstractMessagingRepository,
         notifier: AbstractRealtimeNotifier | None = None,
+        notification_recorder: AbstractNotificationRecorder | None = None,
     ) -> None:
         self._repository = repository
         self._notifier = notifier
+        self._notification_recorder = notification_recorder
 
     def execute(
         self,
@@ -77,11 +83,21 @@ class SendMessageUseCase:
             group_id=group_id,
             direct_chat_id=direct_chat_id,
         )
-        if self._notifier is not None:
+        if self._notifier is not None or self._notification_recorder is not None:
             group_name = _realtime_group_name(
                 topic_id=topic_id, group_id=group_id, direct_chat_id=direct_chat_id
             )
-            self._notifier.notify(group_name, "NEW_MESSAGE", _message_payload(message))
+            payload = _message_payload(message)
+            if self._notifier is not None:
+                self._notifier.notify(group_name, "NEW_MESSAGE", payload)
+            if self._notification_recorder is not None:
+                recipient_ids = self._repository.list_target_member_ids(
+                    topic_id=topic_id,
+                    group_id=group_id,
+                    direct_chat_id=direct_chat_id,
+                    user_id=sender_id,
+                )
+                self._notification_recorder.record(recipient_ids, "NEW_MESSAGE", payload)
         return message
 
 
@@ -167,9 +183,11 @@ class DeleteMessageUseCase:
         self,
         repository: AbstractMessagingRepository,
         notifier: AbstractRealtimeNotifier | None = None,
+        notification_recorder: AbstractNotificationRecorder | None = None,
     ) -> None:
         self._repository = repository
         self._notifier = notifier
+        self._notification_recorder = notification_recorder
 
     def execute(self, base_message_id: int, user_id: int) -> None:
         message = self._repository.get_message(base_message_id)
@@ -178,15 +196,25 @@ class DeleteMessageUseCase:
                 "You cannot delete this message globally."
             )
         self._repository.delete_message(base_message_id)
-        if self._notifier is not None:
+        if self._notifier is not None or self._notification_recorder is not None:
             group_name = _realtime_group_name(
                 topic_id=message.topic_id,
                 group_id=message.group_id,
                 direct_chat_id=message.direct_chat_id,
             )
-            self._notifier.notify(
-                group_name, "MESSAGE_DELETED", {"base_message_id": base_message_id}
-            )
+            payload = {"base_message_id": base_message_id}
+            if self._notifier is not None:
+                self._notifier.notify(group_name, "MESSAGE_DELETED", payload)
+            if self._notification_recorder is not None:
+                recipient_ids = self._repository.list_target_member_ids(
+                    topic_id=message.topic_id,
+                    group_id=message.group_id,
+                    direct_chat_id=message.direct_chat_id,
+                    user_id=message.sender_id,
+                )
+                self._notification_recorder.record(
+                    recipient_ids, "MESSAGE_DELETED", payload
+                )
 
     def _can_moderate(self, message: MessageEntity, user_id: int) -> bool:
         if message.topic_id is not None:

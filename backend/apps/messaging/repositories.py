@@ -219,3 +219,27 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
             user_id=user_id,
             is_admin=True,
         ).exists()
+
+    def list_target_member_ids(
+        self,
+        *,
+        topic_id: int | None,
+        group_id: int | None,
+        direct_chat_id: int | None,
+        user_id: int,
+    ) -> list[int]:
+        if topic_id is not None:
+            topic = Topic.objects.filter(pk=topic_id).first()
+            if topic is None:
+                return []
+            member_ids = [m.user_id for m in self._channels.list_members(topic.channel_id)]
+        elif group_id is not None:
+            member_ids = [m.user_id for m in self._private_spaces.list_group_members(group_id)]
+        elif direct_chat_id is not None:
+            chat = self._private_spaces.get_direct_chat_for_participant(
+                direct_chat_id, user_id
+            )
+            member_ids = [chat.user1_id, chat.user2_id] if chat is not None else []
+        else:
+            member_ids = []
+        return [uid for uid in member_ids if uid != user_id]

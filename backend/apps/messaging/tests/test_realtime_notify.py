@@ -124,3 +124,78 @@ def test_delete_message_does_not_notify_when_the_delete_is_forbidden():
 
     repository.delete_message.assert_not_called()
     notifier.notify.assert_not_called()
+
+
+def test_send_message_records_a_notification_for_every_other_member():
+    repository = Mock()
+    repository.can_access_target.return_value = True
+    repository.create_message.return_value = _message(topic_id=5, sender_id=10)
+    repository.list_target_member_ids.return_value = [11, 12]
+    recorder = Mock()
+
+    SendMessageUseCase(repository, notification_recorder=recorder).execute(
+        sender_id=10, content="hello", topic_id=5
+    )
+
+    repository.list_target_member_ids.assert_called_once_with(
+        topic_id=5, group_id=None, direct_chat_id=None, user_id=10
+    )
+    recorder.record.assert_called_once_with(
+        [11, 12],
+        "NEW_MESSAGE",
+        {
+            "base_message_id": 1,
+            "sender_id": 10,
+            "content": "hello",
+            "sent_at": "2026-01-01T00:00:00+00:00",
+            "is_edited": False,
+        },
+    )
+
+
+def test_send_message_works_with_no_notification_recorder_configured():
+    repository = Mock()
+    repository.can_access_target.return_value = True
+    repository.create_message.return_value = _message(topic_id=5)
+
+    # No recorder passed -- must not raise, and must not even try to
+    # resolve recipients since there's nothing to record them for.
+    SendMessageUseCase(repository, notifier=Mock()).execute(
+        sender_id=10, content="hello", topic_id=5
+    )
+
+    repository.list_target_member_ids.assert_not_called()
+
+
+def test_delete_message_records_a_notification_after_the_delete_succeeds():
+    repository = Mock()
+    repository.get_message.return_value = _message(
+        topic_id=5, sender_id=10, base_message_id=1
+    )
+    repository.list_target_member_ids.return_value = [11, 12]
+    recorder = Mock()
+
+    DeleteMessageUseCase(repository, notification_recorder=recorder).execute(
+        base_message_id=1, user_id=10
+    )
+
+    repository.list_target_member_ids.assert_called_once_with(
+        topic_id=5, group_id=None, direct_chat_id=None, user_id=10
+    )
+    recorder.record.assert_called_once_with([11, 12], "MESSAGE_DELETED", {"base_message_id": 1})
+
+
+def test_delete_message_does_not_record_when_the_delete_is_forbidden():
+    repository = Mock()
+    repository.get_message.return_value = _message(
+        topic_id=5, sender_id=10, group_id=None
+    )
+    repository.get_permissions_for_topic.return_value = []
+    recorder = Mock()
+
+    with pytest.raises(MessageDeleteForbiddenError):
+        DeleteMessageUseCase(repository, notification_recorder=recorder).execute(
+            base_message_id=1, user_id=999
+        )
+
+    recorder.record.assert_not_called()

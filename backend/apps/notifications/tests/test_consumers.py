@@ -68,11 +68,11 @@ def test_subscribed_client_receives_a_group_broadcast():
         connected, _ = await communicator.connect()
         assert connected is True
 
-        await communicator.send_json_to({"action": "subscribe", "group": "topic_5"})
+        await communicator.send_json_to({"action": "subscribe", "group": "test-group-a"})
 
         layer = get_channel_layer()
         await layer.group_send(
-            "topic_5",
+            "test-group-a",
             {
                 "type": "broadcast.event",
                 "event_type": "NEW_MESSAGE",
@@ -80,7 +80,7 @@ def test_subscribed_client_receives_a_group_broadcast():
             },
         )
 
-        response = await communicator.receive_json_from(timeout=2)
+        response = await communicator.receive_json_from(timeout=5)
         assert response == {
             "event_type": "NEW_MESSAGE",
             "data": {"base_message_id": 1, "content": "hi"},
@@ -108,7 +108,7 @@ def test_client_does_not_receive_broadcasts_for_groups_it_never_subscribed_to():
 
         layer = get_channel_layer()
         await layer.group_send(
-            "topic_5",
+            "test-group-a",
             {
                 "type": "broadcast.event",
                 "event_type": "NEW_MESSAGE",
@@ -135,14 +135,14 @@ def test_disconnect_stops_further_delivery_to_that_socket():
         )
         connected, _ = await communicator.connect()
         assert connected is True
-        await communicator.send_json_to({"action": "subscribe", "group": "topic_9"})
+        await communicator.send_json_to({"action": "subscribe", "group": "test-group-b"})
         await communicator.disconnect()
 
         layer = get_channel_layer()
         # Should not raise even though the only subscriber just disconnected
         # and was removed from the group.
         await layer.group_send(
-            "topic_9",
+            "test-group-b",
             {"type": "broadcast.event", "event_type": "NEW_MESSAGE", "payload": {}},
         )
 

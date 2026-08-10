@@ -32,6 +32,7 @@ from apps.messaging.domain.exceptions import (
 )
 from apps.messaging.realtime import ChannelsRealtimeNotifier
 from apps.messaging.repositories import DjangoMessagingRepository
+from apps.notifications.recorder import DjangoNotificationRecorder
 
 
 def _detail(message, status_code):
@@ -97,7 +98,11 @@ class MessageListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
-            message = SendMessageUseCase(DjangoMessagingRepository(), ChannelsRealtimeNotifier()).execute(
+            message = SendMessageUseCase(
+                DjangoMessagingRepository(),
+                ChannelsRealtimeNotifier(),
+                DjangoNotificationRecorder(),
+            ).execute(
                 request.user.id,
                 data["content"],
                 **_target_kwargs(data),
@@ -147,7 +152,11 @@ class MessageDetailView(APIView):
 
     def delete(self, request, base_message_id):
         try:
-            DeleteMessageUseCase(DjangoMessagingRepository(), ChannelsRealtimeNotifier()).execute(
+            DeleteMessageUseCase(
+                DjangoMessagingRepository(),
+                ChannelsRealtimeNotifier(),
+                DjangoNotificationRecorder(),
+            ).execute(
                 base_message_id, request.user.id
             )
         except MessageNotFoundError as exc:
