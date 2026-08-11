@@ -1,5 +1,7 @@
-import React, { useState, useRef, useLayoutEffect, UIEvent } from 'react';
+import React, { useCallback, useState, useRef, useLayoutEffect, UIEvent } from 'react';
 import { Message } from '../types';
+import { useLiveMessages } from '../useLiveMessages';
+import { NewMessageData, MessageDeletedData } from '../../notifications';
 
 const MOCK_ALL_MESSAGES: Message[] = Array.from({ length: 60 }, (_, index) => {
   const msgNum = 60 - index;
@@ -15,7 +17,13 @@ const MOCK_ALL_MESSAGES: Message[] = Array.from({ length: 60 }, (_, index) => {
 
 const PAGE_SIZE = 20;
 
-export const MessageThread: React.FC = () => {
+interface MessageThreadProps {
+  /** Optional -- when omitted, this thread receives no live updates (same
+   * behavior as before SCRUM-55). */
+  topicId?: number;
+}
+
+export const MessageThread: React.FC<MessageThreadProps> = ({ topicId }) => {
   const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -24,6 +32,30 @@ export const MessageThread: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(() =>
     MOCK_ALL_MESSAGES.slice(-PAGE_SIZE)
   );
+
+  const handleNewMessage = useCallback((data: NewMessageData) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        base_message_id: data.base_message_id,
+        sender_id: data.sender_id,
+        sender_username: `User #${data.sender_id}`,
+        content: data.content,
+        sent_at: data.sent_at,
+        is_edited: data.is_edited,
+      },
+    ]);
+  }, []);
+
+  const handleMessageDeleted = useCallback((data: MessageDeletedData) => {
+    setMessages((prev) => prev.filter((m) => m.base_message_id !== data.base_message_id));
+  }, []);
+
+  useLiveMessages({
+    topicId,
+    onNewMessage: handleNewMessage,
+    onMessageDeleted: handleMessageDeleted,
+  });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollHeightBeforeLoad = useRef<number>(0);

@@ -6,21 +6,24 @@ import { ProfilePage } from '../modules/profile/pages/ProfilePage';
 import { PrivateSpacesPage } from '../modules/private_spaces/pages/PrivateSpacesPage';
 import { WorkspacePage } from '../modules/workspaces/pages/WorkspacePage';
 import { ChannelThreadPage } from '../modules/messaging/pages/ChannelThreadPage';
+import { RealtimeProvider } from '../modules/notifications/RealtimeProvider';
 
 export function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
-        <main>
-          <Routes>
-            <Route path="/" element={<AuthPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/private-spaces" element={<PrivateSpacesPage />} />
-            <Route path="/workspaces" element={<WorkspacePage />} />
-            <Route path="/channels/demo" element={<ChannelThreadPage />} />
-          </Routes>
-        </main>
+        <RealtimeProvider>
+          <main>
+            <Routes>
+              <Route path="/" element={<AuthPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/private-spaces" element={<PrivateSpacesPage />} />
+              <Route path="/workspaces" element={<WorkspacePage />} />
+              <Route path="/channels/demo" element={<ChannelThreadPage />} />
+            </Routes>
+          </main>
+        </RealtimeProvider>
       </AuthProvider>
     </BrowserRouter>
   );
