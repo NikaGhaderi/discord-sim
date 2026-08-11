@@ -15,9 +15,9 @@ from apps.messaging.api.serializers import (
     UpdateMessageSerializer,
 )
 from apps.messaging.application.use_cases.media import AttachMediaUseCase
+from apps.messaging.application.use_cases.delete_message import DeleteMessageUseCase
+from apps.messaging.application.use_cases.edit_message import EditMessageUseCase
 from apps.messaging.application.use_cases.messages import (
-    DeleteMessageUseCase,
-    EditMessageUseCase,
     ListMessagesUseCase,
     SearchMessagesUseCase,
     SendMessageUseCase,
