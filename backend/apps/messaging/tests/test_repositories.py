@@ -5,7 +5,8 @@ import pytest
 from apps.authentication.models import User
 from apps.messaging.models import Message, MessageHistory
 from apps.messaging.repositories import DjangoMessagingRepository
-from apps.private_spaces.models import DirectChat
+from apps.private_spaces.models import DirectChat, Group, GroupMember
+from apps.workspaces.models import Channel, ChannelMember, Topic
 
 
 @pytest.mark.django_db(transaction=True)
@@ -39,3 +40,68 @@ def test_failed_history_insert_rolls_back_message_edit():
     assert message.body == "original"
     assert message.is_edited is False
     assert MessageHistory.objects.count() == 0
+
+
+@pytest.fixture
+def three_users(db):
+    return [
+        User.objects.create_user(
+            username=f"recipient-{i}", email=f"recipient-{i}@example.com"
+        )
+        for i in range(3)
+    ]
+
+
+@pytest.mark.django_db
+def test_list_target_member_ids_for_a_topic_excludes_the_caller(three_users):
+    sender, member, outsider = three_users
+    channel = Channel.objects.create(name="Channel", creator=sender)
+    topic = Topic.objects.create(title="Topic", channel=channel)
+    ChannelMember.objects.create(channel=channel, user=sender)
+    ChannelMember.objects.create(channel=channel, user=member)
+
+    recipient_ids = DjangoMessagingRepository().list_target_member_ids(
+        topic_id=topic.id, group_id=None, direct_chat_id=None, user_id=sender.id
+    )
+
+    assert recipient_ids == [member.id]
+    assert outsider.id not in recipient_ids
+
+
+@pytest.mark.django_db
+def test_list_target_member_ids_for_a_group_excludes_the_caller(three_users):
+    sender, member, _outsider = three_users
+    group = Group.objects.create(name="Group", creator=sender)
+    GroupMember.objects.create(group=group, user=sender, is_admin=True)
+    GroupMember.objects.create(group=group, user=member)
+
+    recipient_ids = DjangoMessagingRepository().list_target_member_ids(
+        topic_id=None, group_id=group.id, direct_chat_id=None, user_id=sender.id
+    )
+
+    assert recipient_ids == [member.id]
+
+
+@pytest.mark.django_db
+def test_list_target_member_ids_for_a_direct_chat_returns_just_the_other_participant(
+    three_users,
+):
+    sender, other, _outsider = three_users
+    direct_chat = DirectChat.objects.create(user1=sender, user2=other)
+
+    recipient_ids = DjangoMessagingRepository().list_target_member_ids(
+        topic_id=None, group_id=None, direct_chat_id=direct_chat.id, user_id=sender.id
+    )
+
+    assert recipient_ids == [other.id]
+
+
+@pytest.mark.django_db
+def test_list_target_member_ids_returns_empty_for_a_nonexistent_topic(three_users):
+    sender, _member, _outsider = three_users
+
+    recipient_ids = DjangoMessagingRepository().list_target_member_ids(
+        topic_id=999999, group_id=None, direct_chat_id=None, user_id=sender.id
+    )
+
+    assert recipient_ids == []

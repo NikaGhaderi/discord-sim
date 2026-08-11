@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { App } from './App';
 import { profileApi } from '../modules/profile';
 import { privateSpacesApi } from '../modules/private_spaces';
+import { workspacesApi } from '../modules/workspaces';
 
 vi.mock('../modules/profile', () => ({
   profileApi: {
@@ -27,6 +28,31 @@ vi.mock('../modules/private_spaces', () => ({
     sendGroupInvitation: vi.fn(),
     respondToInvitation: vi.fn(),
     listMyInvitations: vi.fn(),
+  },
+}));
+
+vi.mock('../modules/workspaces', () => ({
+  workspacesApi: {
+    listChannels: vi.fn(),
+    getChannel: vi.fn(),
+    createChannel: vi.fn(),
+    updateChannel: vi.fn(),
+    deleteChannel: vi.fn(),
+    joinChannel: vi.fn(),
+    joinChannelByInviteToken: vi.fn(),
+    leaveChannel: vi.fn(),
+    listMembers: vi.fn(),
+    updateMemberNickname: vi.fn(),
+    kickMember: vi.fn(),
+    listRoles: vi.fn(),
+    createRole: vi.fn(),
+    updateRole: vi.fn(),
+    deleteRole: vi.fn(),
+    assignRole: vi.fn(),
+    listTopics: vi.fn(),
+    getTopic: vi.fn(),
+    createTopic: vi.fn(),
+    deleteTopic: vi.fn(),
   },
 }));
 
@@ -74,5 +100,31 @@ describe('App Component', () => {
 
     expect(await screen.findByText('Direct Messages')).toBeInTheDocument();
     expect(screen.getByText('Groups')).toBeInTheDocument();
+  });
+
+  test('renders the channel thread page when navigated to /channels/demo', () => {
+    window.history.pushState({}, 'Channel Thread Page', '/channels/demo');
+    render(<App />);
+
+    expect(screen.getByText('# general')).toBeInTheDocument();
+    expect(screen.getByText('Message content #1')).toBeInTheDocument();
+  });
+
+  test('renders the workspaces page when navigated to /workspaces', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([
+      {
+        channel_id: 1,
+        name: 'general',
+        creator_id: 9,
+        default_topic_id: 5,
+        created_at: '2026-01-01T00:00:00Z',
+        invite_token: 'abc123',
+      },
+    ]);
+    window.history.pushState({}, 'Workspaces Page', '/workspaces');
+
+    render(<App />);
+
+    expect(await screen.findAllByText('# general')).not.toHaveLength(0);
   });
 });
