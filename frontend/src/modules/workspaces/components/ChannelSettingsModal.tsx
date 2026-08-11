@@ -27,6 +27,13 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [didCopyInvite, setDidCopyInvite] = useState(false);
+
+  const handleCopyInvite = async () => {
+    await navigator.clipboard.writeText(channel.invite_token);
+    setDidCopyInvite(true);
+    setTimeout(() => setDidCopyInvite(false), 2000);
+  };
 
   const handleRename = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -99,6 +106,16 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
           {isSaving ? 'Saving...' : 'Save Name'}
         </button>
       </form>
+
+      <div className="field">
+        <label htmlFor="settings-invite-link">Invite Link</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input id="settings-invite-link" type="text" readOnly value={channel.invite_token} />
+          <button type="button" className="btn" onClick={handleCopyInvite}>
+            {didCopyInvite ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
         <button type="button" className="btn btn-block" onClick={() => setSubPanel('roles')}>

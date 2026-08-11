@@ -273,6 +273,28 @@ describe('ChannelSettingsModal', () => {
     await waitFor(() => expect(onLeft).toHaveBeenCalledWith(1));
   });
 
+  it('shows the invite link and copies it to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText('Invite Link')).toHaveValue('abc123');
+
+    fireEvent.click(screen.getByText('Copy'));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('abc123'));
+    expect(await screen.findByText('Copied!')).toBeInTheDocument();
+  });
+
   it('navigates into the roles and topics sub-panels', async () => {
     vi.mocked(workspacesApi.listRoles).mockResolvedValue([]);
     vi.mocked(workspacesApi.listMembers).mockResolvedValue([]);
