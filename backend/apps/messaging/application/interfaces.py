@@ -85,3 +85,28 @@ class AbstractMessagingRepository(ABC):
 
     @abstractmethod
     def is_group_admin(self, group_id: int, user_id: int) -> bool: ...
+
+    @abstractmethod
+    def list_target_member_ids(
+        self,
+        *,
+        topic_id: int | None,
+        group_id: int | None,
+        direct_chat_id: int | None,
+        user_id: int,
+    ) -> list[int]:
+        """Every other member of the target room -- the calling user's own
+        id is always excluded, so callers get a ready-to-use recipient list."""
+        ...
+
+
+class AbstractRealtimeNotifier(ABC):
+    @abstractmethod
+    def notify(self, group_name: str, event_type: str, payload: dict) -> None: ...
+
+
+class AbstractNotificationRecorder(ABC):
+    @abstractmethod
+    def record(
+        self, recipient_ids: list[int], event_type: str, payload: dict
+    ) -> None: ...

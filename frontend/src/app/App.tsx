@@ -5,6 +5,7 @@ import { ResetPasswordPage } from '../modules/identity/pages/ResetPasswordPage';
 import { ProfilePage } from '../modules/profile/pages/ProfilePage';
 import { PrivateSpacesPage } from '../modules/private_spaces/pages/PrivateSpacesPage';
 import { ChannelThreadPage } from '../modules/messaging/pages/ChannelThreadPage';
+import { WorkspacePage } from '../modules/workspaces/pages/WorkspacePage';
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/private-spaces" element={<PrivateSpacesPage />} />
             <Route path="/channels/demo" element={<ChannelThreadPage />} />
+            <Route path="/workspaces" element={<WorkspacePage />} />
           </Routes>
         </main>
       </AuthProvider>
