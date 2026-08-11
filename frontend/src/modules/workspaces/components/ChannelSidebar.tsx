@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Modal } from '@shared/components/Modal';
+import { NotificationFeed } from '../../notifications/components/NotificationFeed';
 import { Channel, ChannelMember } from '../types';
 import { CreateChannelModal } from './CreateChannelModal';
 import { JoinChannelModal } from './JoinChannelModal';
@@ -11,7 +13,7 @@ interface ChannelSidebarProps {
   onChannelJoined: (membership: ChannelMember) => void;
 }
 
-type OpenModal = 'none' | 'create' | 'join';
+type OpenModal = 'none' | 'create' | 'join' | 'notifications';
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   channels,
@@ -29,6 +31,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div className="channel-item">Home</div>
         <div className="channel-item">Friends</div>
         <div className="channel-item">Direct Messages</div>
+        <div className="channel-item" onClick={() => setOpenModal('notifications')}>
+          Notifications
+        </div>
       </nav>
 
       <div className="sidebar-section-title">
@@ -102,6 +107,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       )}
       {openModal === 'join' && (
         <JoinChannelModal onClose={() => setOpenModal('none')} onJoined={onChannelJoined} />
+      )}
+      {openModal === 'notifications' && (
+        <Modal title="Notifications" onClose={() => setOpenModal('none')}>
+          <NotificationFeed />
+        </Modal>
       )}
     </aside>
   );
