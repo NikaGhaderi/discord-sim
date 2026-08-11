@@ -62,6 +62,20 @@ class Message(BaseMessage):
         constraints = [
             exactly_one_target_constraint("messaging_message_exactly_one_target")
         ]
+        indexes = [
+            models.Index(
+                fields=("topic", "basemessage_ptr"),
+                name="messaging_topic_message_idx",
+            ),
+            models.Index(
+                fields=("group", "basemessage_ptr"),
+                name="messaging_group_message_idx",
+            ),
+            models.Index(
+                fields=("direct_chat", "basemessage_ptr"),
+                name="messaging_dm_message_idx",
+            ),
+        ]
 
     def clean(self):
         super().clean()
@@ -97,6 +111,20 @@ class ScheduledMessage(BaseMessage):
         ordering = ("scheduled_time", "id")
         constraints = [
             exactly_one_target_constraint("messaging_scheduled_exactly_one_target")
+        ]
+        indexes = [
+            models.Index(
+                fields=("topic", "basemessage_ptr"),
+                name="messaging_topic_scheduled_idx",
+            ),
+            models.Index(
+                fields=("group", "basemessage_ptr"),
+                name="messaging_group_scheduled_idx",
+            ),
+            models.Index(
+                fields=("direct_chat", "basemessage_ptr"),
+                name="messaging_dm_scheduled_idx",
+            ),
         ]
 
     def clean(self):
