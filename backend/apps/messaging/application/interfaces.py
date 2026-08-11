@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import BinaryIO
 
-from apps.messaging.domain.models import MediaEntity, MessageEntity, MessagePage
+from apps.messaging.domain.models import (
+    MediaEntity,
+    MessageEntity,
+    MessagePage,
+    ScheduledMessageEntity,
+)
 
 
 class AbstractMessagingRepository(ABC):
@@ -25,6 +31,33 @@ class AbstractMessagingRepository(ABC):
         group_id: int | None,
         direct_chat_id: int | None,
     ) -> MessageEntity: ...
+
+    @abstractmethod
+    def create_scheduled_message(
+        self,
+        sender_id: int,
+        content: str,
+        scheduled_time: datetime,
+        *,
+        topic_id: int | None,
+        group_id: int | None,
+        direct_chat_id: int | None,
+    ) -> ScheduledMessageEntity: ...
+
+    @abstractmethod
+    def get_scheduled_message(
+        self, scheduled_message_id: int
+    ) -> ScheduledMessageEntity: ...
+
+    @abstractmethod
+    def delete_scheduled_message(self, scheduled_message_id: int) -> None: ...
+
+    @abstractmethod
+    def promote_scheduled_message(
+        self, scheduled_message_id: int
+    ) -> MessageEntity | None:
+        """Atomically promotes an existing scheduled row, or returns None."""
+        ...
 
     @abstractmethod
     def list_messages(
@@ -110,3 +143,8 @@ class AbstractNotificationRecorder(ABC):
     def record(
         self, recipient_ids: list[int], event_type: str, payload: dict
     ) -> None: ...
+
+
+class AbstractScheduledMessageDispatcher(ABC):
+    @abstractmethod
+    def schedule(self, scheduled_message_id: int, eta: datetime) -> None: ...

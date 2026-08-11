@@ -31,3 +31,14 @@ class MessageEntity:
 class MessagePage:
     count: int
     results: list[MessageEntity]
+
+
+@dataclass
+class ScheduledMessageEntity:
+    scheduled_id: int
+    sender_id: int
+    content: str
+    scheduled_time: datetime
+    topic_id: int | None = None
+    group_id: int | None = None
+    direct_chat_id: int | None = None

@@ -24,3 +24,15 @@ class MediaAttachmentForbiddenError(Exception):
 
 class InvalidMediaError(Exception):
     """Raised when an uploaded attachment violates file policy."""
+
+
+class InvalidScheduledTimeError(Exception):
+    """Raised when a scheduled message is not set for a future time."""
+
+
+class ScheduledMessageNotFoundError(Exception):
+    """Raised when a scheduled message does not exist."""
+
+
+class ScheduledMessageCancelForbiddenError(Exception):
+    """Raised when someone other than the sender attempts cancellation."""

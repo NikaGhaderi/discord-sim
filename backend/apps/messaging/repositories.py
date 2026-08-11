@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import BinaryIO
 
 from django.contrib.postgres.search import SearchQuery, SearchVector
@@ -5,9 +6,17 @@ from django.db import transaction
 from django.db.models import QuerySet
 
 from apps.messaging.application.interfaces import AbstractMessagingRepository
-from apps.messaging.domain.exceptions import MessageNotFoundError
-from apps.messaging.domain.models import MediaEntity, MessageEntity, MessagePage
-from apps.messaging.models import Media, Message, MessageHistory
+from apps.messaging.domain.exceptions import (
+    MessageNotFoundError,
+    ScheduledMessageNotFoundError,
+)
+from apps.messaging.domain.models import (
+    MediaEntity,
+    MessageEntity,
+    MessagePage,
+    ScheduledMessageEntity,
+)
+from apps.messaging.models import Media, Message, MessageHistory, ScheduledMessage
 from apps.permissions.domain.checker import has_permission
 from apps.permissions.domain.permissions import PermissionCode
 from apps.private_spaces.models import GroupMember
@@ -39,6 +48,20 @@ def _to_message_entity(message: Message) -> MessageEntity:
         group_id=message.group_id,
         direct_chat_id=message.direct_chat_id,
         media=[_to_media_entity(item) for item in prefetched_media],
+    )
+
+
+def _to_scheduled_message_entity(
+    scheduled: ScheduledMessage,
+) -> ScheduledMessageEntity:
+    return ScheduledMessageEntity(
+        scheduled_id=scheduled.pk,
+        sender_id=scheduled.sender_id,
+        content=scheduled.content,
+        scheduled_time=scheduled.scheduled_time,
+        topic_id=scheduled.topic_id,
+        group_id=scheduled.group_id,
+        direct_chat_id=scheduled.direct_chat_id,
     )
 
 
@@ -105,6 +128,62 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
                 group_id=group_id,
                 direct_chat_id=direct_chat_id,
             )
+        return _to_message_entity(self._messages().get(pk=message.pk))
+
+    def create_scheduled_message(
+        self,
+        sender_id: int,
+        content: str,
+        scheduled_time: datetime,
+        *,
+        topic_id: int | None,
+        group_id: int | None,
+        direct_chat_id: int | None,
+    ) -> ScheduledMessageEntity:
+        scheduled = ScheduledMessage.objects.create(
+            sender_id=sender_id,
+            content=content,
+            scheduled_time=scheduled_time,
+            topic_id=topic_id,
+            group_id=group_id,
+            direct_chat_id=direct_chat_id,
+        )
+        return _to_scheduled_message_entity(scheduled)
+
+    def get_scheduled_message(
+        self, scheduled_message_id: int
+    ) -> ScheduledMessageEntity:
+        scheduled = ScheduledMessage.objects.filter(pk=scheduled_message_id).first()
+        if scheduled is None:
+            raise ScheduledMessageNotFoundError("Scheduled message not found.")
+        return _to_scheduled_message_entity(scheduled)
+
+    def delete_scheduled_message(self, scheduled_message_id: int) -> None:
+        deleted_count, _ = ScheduledMessage.objects.filter(
+            pk=scheduled_message_id
+        ).delete()
+        if deleted_count == 0:
+            raise ScheduledMessageNotFoundError("Scheduled message not found.")
+
+    def promote_scheduled_message(
+        self, scheduled_message_id: int
+    ) -> MessageEntity | None:
+        with transaction.atomic():
+            scheduled = (
+                ScheduledMessage.objects.select_for_update()
+                .filter(pk=scheduled_message_id)
+                .first()
+            )
+            if scheduled is None:
+                return None
+            message = Message.objects.create(
+                sender_id=scheduled.sender_id,
+                content=scheduled.content,
+                topic_id=scheduled.topic_id,
+                group_id=scheduled.group_id,
+                direct_chat_id=scheduled.direct_chat_id,
+            )
+            scheduled.delete()
         return _to_message_entity(self._messages().get(pk=message.pk))
 
     def list_messages(
