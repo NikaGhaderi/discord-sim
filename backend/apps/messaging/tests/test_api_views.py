@@ -84,7 +84,25 @@ def test_send_text_matches_contract_and_checks_membership(spaces):
         "is_edited",
     }
     assert created.json()["is_edited"] is False
-    assert rejected.status_code == 404
+    assert rejected.status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("target_field", "space_name"),
+    (("group_id", "group"), ("direct_chat_id", "direct_chat")),
+)
+def test_send_rejects_non_member_for_each_private_target(
+    spaces, target_field, space_name
+):
+    response = client_for(spaces["outsider"]).post(
+        "/api/messages/",
+        {target_field: spaces[space_name].id, "content": "not allowed"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert Message.objects.count() == 0
 
 
 @pytest.mark.django_db
@@ -133,8 +151,11 @@ def test_history_pagination_next_link_points_past_the_current_page(spaces):
         f"/api/messages/?group_id={group.id}&limit=1&offset=0"
     )
 
-    assert response.json()["previous"] is None
-    next_url = response.json()["next"]
+    body = response.json()
+    assert set(body) == {"count", "next", "previous", "results"}
+    assert body["previous"] is None
+    assert body["results"][0]["media"] == []
+    next_url = body["next"]
     assert next_url is not None
     assert "offset=1" in next_url
     assert "limit=1" in next_url

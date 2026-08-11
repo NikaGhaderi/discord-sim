@@ -1,11 +1,15 @@
+from datetime import datetime, timezone
+
 from apps.messaging.api.serializers import (
-    CreateMessageSerializer,
+    MessageSerializer,
     MessageQuerySerializer,
+    SendMessageSerializer,
 )
+from apps.messaging.domain.models import MessageEntity
 
 
 def test_create_serializer_accepts_exactly_one_target():
-    serializer = CreateMessageSerializer(
+    serializer = SendMessageSerializer(
         data={
             "topic_id": 5,
             "group_id": None,
@@ -18,14 +22,14 @@ def test_create_serializer_accepts_exactly_one_target():
 
 
 def test_create_serializer_rejects_zero_targets():
-    serializer = CreateMessageSerializer(data={"content": "Hello"})
+    serializer = SendMessageSerializer(data={"content": "Hello"})
 
     assert not serializer.is_valid()
     assert "Exactly one" in str(serializer.errors)
 
 
 def test_create_serializer_rejects_multiple_targets():
-    serializer = CreateMessageSerializer(
+    serializer = SendMessageSerializer(
         data={"topic_id": 1, "group_id": 2, "content": "Hello"}
     )
 
@@ -38,3 +42,15 @@ def test_query_serializer_enforces_pagination_bounds():
 
     assert not serializer.is_valid()
     assert "limit" in serializer.errors
+
+
+def test_message_serializer_includes_empty_media_array():
+    message = MessageEntity(
+        base_message_id=1,
+        sender_id=2,
+        content="Hello",
+        sent_at=datetime.now(timezone.utc),
+        is_edited=False,
+    )
+
+    assert MessageSerializer(message).data["media"] == []
