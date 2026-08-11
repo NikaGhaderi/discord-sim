@@ -17,6 +17,24 @@ export type ChannelPermission =
   | 'KICK_MEMBERS'
   | 'SEND_MEDIA';
 
+export const CHANNEL_PERMISSIONS: ChannelPermission[] = [
+  'MANAGE_CHANNEL',
+  'MANAGE_ROLES',
+  'MANAGE_TOPICS',
+  'DELETE_MESSAGES',
+  'KICK_MEMBERS',
+  'SEND_MEDIA',
+];
+
+export const PERMISSION_LABELS: Record<ChannelPermission, string> = {
+  MANAGE_CHANNEL: 'Manage Channel',
+  MANAGE_ROLES: 'Manage Roles',
+  MANAGE_TOPICS: 'Manage Topics',
+  DELETE_MESSAGES: 'Delete Messages',
+  KICK_MEMBERS: 'Kick Members',
+  SEND_MEDIA: 'Send Media',
+};
+
 export interface Channel {
   channel_id: number;
   name: string;
