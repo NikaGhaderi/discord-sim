@@ -15,10 +15,11 @@ from apps.messaging.api.routing import (  # noqa: E402
 from apps.notifications.api.routing import (  # noqa: E402
     websocket_urlpatterns as notifications_ws,
 )
+from core.ws_auth import JWTAuthMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": URLRouter(messaging_ws + notifications_ws),
+        "websocket": JWTAuthMiddleware(URLRouter(messaging_ws + notifications_ws)),
     }
 )
