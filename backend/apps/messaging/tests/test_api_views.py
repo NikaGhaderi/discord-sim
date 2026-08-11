@@ -185,6 +185,33 @@ def test_search_matches_word_stems_not_just_substrings(spaces):
 
 
 @pytest.mark.django_db
+def test_search_stems_query_and_scopes_results_to_requested_group(spaces):
+    sender = spaces["sender"]
+    group = spaces["group"]
+    Message.objects.create(sender=sender, group=group, content="we run every morning")
+    Message.objects.create(
+        sender=sender,
+        topic=spaces["topic"],
+        content="we run this channel deployment",
+    )
+    Message.objects.create(
+        sender=sender,
+        direct_chat=spaces["direct_chat"],
+        content="we run this private deployment",
+    )
+
+    response = client_for(sender).get(
+        f"/api/messages/search/?q=running&group_id={group.id}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert [item["content"] for item in response.json()["results"]] == [
+        "we run every morning"
+    ]
+
+
+@pytest.mark.django_db
 def test_edit_writes_old_content_to_history(spaces):
     sender = spaces["sender"]
     message = Message.objects.create(
@@ -433,7 +460,7 @@ def test_image_upload_triggers_thumbnail_task(spaces, tmp_path):
     with (
         override_settings(MEDIA_ROOT=tmp_path),
         mock.patch(
-            "apps.messaging.application.use_cases.media.generate_thumbnail_task"
+            "apps.messaging.application.use_cases.attach_media.generate_thumbnail_task"
         ) as mock_task,
     ):
         response = client.post(
@@ -466,7 +493,7 @@ def test_non_image_upload_does_not_trigger_thumbnail_task(spaces, tmp_path):
     with (
         override_settings(MEDIA_ROOT=tmp_path),
         mock.patch(
-            "apps.messaging.application.use_cases.media.generate_thumbnail_task"
+            "apps.messaging.application.use_cases.attach_media.generate_thumbnail_task"
         ) as mock_task,
     ):
         response = client.post(

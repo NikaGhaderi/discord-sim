@@ -14,7 +14,7 @@ from apps.messaging.api.serializers import (
     SearchMessageQuerySerializer,
     UpdateMessageSerializer,
 )
-from apps.messaging.application.use_cases.media import AttachMediaUseCase
+from apps.messaging.application.use_cases.attach_media import AttachMediaUseCase
 from apps.messaging.application.use_cases.messages import (
     DeleteMessageUseCase,
     EditMessageUseCase,
@@ -182,6 +182,8 @@ class MessageMediaView(APIView):
             )
         except InvalidMediaError as exc:
             return _detail(str(exc), 400)
+        except MessageNotFoundError as exc:
+            return _detail(str(exc), 404)
         except MediaAttachmentForbiddenError as exc:
             return _detail(str(exc), 403)
         return Response(MediaSerializer(media).data, status=201)

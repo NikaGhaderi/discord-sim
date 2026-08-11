@@ -158,13 +158,28 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         )
 
     def can_attach_media(self, base_message_id: int, user_id: int) -> bool:
-        message = Message.objects.filter(pk=base_message_id).first()
-        if message is None or message.sender_id != user_id:
+        message = (
+            Message.objects.select_related("topic").filter(pk=base_message_id).first()
+        )
+        if message is None:
             return False
-        if message.topic_id is None:
-            return True
-        granted = self._channels.get_user_permissions(message.topic.channel_id, user_id)
-        return has_permission(granted, PermissionCode.SEND_MEDIA.value)
+        if message.topic_id is not None:
+            if not self._channels.is_member(message.topic.channel_id, user_id):
+                return False
+            granted = self._channels.get_user_permissions(
+                message.topic.channel_id,
+                user_id,
+            )
+            return has_permission(granted, PermissionCode.SEND_MEDIA.value)
+        if message.group_id is not None:
+            return self._private_spaces.is_group_member(message.group_id, user_id)
+        return (
+            self._private_spaces.get_direct_chat_for_participant(
+                message.direct_chat_id,
+                user_id,
+            )
+            is not None
+        )
 
     def attach_media(
         self,
