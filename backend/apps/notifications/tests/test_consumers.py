@@ -66,6 +66,12 @@ def test_subscribed_client_receives_a_group_broadcast():
             {"action": "subscribe", "group": "test-group-a"}
         )
 
+        acknowledgement = await communicator.receive_json_from(timeout=10)
+        assert acknowledgement == {
+            "event_type": "SUBSCRIBED",
+            "data": {"group": "test-group-a"},
+        }
+
         layer = get_channel_layer()
         await layer.group_send(
             "test-group-a",
