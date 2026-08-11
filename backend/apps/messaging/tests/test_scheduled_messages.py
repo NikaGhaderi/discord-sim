@@ -106,9 +106,7 @@ def test_create_endpoint_matches_contract_and_does_not_publish_early(
     sender, _member, _outsider, group = scheduled_space
     scheduled_time = timezone.now() + timedelta(minutes=10)
 
-    with mock.patch(
-        "apps.messaging.tasks.promote_scheduled_message"
-    ) as task:
+    with mock.patch("apps.messaging.tasks.promote_scheduled_message") as task:
         response = _client(sender).post(
             "/api/messages/scheduled/",
             {
