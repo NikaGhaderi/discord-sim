@@ -14,13 +14,11 @@ from apps.messaging.api.serializers import (
     SentMessageSerializer,
     UpdateMessageSerializer,
 )
+from apps.messaging.application.use_cases.delete_message import DeleteMessageUseCase
+from apps.messaging.application.use_cases.edit_message import EditMessageUseCase
 from apps.messaging.application.use_cases.list_messages import ListMessagesUseCase
 from apps.messaging.application.use_cases.media import AttachMediaUseCase
-from apps.messaging.application.use_cases.messages import (
-    DeleteMessageUseCase,
-    EditMessageUseCase,
-    SearchMessagesUseCase,
-)
+from apps.messaging.application.use_cases.messages import SearchMessagesUseCase
 from apps.messaging.application.use_cases.send_message import SendMessageUseCase
 from apps.messaging.domain.exceptions import (
     InvalidMediaError,
