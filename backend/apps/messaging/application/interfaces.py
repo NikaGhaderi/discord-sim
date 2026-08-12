@@ -50,6 +50,16 @@ class AbstractMessagingRepository(ABC):
     ) -> ScheduledMessageEntity: ...
 
     @abstractmethod
+    def list_scheduled_messages(
+        self,
+        sender_id: int,
+        *,
+        topic_id: int | None = None,
+        group_id: int | None = None,
+        direct_chat_id: int | None = None,
+    ) -> list[ScheduledMessageEntity]: ...
+
+    @abstractmethod
     def delete_scheduled_message(self, scheduled_message_id: int) -> None: ...
 
     @abstractmethod

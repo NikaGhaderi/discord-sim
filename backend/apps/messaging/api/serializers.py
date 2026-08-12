@@ -31,6 +31,23 @@ class CreateScheduledMessageSerializer(SendMessageSerializer):
     scheduled_time = serializers.DateTimeField()
 
 
+class ScheduledMessageQuerySerializer(serializers.Serializer):
+    topic_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    group_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    direct_chat_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+
+
+class ScheduledMessageSerializer(serializers.Serializer):
+    scheduled_id = serializers.IntegerField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    scheduled_time = serializers.DateTimeField(read_only=True)
+    topic_id = serializers.IntegerField(read_only=True, allow_null=True)
+    group_id = serializers.IntegerField(read_only=True, allow_null=True)
+    direct_chat_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+
 class MessageQuerySerializer(MessageTargetSerializer):
     limit = serializers.IntegerField(
         required=False, default=50, min_value=1, max_value=100
