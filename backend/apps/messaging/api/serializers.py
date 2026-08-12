@@ -1,9 +1,7 @@
 from rest_framework import serializers
 
-from apps.messaging.application.use_cases.send_message import (
-    validate_exactly_one_target,
-)
 from apps.messaging.domain.exceptions import InvalidMessageTargetError
+from apps.messaging.domain.models import validate_exactly_one_target
 
 
 class MessageTargetSerializer(serializers.Serializer):
@@ -63,19 +61,19 @@ class MediaSummarySerializer(serializers.Serializer):
 
 
 class MessageSerializer(serializers.Serializer):
-    base_message_id = serializers.IntegerField(read_only=True)
+    base_message_id = serializers.IntegerField(source="id", read_only=True)
     sender_id = serializers.IntegerField(read_only=True)
-    content = serializers.CharField(read_only=True)
-    sent_at = serializers.DateTimeField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    sent_at = serializers.DateTimeField(source="created_at", read_only=True)
     is_edited = serializers.BooleanField(read_only=True)
     media = MediaSummarySerializer(many=True, read_only=True)
 
 
 class SentMessageSerializer(serializers.Serializer):
-    base_message_id = serializers.IntegerField(read_only=True)
+    base_message_id = serializers.IntegerField(source="id", read_only=True)
     sender_id = serializers.IntegerField(read_only=True)
-    content = serializers.CharField(read_only=True)
-    sent_at = serializers.DateTimeField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    sent_at = serializers.DateTimeField(source="created_at", read_only=True)
     is_edited = serializers.BooleanField(read_only=True)
 
 

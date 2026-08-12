@@ -102,6 +102,14 @@ describe('App Component', () => {
     expect(screen.getByText('Groups')).toBeInTheDocument();
   });
 
+  test('renders the channel thread page when navigated to /channels/demo', () => {
+    window.history.pushState({}, 'Channel Thread Page', '/channels/demo');
+    render(<App />);
+
+    expect(screen.getByText('# general')).toBeInTheDocument();
+    expect(screen.getByText('Message content #1')).toBeInTheDocument();
+  });
+
   test('renders the workspaces page when navigated to /workspaces', async () => {
     vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([
       {

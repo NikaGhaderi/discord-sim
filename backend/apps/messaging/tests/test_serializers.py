@@ -5,7 +5,7 @@ from apps.messaging.api.serializers import (
     MessageQuerySerializer,
     SendMessageSerializer,
 )
-from apps.messaging.domain.models import MessageEntity
+from apps.messaging.domain.models import MessageDetailEntity
 
 
 def test_create_serializer_accepts_exactly_one_target():
@@ -45,12 +45,15 @@ def test_query_serializer_enforces_pagination_bounds():
 
 
 def test_message_serializer_includes_empty_media_array():
-    message = MessageEntity(
-        base_message_id=1,
+    message = MessageDetailEntity(
+        id=1,
         sender_id=2,
-        content="Hello",
-        sent_at=datetime.now(timezone.utc),
+        topic_id=5,
+        group_id=None,
+        direct_chat_id=None,
+        body="Hello",
         is_edited=False,
+        created_at=datetime.now(timezone.utc),
     )
 
     assert MessageSerializer(message).data["media"] == []

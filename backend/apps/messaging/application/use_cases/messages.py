@@ -7,14 +7,17 @@ from apps.messaging.application.use_cases.list_messages import ListMessagesUseCa
 from apps.messaging.application.use_cases.send_message import (
     SendMessageUseCase,
     realtime_group_name,
-    validate_exactly_one_target,
 )
 from apps.messaging.domain.exceptions import (
     MessageDeleteForbiddenError,
     MessageEditForbiddenError,
     MessageTargetNotFoundError,
 )
-from apps.messaging.domain.models import MessageEntity, MessagePage
+from apps.messaging.domain.models import (
+    MessageEntity,
+    MessagePage,
+    validate_exactly_one_target,
+)
 from apps.permissions.domain.checker import has_permission
 from apps.permissions.domain.permissions import PermissionCode
 

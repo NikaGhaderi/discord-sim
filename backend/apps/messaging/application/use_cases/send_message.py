@@ -3,23 +3,8 @@ from apps.messaging.application.interfaces import (
     AbstractNotificationRecorder,
     AbstractRealtimeNotifier,
 )
-from apps.messaging.domain.exceptions import (
-    InvalidMessageTargetError,
-    MessageTargetForbiddenError,
-)
-from apps.messaging.domain.models import MessageEntity
-
-
-def validate_exactly_one_target(
-    topic_id: int | None,
-    group_id: int | None,
-    direct_chat_id: int | None,
-) -> None:
-    targets = (topic_id, group_id, direct_chat_id)
-    if sum(value is not None for value in targets) != 1:
-        raise InvalidMessageTargetError(
-            "Exactly one of topic_id, group_id, or direct_chat_id must be set."
-        )
+from apps.messaging.domain.exceptions import MessageTargetForbiddenError
+from apps.messaging.domain.models import MessageEntity, validate_exactly_one_target
 
 
 def realtime_group_name(
@@ -37,10 +22,10 @@ def realtime_group_name(
 
 def message_payload(message: MessageEntity) -> dict:
     return {
-        "base_message_id": message.base_message_id,
+        "base_message_id": message.id,
         "sender_id": message.sender_id,
-        "content": message.content,
-        "sent_at": message.sent_at.isoformat(),
+        "content": message.body,
+        "sent_at": message.created_at.isoformat(),
         "is_edited": message.is_edited,
         "media": [
             {"file_url": media.file_url, "file_type": media.file_type}

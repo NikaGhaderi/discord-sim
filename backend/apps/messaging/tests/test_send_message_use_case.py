@@ -13,12 +13,14 @@ from apps.messaging.domain.models import MessageEntity
 
 def _message() -> MessageEntity:
     return MessageEntity(
-        base_message_id=10,
+        id=10,
         sender_id=1,
-        content="Hello",
-        sent_at=datetime.now(timezone.utc),
-        is_edited=False,
         topic_id=5,
+        group_id=None,
+        direct_chat_id=None,
+        body="Hello",
+        is_edited=False,
+        created_at=datetime.now(timezone.utc),
     )
 
 

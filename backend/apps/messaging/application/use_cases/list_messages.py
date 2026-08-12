@@ -1,9 +1,6 @@
 from apps.messaging.application.interfaces import AbstractMessagingRepository
-from apps.messaging.application.use_cases.send_message import (
-    validate_exactly_one_target,
-)
 from apps.messaging.domain.exceptions import MessageTargetNotFoundError
-from apps.messaging.domain.models import MessagePage
+from apps.messaging.domain.models import MessagePage, validate_exactly_one_target
 
 
 class ListMessagesUseCase:
