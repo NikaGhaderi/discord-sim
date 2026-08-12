@@ -31,12 +31,12 @@ def media_row(db, tmp_path):
         message = Message.objects.create(
             sender=sender,
             topic=topic,
-            content="attachment",
+            body="attachment",
         )
         media = Media.objects.create(
-            base_message=message,
+            message=message,
             file=_make_uploaded_image(),
-            file_type="image/jpeg",
+            content_type="image/jpeg",
             file_size=1024,
         )
         yield media

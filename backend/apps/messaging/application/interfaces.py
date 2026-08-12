@@ -59,9 +59,6 @@ class AbstractMessagingRepository(ABC):
     ) -> MediaEntity: ...
 
     @abstractmethod
-    def can_attach_media(self, base_message_id: int, user_id: int) -> bool: ...
-
-    @abstractmethod
     def get_message(self, base_message_id: int) -> MessageEntity: ...
 
     @abstractmethod

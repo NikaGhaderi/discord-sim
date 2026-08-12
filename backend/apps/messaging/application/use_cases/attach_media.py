@@ -47,12 +47,7 @@ class AttachMediaUseCase:
         return media
 
     def _can_attach(self, message: MessageEntity, user_id: int) -> bool:
-        target = {
-            "topic_id": message.topic_id,
-            "group_id": message.group_id,
-            "direct_chat_id": message.direct_chat_id,
-        }
-        if not self._repository.can_access_target(user_id, **target):
+        if message.sender_id != user_id:
             return False
         if message.topic_id is None:
             return True
