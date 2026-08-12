@@ -6,6 +6,10 @@ class MessageTargetNotFoundError(Exception):
     """Raised when the target is absent or inaccessible to the requester."""
 
 
+class MessageTargetForbiddenError(Exception):
+    """Raised when the requester is not a member of the message target."""
+
+
 class MessageNotFoundError(Exception):
     """Raised when a message is absent or hidden from the requester."""
 
@@ -24,3 +28,15 @@ class MediaAttachmentForbiddenError(Exception):
 
 class InvalidMediaError(Exception):
     """Raised when an uploaded attachment violates file policy."""
+
+
+class InvalidScheduledTimeError(Exception):
+    """Raised when a scheduled message is not set for a future time."""
+
+
+class ScheduledMessageNotFoundError(Exception):
+    """Raised when a scheduled message does not exist."""
+
+
+class ScheduledMessageCancelForbiddenError(Exception):
+    """Raised when someone other than the sender attempts cancellation."""
