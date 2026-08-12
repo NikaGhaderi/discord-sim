@@ -315,7 +315,7 @@ def test_non_sender_cannot_delete_direct_message(spaces):
 
 
 @pytest.mark.django_db
-def test_group_admin_cannot_delete_another_members_message(spaces):
+def test_group_admin_can_delete_another_members_message(spaces):
     message = Message.objects.create(
         sender=spaces["participant"],
         group=spaces["group"],
@@ -324,8 +324,8 @@ def test_group_admin_cannot_delete_another_members_message(spaces):
 
     response = client_for(spaces["sender"]).delete(f"/api/messages/{message.id}/")
 
-    assert response.status_code == 403
-    assert Message.objects.filter(pk=message.id).exists()
+    assert response.status_code == 204
+    assert not Message.objects.filter(pk=message.id).exists()
 
 
 @pytest.mark.django_db

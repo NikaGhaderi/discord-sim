@@ -53,13 +53,25 @@ def test_non_sender_without_permission_cannot_delete():
     repository.delete_message.assert_not_called()
 
 
-def test_group_admin_has_no_channel_permission_escalation_path():
+def test_group_admin_can_delete_another_members_message():
     repository = Mock()
     repository.get_message.return_value = _message(sender_id=1, topic_id=None)
+    repository.is_group_admin.return_value = True
+
+    DeleteMessageUseCase(repository).execute(10, 2)
+
+    repository.get_permissions_for_topic.assert_not_called()
+    repository.is_group_admin.assert_called_once_with(7, 2)
+    repository.delete_message.assert_called_once_with(10)
+
+
+def test_non_admin_group_member_cannot_delete_another_members_message():
+    repository = Mock()
+    repository.get_message.return_value = _message(sender_id=1, topic_id=None)
+    repository.is_group_admin.return_value = False
 
     with pytest.raises(MessageDeleteForbiddenError):
         DeleteMessageUseCase(repository).execute(10, 2)
 
     repository.get_permissions_for_topic.assert_not_called()
-    repository.is_group_admin.assert_not_called()
     repository.delete_message.assert_not_called()

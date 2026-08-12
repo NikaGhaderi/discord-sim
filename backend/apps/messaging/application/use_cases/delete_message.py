@@ -47,13 +47,15 @@ class DeleteMessageUseCase:
         message: MessageEntity,
         user_id: int,
     ) -> bool:
-        if message.topic_id is None:
-            return False
-        granted = self._repository.get_permissions_for_topic(
-            message.topic_id,
-            user_id,
-        )
-        return has_permission(granted, PermissionCode.DELETE_MESSAGES.value)
+        if message.topic_id is not None:
+            granted = self._repository.get_permissions_for_topic(
+                message.topic_id,
+                user_id,
+            )
+            return has_permission(granted, PermissionCode.DELETE_MESSAGES.value)
+        if message.group_id is not None:
+            return self._repository.is_group_admin(message.group_id, user_id)
+        return False
 
     def _publish_deleted(self, message: MessageEntity) -> None:
         if self._notifier is None and self._notification_recorder is None:
