@@ -151,10 +151,6 @@ export const messagingApi = {
     await apiClient.delete(`/api/messages/scheduled/${scheduledId}/`);
   },
 
-  // NOTE: the backend has no GET handler for /api/messages/scheduled/ yet
-  // (SCRUM-49 only implemented create + cancel + the promotion task) -- this
-  // call will 404 until that's added. Kept here so the api.ts/mockApi.ts
-  // contract stays swappable; see the PR discussion for SCRUM-53.
   listScheduledMessages: async (target: MessageTarget): Promise<ScheduledMessage[]> => {
     const response = await apiClient.get<ScheduledMessage[]>('/api/messages/scheduled/', {
       params: target,
