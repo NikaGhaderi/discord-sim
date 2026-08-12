@@ -23,7 +23,7 @@ class MessageTargetSerializer(serializers.Serializer):
         return attrs
 
 
-class CreateMessageSerializer(MessageTargetSerializer):
+class SendMessageSerializer(MessageTargetSerializer):
     content = serializers.CharField(allow_blank=False, trim_whitespace=False)
 
 
@@ -66,7 +66,18 @@ class MessageSerializer(serializers.Serializer):
     content = serializers.CharField(source="body", read_only=True)
     sent_at = serializers.DateTimeField(source="created_at", read_only=True)
     is_edited = serializers.BooleanField(read_only=True)
-
-
-class MessageHistorySerializer(MessageSerializer):
     media = MediaSummarySerializer(many=True, read_only=True)
+
+
+class SentMessageSerializer(serializers.Serializer):
+    base_message_id = serializers.IntegerField(source="id", read_only=True)
+    sender_id = serializers.IntegerField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    sent_at = serializers.DateTimeField(source="created_at", read_only=True)
+    is_edited = serializers.BooleanField(read_only=True)
+
+
+# Compatibility names for callers written before SCRUM-38 split read/write
+# serializer responsibilities.
+CreateMessageSerializer = SendMessageSerializer
+MessageHistorySerializer = MessageSerializer
