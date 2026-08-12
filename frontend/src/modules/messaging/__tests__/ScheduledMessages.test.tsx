@@ -40,10 +40,10 @@ describe('SCRUM-53 Scheduled Messages UI', () => {
   describe('ScheduledMessagesList & Mock API Parity', () => {
     const mockList: ScheduledMessage[] = [
       {
-        id: 'sched-1',
-        topic_id: 't1',
+        scheduled_id: 1,
+        topic_id: 5,
         content: 'Scheduled test message',
-        scheduled_at: '2030-01-01T10:00:00Z',
+        scheduled_time: '2030-01-01T10:00:00Z',
       },
     ];
 
@@ -59,25 +59,25 @@ describe('SCRUM-53 Scheduled Messages UI', () => {
       expect(screen.getByText('Scheduled test message')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /cancel scheduled message/i }));
-      expect(handleCancel).toHaveBeenCalledWith('sched-1');
+      expect(handleCancel).toHaveBeenCalledWith(1);
     });
 
     it('removes scheduled message immediately via mockApi', async () => {
       const created = await mockMessagingApi.createScheduledMessage({
-        topic_id: 'topic-1',
+        topic_id: 5,
         content: 'To be cancelled',
-        scheduled_at: '2030-05-01T12:00:00Z',
+        scheduled_time: '2030-05-01T12:00:00Z',
       });
 
-      let list = await mockMessagingApi.listScheduledMessages('topic-1');
-      expect(list.some((s) => s.id === created.id)).toBe(true);
+      let list = await mockMessagingApi.listScheduledMessages({ topic_id: 5 });
+      expect(list.some((s) => s.scheduled_id === created.scheduled_id)).toBe(true);
 
-      await mockMessagingApi.cancelScheduledMessage(created.id);
+      await mockMessagingApi.cancelScheduledMessage(created.scheduled_id);
 
-      list = await mockMessagingApi.listScheduledMessages('topic-1');
-      expect(list.some((s) => s.id === created.id)).toBe(false);
+      list = await mockMessagingApi.listScheduledMessages({ topic_id: 5 });
+      expect(list.some((s) => s.scheduled_id === created.scheduled_id)).toBe(false);
 
-      const threadMessages = await mockMessagingApi.listMessages('topic-1');
+      const threadMessages = await mockMessagingApi.listMessages({ topic_id: 5 });
       expect(threadMessages.results.some((m) => m.content === 'To be cancelled')).toBe(false);
     });
   });

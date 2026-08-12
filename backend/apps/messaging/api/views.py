@@ -5,33 +5,43 @@ from rest_framework.utils.urls import remove_query_param, replace_query_param
 from rest_framework.views import APIView
 
 from apps.messaging.api.serializers import (
-    CreateMessageSerializer,
+    CreateScheduledMessageSerializer,
     MediaSerializer,
     MediaUploadSerializer,
-    MessageHistorySerializer,
     MessageQuerySerializer,
     MessageSerializer,
     SearchMessageQuerySerializer,
+    SendMessageSerializer,
+    SentMessageSerializer,
     UpdateMessageSerializer,
 )
-from apps.messaging.application.use_cases.media import AttachMediaUseCase
-from apps.messaging.application.use_cases.messages import (
-    DeleteMessageUseCase,
-    EditMessageUseCase,
-    ListMessagesUseCase,
-    SearchMessagesUseCase,
-    SendMessageUseCase,
+from apps.messaging.application.use_cases.attach_media import AttachMediaUseCase
+from apps.messaging.application.use_cases.cancel_scheduled_message import (
+    CancelScheduledMessageUseCase,
 )
+from apps.messaging.application.use_cases.create_scheduled_message import (
+    CreateScheduledMessageUseCase,
+)
+from apps.messaging.application.use_cases.delete_message import DeleteMessageUseCase
+from apps.messaging.application.use_cases.edit_message import EditMessageUseCase
+from apps.messaging.application.use_cases.list_messages import ListMessagesUseCase
+from apps.messaging.application.use_cases.messages import SearchMessagesUseCase
+from apps.messaging.application.use_cases.send_message import SendMessageUseCase
 from apps.messaging.domain.exceptions import (
     InvalidMediaError,
+    InvalidScheduledTimeError,
     MediaAttachmentForbiddenError,
     MessageDeleteForbiddenError,
     MessageEditForbiddenError,
     MessageNotFoundError,
+    MessageTargetForbiddenError,
     MessageTargetNotFoundError,
+    ScheduledMessageCancelForbiddenError,
+    ScheduledMessageNotFoundError,
 )
 from apps.messaging.realtime import ChannelsRealtimeNotifier
 from apps.messaging.repositories import DjangoMessagingRepository
+from apps.messaging.tasks import CeleryScheduledMessageDispatcher
 from apps.notifications.recorder import DjangoNotificationRecorder
 
 
@@ -69,7 +79,7 @@ def _page_response(request, page, limit, offset):
             "count": page.count,
             "next": next_url,
             "previous": previous_url,
-            "results": MessageHistorySerializer(page.results, many=True).data,
+            "results": MessageSerializer(page.results, many=True).data,
         },
         status=200,
     )
@@ -94,7 +104,7 @@ class MessageListCreateView(APIView):
         return _page_response(request, page, data["limit"], data["offset"])
 
     def post(self, request):
-        serializer = CreateMessageSerializer(data=request.data)
+        serializer = SendMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
@@ -107,9 +117,9 @@ class MessageListCreateView(APIView):
                 data["content"],
                 **_target_kwargs(data),
             )
-        except MessageTargetNotFoundError as exc:
-            return _detail(str(exc), 404)
-        return Response(MessageSerializer(message).data, status=201)
+        except MessageTargetForbiddenError as exc:
+            return _detail(str(exc), 403)
+        return Response(SentMessageSerializer(message).data, status=201)
 
 
 class MessageSearchView(APIView):
@@ -132,6 +142,48 @@ class MessageSearchView(APIView):
         return _page_response(request, page, data["limit"], data["offset"])
 
 
+class ScheduledMessageCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateScheduledMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            scheduled = CreateScheduledMessageUseCase(
+                DjangoMessagingRepository(),
+                CeleryScheduledMessageDispatcher(),
+            ).execute(
+                request.user.id,
+                data["content"],
+                data["scheduled_time"],
+                **_target_kwargs(data),
+            )
+        except InvalidScheduledTimeError as exc:
+            return _detail(str(exc), 400)
+        except MessageTargetNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(
+            {"scheduled_id": scheduled.scheduled_id, "status": "QUEUED"},
+            status=201,
+        )
+
+
+class ScheduledMessageDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, scheduled_id):
+        try:
+            CancelScheduledMessageUseCase(DjangoMessagingRepository()).execute(
+                scheduled_id, request.user.id
+            )
+        except ScheduledMessageNotFoundError as exc:
+            return _detail(str(exc), 404)
+        except ScheduledMessageCancelForbiddenError as exc:
+            return _detail(str(exc), 403)
+        return Response(status=204)
+
+
 class MessageDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -148,7 +200,7 @@ class MessageDetailView(APIView):
             return _detail(str(exc), 404)
         except MessageEditForbiddenError as exc:
             return _detail(str(exc), 403)
-        return Response(MessageSerializer(message).data, status=200)
+        return Response(SentMessageSerializer(message).data, status=200)
 
     def delete(self, request, base_message_id):
         try:
@@ -182,6 +234,8 @@ class MessageMediaView(APIView):
             )
         except InvalidMediaError as exc:
             return _detail(str(exc), 400)
+        except MessageNotFoundError as exc:
+            return _detail(str(exc), 404)
         except MediaAttachmentForbiddenError as exc:
             return _detail(str(exc), 403)
         return Response(MediaSerializer(media).data, status=201)

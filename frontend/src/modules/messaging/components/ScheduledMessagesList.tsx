@@ -3,7 +3,7 @@ import { ScheduledMessage } from '../api';
 
 interface ScheduledMessagesListProps {
   scheduledMessages: ScheduledMessage[];
-  onCancelScheduledMessage: (id: string) => void;
+  onCancelScheduledMessage: (id: number) => void;
 }
 
 export const ScheduledMessagesList: React.FC<ScheduledMessagesListProps> = ({
@@ -34,19 +34,19 @@ export const ScheduledMessagesList: React.FC<ScheduledMessagesListProps> = ({
       <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
         {scheduledMessages.map((msg) => (
           <div
-            key={msg.id}
+            key={msg.scheduled_id}
             className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs"
             data-testid="scheduled-message-item"
           >
             <div className="flex flex-col gap-0.5 truncate max-w-[80%]">
               <span className="font-medium text-gray-800 truncate">{msg.content}</span>
               <span className="text-gray-500 text-[10px]">
-                Will send at: {formatScheduledDate(msg.scheduled_at)}
+                Will send at: {formatScheduledDate(msg.scheduled_time)}
               </span>
             </div>
             <button
               type="button"
-              onClick={() => onCancelScheduledMessage(msg.id)}
+              onClick={() => onCancelScheduledMessage(msg.scheduled_id)}
               className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 font-medium"
               aria-label="Cancel Scheduled Message"
             >
