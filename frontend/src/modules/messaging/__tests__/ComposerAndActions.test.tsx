@@ -2,7 +2,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { Composer } from '../components/Composer';
-import { MessageActions, Message } from '../components/MessageActions';
+import { MessageActions } from '../components/MessageActions';
+import { Message } from '../types';
 
 describe('SCRUM-43 Messaging Components', () => {
   describe('Composer', () => {
@@ -32,16 +33,19 @@ describe('SCRUM-43 Messaging Components', () => {
 
   describe('MessageActions Permissions', () => {
     const mockMessage: Message = {
-      base_message_id: 'msg-1',
-      sender_id: 'user-1',
+      base_message_id: 1,
+      sender_id: 1,
+      sender_username: 'sender',
       content: 'Original Message',
+      sent_at: '2026-01-01T00:00:00Z',
+      is_edited: false,
     };
 
     it('renders Edit and Delete controls when user is the sender', () => {
       render(
         <MessageActions
           message={mockMessage}
-          currentUserId="user-1"
+          currentUserId={1}
           hasDeletePermission={false}
           onEditMessage={vi.fn()}
           onDeleteMessage={vi.fn()}
@@ -56,7 +60,7 @@ describe('SCRUM-43 Messaging Components', () => {
       render(
         <MessageActions
           message={mockMessage}
-          currentUserId="user-2"
+          currentUserId={2}
           hasDeletePermission={true}
           onEditMessage={vi.fn()}
           onDeleteMessage={vi.fn()}
@@ -72,14 +76,14 @@ describe('SCRUM-43 Messaging Components', () => {
       render(
         <MessageActions
           message={mockMessage}
-          currentUserId="user-1"
+          currentUserId={1}
           onEditMessage={vi.fn()}
           onDeleteMessage={handleDelete}
         />
       );
 
       fireEvent.click(screen.getByRole('button', { name: /delete message/i }));
-      expect(handleDelete).toHaveBeenCalledWith('msg-1');
+      expect(handleDelete).toHaveBeenCalledWith(1);
     });
   });
 });
