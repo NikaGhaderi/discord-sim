@@ -164,6 +164,26 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         if deleted_count == 0:
             raise ScheduledMessageNotFoundError("Scheduled message not found.")
 
+    def list_scheduled_messages(
+        self,
+        sender_id: int,
+        *,
+        topic_id: int | None = None,
+        group_id: int | None = None,
+        direct_chat_id: int | None = None,
+    ) -> list[ScheduledMessageEntity]:
+        queryset = ScheduledMessage.objects.filter(sender_id=sender_id)
+        if topic_id is not None:
+            queryset = queryset.filter(topic_id=topic_id)
+        elif group_id is not None:
+            queryset = queryset.filter(group_id=group_id)
+        elif direct_chat_id is not None:
+            queryset = queryset.filter(direct_chat_id=direct_chat_id)
+        return [
+            _to_scheduled_message_entity(scheduled)
+            for scheduled in queryset.order_by("scheduled_time", "id")
+        ]
+
     def promote_scheduled_message(
         self, scheduled_message_id: int
     ) -> MessageEntity | None:

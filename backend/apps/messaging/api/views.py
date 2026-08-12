@@ -10,6 +10,8 @@ from apps.messaging.api.serializers import (
     MediaUploadSerializer,
     MessageQuerySerializer,
     MessageSerializer,
+    ScheduledMessageQuerySerializer,
+    ScheduledMessageSerializer,
     SearchMessageQuerySerializer,
     SendMessageSerializer,
     SentMessageSerializer,
@@ -25,6 +27,9 @@ from apps.messaging.application.use_cases.create_scheduled_message import (
 from apps.messaging.application.use_cases.delete_message import DeleteMessageUseCase
 from apps.messaging.application.use_cases.edit_message import EditMessageUseCase
 from apps.messaging.application.use_cases.list_messages import ListMessagesUseCase
+from apps.messaging.application.use_cases.list_scheduled_messages import (
+    ListScheduledMessagesUseCase,
+)
 from apps.messaging.application.use_cases.messages import SearchMessagesUseCase
 from apps.messaging.application.use_cases.send_message import SendMessageUseCase
 from apps.messaging.domain.exceptions import (
@@ -144,6 +149,18 @@ class MessageSearchView(APIView):
 
 class ScheduledMessageCreateView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = ScheduledMessageQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        scheduled = ListScheduledMessagesUseCase(DjangoMessagingRepository()).execute(
+            request.user.id,
+            **_target_kwargs(data),
+        )
+        return Response(
+            ScheduledMessageSerializer(scheduled, many=True).data, status=200
+        )
 
     def post(self, request):
         serializer = CreateScheduledMessageSerializer(data=request.data)
