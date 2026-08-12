@@ -1,19 +1,12 @@
 import React, { useState } from 'react';
-
-export interface Message {
-  base_message_id: string;
-  sender_id: string;
-  content: string;
-  sent_at?: string;
-  is_edited?: boolean;
-}
+import { Message } from '../types';
 
 interface MessageActionsProps {
   message: Message;
-  currentUserId: string;
+  currentUserId: number;
   hasDeletePermission?: boolean;
-  onEditMessage: (messageId: string, newContent: string) => void;
-  onDeleteMessage: (messageId: string) => void;
+  onEditMessage: (messageId: number, newContent: string) => void;
+  onDeleteMessage: (messageId: number) => void;
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = ({

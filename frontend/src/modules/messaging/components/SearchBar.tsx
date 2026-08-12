@@ -78,6 +78,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={query}
           onChange={handleInputChange}
           placeholder="Search messages..."
+          required
           className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           aria-label="Search Messages"
         />

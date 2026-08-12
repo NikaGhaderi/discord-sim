@@ -15,6 +15,12 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
         if content.get("action") == "subscribe" and group:
             await self.channel_layer.group_add(group, self.channel_name)
             self.groups_joined.append(group)
+            await self.send_json(
+                {
+                    "event_type": "SUBSCRIBED",
+                    "data": {"group": group},
+                }
+            )
 
     async def disconnect(self, code):
         for group in getattr(self, "groups_joined", []):
