@@ -28,9 +28,17 @@ export interface SendMessagePayload {
   content: string;
 }
 
-export interface SearchMessagesParams {
-  query: string;
-  group_id?: string;
+export interface ScheduledMessage {
+  id: string;
+  topic_id: string;
+  content: string;
+  scheduled_at: string;
+}
+
+export interface CreateScheduledMessagePayload {
+  topic_id: string;
+  content: string;
+  scheduled_at: string;
 }
 
 export const messagingApi = {
@@ -79,6 +87,22 @@ export const messagingApi = {
   searchMessages: async (query: string, groupId?: string): Promise<Message[]> => {
     const response = await apiClient.get<Message[]>('/api/messaging/messages/search/', {
       params: { q: query, group_id: groupId },
+    });
+    return response.data;
+  },
+
+  createScheduledMessage: async (payload: CreateScheduledMessagePayload): Promise<ScheduledMessage> => {
+    const response = await apiClient.post<ScheduledMessage>('/api/messaging/scheduled-messages/', payload);
+    return response.data;
+  },
+
+  cancelScheduledMessage: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/messaging/scheduled-messages/${id}/`);
+  },
+
+  listScheduledMessages: async (topicId?: string): Promise<ScheduledMessage[]> => {
+    const response = await apiClient.get<ScheduledMessage[]>('/api/messaging/scheduled-messages/', {
+      params: { topic_id: topicId },
     });
     return response.data;
   },
