@@ -14,7 +14,7 @@ def promote_scheduled_message(scheduled_message_id: int) -> int | None:
     message = PromoteScheduledMessageUseCase(DjangoMessagingRepository()).execute(
         scheduled_message_id
     )
-    return message.base_message_id if message is not None else None
+    return message.id if message is not None else None
 
 
 class CeleryScheduledMessageDispatcher(AbstractScheduledMessageDispatcher):

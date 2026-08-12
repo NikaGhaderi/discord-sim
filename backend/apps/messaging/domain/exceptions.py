@@ -6,6 +6,10 @@ class MessageTargetNotFoundError(Exception):
     """Raised when the target is absent or inaccessible to the requester."""
 
 
+class MessageTargetForbiddenError(Exception):
+    """Raised when the requester is not a member of the message target."""
+
+
 class MessageNotFoundError(Exception):
     """Raised when a message is absent or hidden from the requester."""
 

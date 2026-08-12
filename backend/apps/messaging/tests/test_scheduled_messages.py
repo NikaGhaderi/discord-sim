@@ -53,7 +53,7 @@ def test_create_use_case_persists_then_schedules_task():
     entity = ScheduledMessageEntity(
         scheduled_id=12,
         sender_id=1,
-        content="Standup reminder",
+        body="Standup reminder",
         scheduled_time=scheduled_time,
         topic_id=5,
     )
@@ -76,7 +76,7 @@ def test_cancel_use_case_rejects_non_sender():
     repository.get_scheduled_message.return_value = ScheduledMessageEntity(
         scheduled_id=12,
         sender_id=1,
-        content="Standup reminder",
+        body="Standup reminder",
         scheduled_time=timezone.now() + timedelta(minutes=10),
         topic_id=5,
     )
@@ -135,7 +135,7 @@ def test_non_sender_cannot_cancel_scheduled_message(scheduled_space):
     scheduled = ScheduledMessage.objects.create(
         sender=sender,
         group=group,
-        content="Standup reminder",
+        body="Standup reminder",
         scheduled_time=timezone.now() + timedelta(minutes=10),
     )
 
@@ -151,7 +151,7 @@ def test_task_promotes_message_and_history_endpoint_can_query_it(scheduled_space
     scheduled = ScheduledMessage.objects.create(
         sender=sender,
         group=group,
-        content="Standup reminder",
+        body="Standup reminder",
         scheduled_time=timezone.now(),
     )
     client = _client(sender)
@@ -172,7 +172,7 @@ def test_cancelled_scheduled_message_task_is_safe_no_op(scheduled_space):
     scheduled = ScheduledMessage.objects.create(
         sender=sender,
         group=group,
-        content="Never publish",
+        body="Never publish",
         scheduled_time=timezone.now() + timedelta(minutes=10),
     )
 
