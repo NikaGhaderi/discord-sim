@@ -13,8 +13,6 @@ from apps.messaging.domain.models import (
     MessagePage,
 )
 from apps.messaging.models import Media, Message, MessageHistory
-from apps.permissions.domain.checker import has_permission
-from apps.permissions.domain.permissions import PermissionCode
 from apps.private_spaces.models import GroupMember
 from apps.private_spaces.repositories import DjangoPrivateSpacesRepository
 from apps.workspaces.models import Topic
@@ -161,15 +159,6 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         return MessagePage(
             count=count, results=[_to_message_entity(m) for m in results]
         )
-
-    def can_attach_media(self, base_message_id: int, user_id: int) -> bool:
-        message = Message.objects.filter(pk=base_message_id).first()
-        if message is None or message.sender_id != user_id:
-            return False
-        if message.topic_id is None:
-            return True
-        granted = self._channels.get_user_permissions(message.topic.channel_id, user_id)
-        return has_permission(granted, PermissionCode.SEND_MEDIA.value)
 
     def attach_media(
         self,
