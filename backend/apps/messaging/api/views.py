@@ -5,6 +5,7 @@ from rest_framework.utils.urls import remove_query_param, replace_query_param
 from rest_framework.views import APIView
 
 from apps.messaging.api.serializers import (
+    CreateScheduledMessageSerializer,
     MediaSerializer,
     MediaUploadSerializer,
     MessageQuerySerializer,
@@ -15,6 +16,12 @@ from apps.messaging.api.serializers import (
     UpdateMessageSerializer,
 )
 from apps.messaging.application.use_cases.attach_media import AttachMediaUseCase
+from apps.messaging.application.use_cases.cancel_scheduled_message import (
+    CancelScheduledMessageUseCase,
+)
+from apps.messaging.application.use_cases.create_scheduled_message import (
+    CreateScheduledMessageUseCase,
+)
 from apps.messaging.application.use_cases.delete_message import DeleteMessageUseCase
 from apps.messaging.application.use_cases.edit_message import EditMessageUseCase
 from apps.messaging.application.use_cases.list_messages import ListMessagesUseCase
@@ -22,15 +29,19 @@ from apps.messaging.application.use_cases.messages import SearchMessagesUseCase
 from apps.messaging.application.use_cases.send_message import SendMessageUseCase
 from apps.messaging.domain.exceptions import (
     InvalidMediaError,
+    InvalidScheduledTimeError,
     MediaAttachmentForbiddenError,
     MessageDeleteForbiddenError,
     MessageEditForbiddenError,
     MessageNotFoundError,
     MessageTargetForbiddenError,
     MessageTargetNotFoundError,
+    ScheduledMessageCancelForbiddenError,
+    ScheduledMessageNotFoundError,
 )
 from apps.messaging.realtime import ChannelsRealtimeNotifier
 from apps.messaging.repositories import DjangoMessagingRepository
+from apps.messaging.tasks import CeleryScheduledMessageDispatcher
 from apps.notifications.recorder import DjangoNotificationRecorder
 
 
@@ -129,6 +140,48 @@ class MessageSearchView(APIView):
         except MessageTargetNotFoundError as exc:
             return _detail(str(exc), 404)
         return _page_response(request, page, data["limit"], data["offset"])
+
+
+class ScheduledMessageCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateScheduledMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            scheduled = CreateScheduledMessageUseCase(
+                DjangoMessagingRepository(),
+                CeleryScheduledMessageDispatcher(),
+            ).execute(
+                request.user.id,
+                data["content"],
+                data["scheduled_time"],
+                **_target_kwargs(data),
+            )
+        except InvalidScheduledTimeError as exc:
+            return _detail(str(exc), 400)
+        except MessageTargetNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(
+            {"scheduled_id": scheduled.scheduled_id, "status": "QUEUED"},
+            status=201,
+        )
+
+
+class ScheduledMessageDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, scheduled_id):
+        try:
+            CancelScheduledMessageUseCase(DjangoMessagingRepository()).execute(
+                scheduled_id, request.user.id
+            )
+        except ScheduledMessageNotFoundError as exc:
+            return _detail(str(exc), 404)
+        except ScheduledMessageCancelForbiddenError as exc:
+            return _detail(str(exc), 403)
+        return Response(status=204)
 
 
 class MessageDetailView(APIView):

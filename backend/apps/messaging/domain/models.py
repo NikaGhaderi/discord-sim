@@ -61,3 +61,14 @@ class MessageDetailEntity(MessageEntity):
 class MessagePage:
     count: int
     results: list[MessageDetailEntity]
+
+
+@dataclass
+class ScheduledMessageEntity:
+    scheduled_id: int
+    sender_id: int
+    body: str
+    scheduled_time: datetime
+    topic_id: int | None = None
+    group_id: int | None = None
+    direct_chat_id: int | None = None

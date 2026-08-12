@@ -27,6 +27,10 @@ class SendMessageSerializer(MessageTargetSerializer):
     content = serializers.CharField(allow_blank=False, trim_whitespace=False)
 
 
+class CreateScheduledMessageSerializer(SendMessageSerializer):
+    scheduled_time = serializers.DateTimeField()
+
+
 class MessageQuerySerializer(MessageTargetSerializer):
     limit = serializers.IntegerField(
         required=False, default=50, min_value=1, max_value=100
