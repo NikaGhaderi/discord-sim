@@ -28,6 +28,17 @@ export interface SendMessagePayload extends MessageTarget {
   content: string;
 }
 
+export interface ScheduledMessage extends MessageTarget {
+  scheduled_id: number;
+  content: string;
+  scheduled_time: string;
+}
+
+export interface CreateScheduledMessagePayload extends MessageTarget {
+  content: string;
+  scheduled_time: string;
+}
+
 export interface SearchMessagesParams extends MessageTarget {
   query: string;
   limit?: number;
@@ -121,5 +132,29 @@ export const messagingApi = {
       { params: { q: query, ...target, limit, offset } }
     );
     return toPaginatedMessages(response.data);
+  },
+
+  createScheduledMessage: async (
+    payload: CreateScheduledMessagePayload
+  ): Promise<ScheduledMessage> => {
+    // The backend's create response is deliberately minimal
+    // ({scheduled_id, status}) -- it doesn't echo back content/target/time,
+    // so those come from what we already sent.
+    const response = await apiClient.post<{ scheduled_id: number; status: string }>(
+      '/api/messages/scheduled/',
+      payload
+    );
+    return { scheduled_id: response.data.scheduled_id, ...payload };
+  },
+
+  cancelScheduledMessage: async (scheduledId: number): Promise<void> => {
+    await apiClient.delete(`/api/messages/scheduled/${scheduledId}/`);
+  },
+
+  listScheduledMessages: async (target: MessageTarget): Promise<ScheduledMessage[]> => {
+    const response = await apiClient.get<ScheduledMessage[]>('/api/messages/scheduled/', {
+      params: target,
+    });
+    return response.data;
   },
 };

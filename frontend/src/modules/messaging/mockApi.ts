@@ -5,10 +5,13 @@ import {
   PaginatedMessagesResponse,
   SearchMessagesParams,
   SendMessagePayload,
+  ScheduledMessage,
+  CreateScheduledMessagePayload,
 } from './api';
 
 let nextMessageId = 101;
 let nextMediaId = 1;
+let nextScheduledId = 1;
 
 const mockMessagesStore: Message[] = [
   {
@@ -31,12 +34,23 @@ const mockMessagesStore: Message[] = [
   },
 ];
 
+const mockScheduledMessagesStore: ScheduledMessage[] = [];
+
 function matchesTarget(message: Message, target: MessageTarget): boolean {
   // The mock store doesn't track per-message targets -- every mock message
   // is visible regardless of which target was requested, same as the real
   // backend would be for a single populated space.
   void message;
   void target;
+  return true;
+}
+
+function matchesScheduledTarget(scheduled: ScheduledMessage, target: MessageTarget): boolean {
+  if (target.topic_id !== undefined) return scheduled.topic_id === target.topic_id;
+  if (target.group_id !== undefined) return scheduled.group_id === target.group_id;
+  if (target.direct_chat_id !== undefined) {
+    return scheduled.direct_chat_id === target.direct_chat_id;
+  }
   return true;
 }
 
@@ -119,5 +133,30 @@ export const mockMessagingApi = {
       (m) => matchesTarget(m, target) && m.content.toLowerCase().includes(trimmed.toLowerCase())
     );
     return Promise.resolve(paginate(matches, limit, offset));
+  },
+
+  createScheduledMessage: async (
+    payload: CreateScheduledMessagePayload
+  ): Promise<ScheduledMessage> => {
+    const scheduled: ScheduledMessage = {
+      scheduled_id: nextScheduledId++,
+      ...payload,
+    };
+    mockScheduledMessagesStore.push(scheduled);
+    return Promise.resolve(scheduled);
+  },
+
+  cancelScheduledMessage: async (scheduledId: number): Promise<void> => {
+    const index = mockScheduledMessagesStore.findIndex((s) => s.scheduled_id === scheduledId);
+    if (index !== -1) {
+      mockScheduledMessagesStore.splice(index, 1);
+    }
+    return Promise.resolve();
+  },
+
+  listScheduledMessages: async (target: MessageTarget): Promise<ScheduledMessage[]> => {
+    return Promise.resolve(
+      mockScheduledMessagesStore.filter((s) => matchesScheduledTarget(s, target))
+    );
   },
 };
