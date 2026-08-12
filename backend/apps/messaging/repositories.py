@@ -6,7 +6,12 @@ from django.db.models import QuerySet
 
 from apps.messaging.application.interfaces import AbstractMessagingRepository
 from apps.messaging.domain.exceptions import MessageNotFoundError
-from apps.messaging.domain.models import MediaEntity, MessageEntity, MessagePage
+from apps.messaging.domain.models import (
+    MediaEntity,
+    MessageDetailEntity,
+    MessageEntity,
+    MessagePage,
+)
 from apps.messaging.models import Media, Message, MessageHistory
 from apps.permissions.domain.checker import has_permission
 from apps.permissions.domain.permissions import PermissionCode
@@ -19,25 +24,25 @@ from apps.workspaces.repositories import DjangoChannelRepository
 def _to_media_entity(media: Media) -> MediaEntity:
     return MediaEntity(
         media_id=media.id,
-        base_message_id=media.base_message_id,
+        base_message_id=media.message_id,
         file_url=media.file.url,
-        file_type=media.file_type,
+        file_type=media.content_type,
         file_size=media.file_size,
         thumbnail_url=media.thumbnail.url if media.thumbnail else None,
     )
 
 
-def _to_message_entity(message: Message) -> MessageEntity:
+def _to_message_entity(message: Message) -> MessageDetailEntity:
     prefetched_media = list(message.media.all())
-    return MessageEntity(
-        base_message_id=message.pk,
+    return MessageDetailEntity(
+        id=message.pk,
         sender_id=message.sender_id,
-        content=message.content,
-        sent_at=message.sent_at,
-        is_edited=message.is_edited,
         topic_id=message.topic_id,
         group_id=message.group_id,
         direct_chat_id=message.direct_chat_id,
+        body=message.body,
+        is_edited=message.is_edited,
+        created_at=message.created_at,
         media=[_to_media_entity(item) for item in prefetched_media],
     )
 
@@ -100,7 +105,7 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         with transaction.atomic():
             message = Message.objects.create(
                 sender_id=sender_id,
-                content=content,
+                body=content,
                 topic_id=topic_id,
                 group_id=group_id,
                 direct_chat_id=direct_chat_id,
@@ -141,7 +146,7 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
     ) -> MessagePage:
         queryset = (
             self._messages()
-            .annotate(search=SearchVector("content"))
+            .annotate(search=SearchVector("body"))
             .filter(
                 search=SearchQuery(query),
                 **self._target_filter(
@@ -174,9 +179,9 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         file_size: int,
     ) -> MediaEntity:
         media = Media.objects.create(
-            base_message_id=base_message_id,
+            message_id=base_message_id,
             file=uploaded_file,
-            file_type=file_type,
+            content_type=file_type,
             file_size=file_size,
         )
         return _to_media_entity(media)
@@ -195,12 +200,12 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
             if message is None:
                 raise MessageNotFoundError("Message not found.")
             MessageHistory.objects.create(
-                base_message_id=base_message_id,
-                old_content=message.content,
+                message_id=base_message_id,
+                previous_body=message.body,
             )
-            message.content = content
+            message.body = content
             message.is_edited = True
-            message.save(update_fields=("content", "is_edited"))
+            message.save(update_fields=("body", "is_edited"))
         return _to_message_entity(self._messages().get(pk=base_message_id))
 
     def delete_message(self, base_message_id: int) -> None:

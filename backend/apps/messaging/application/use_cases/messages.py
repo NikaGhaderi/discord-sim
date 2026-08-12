@@ -4,25 +4,17 @@ from apps.messaging.application.interfaces import (
     AbstractRealtimeNotifier,
 )
 from apps.messaging.domain.exceptions import (
-    InvalidMessageTargetError,
     MessageDeleteForbiddenError,
     MessageEditForbiddenError,
     MessageTargetNotFoundError,
 )
-from apps.messaging.domain.models import MessageEntity, MessagePage
+from apps.messaging.domain.models import (
+    MessageEntity,
+    MessagePage,
+    validate_exactly_one_target,
+)
 from apps.permissions.domain.checker import has_permission
 from apps.permissions.domain.permissions import PermissionCode
-
-
-def validate_exactly_one_target(
-    topic_id: int | None,
-    group_id: int | None,
-    direct_chat_id: int | None,
-) -> None:
-    if sum(value is not None for value in (topic_id, group_id, direct_chat_id)) != 1:
-        raise InvalidMessageTargetError(
-            "Exactly one of topic_id, group_id, or direct_chat_id must be set."
-        )
 
 
 def _realtime_group_name(
@@ -40,10 +32,10 @@ def _realtime_group_name(
 
 def _message_payload(message: MessageEntity) -> dict:
     return {
-        "base_message_id": message.base_message_id,
+        "base_message_id": message.id,
         "sender_id": message.sender_id,
-        "content": message.content,
-        "sent_at": message.sent_at.isoformat(),
+        "content": message.body,
+        "sent_at": message.created_at.isoformat(),
         "is_edited": message.is_edited,
         "media": [
             {"file_url": m.file_url, "file_type": m.file_type} for m in message.media

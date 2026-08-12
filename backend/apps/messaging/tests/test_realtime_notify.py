@@ -8,22 +8,23 @@ from apps.messaging.application.use_cases.messages import (
     SendMessageUseCase,
 )
 from apps.messaging.domain.exceptions import MessageDeleteForbiddenError
-from apps.messaging.domain.models import MediaEntity, MessageEntity
+from apps.messaging.domain.models import MediaEntity, MessageDetailEntity
 
 
-def _message(**overrides) -> MessageEntity:
+def _message(**overrides) -> MessageDetailEntity:
     defaults = dict(
-        base_message_id=1,
+        id=1,
         sender_id=10,
-        content="hello",
-        sent_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        body="hello",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         is_edited=False,
         topic_id=None,
         group_id=None,
         direct_chat_id=None,
+        media=[],
     )
     defaults.update(overrides)
-    return MessageEntity(**defaults)
+    return MessageDetailEntity(**defaults)
 
 
 def test_send_message_notifies_the_topic_group_on_success():
@@ -107,7 +108,7 @@ def test_send_message_works_with_no_notifier_configured():
         sender_id=10, content="hello", topic_id=5
     )
 
-    assert result.base_message_id == 1
+    assert result.id == 1
 
 
 def test_delete_message_notifies_after_the_repository_delete_succeeds():
@@ -199,9 +200,7 @@ def test_send_message_works_with_no_notification_recorder_configured():
 
 def test_delete_message_records_a_notification_after_the_delete_succeeds():
     repository = Mock()
-    repository.get_message.return_value = _message(
-        topic_id=5, sender_id=10, base_message_id=1
-    )
+    repository.get_message.return_value = _message(topic_id=5, sender_id=10, id=1)
     repository.list_target_member_ids.return_value = [11, 12]
     recorder = Mock()
 

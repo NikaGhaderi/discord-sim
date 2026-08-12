@@ -91,12 +91,12 @@ def test_send_text_matches_contract_and_checks_membership(spaces):
 def test_history_is_scoped_paginated_and_includes_media(spaces):
     group = spaces["group"]
     sender = spaces["sender"]
-    first = Message.objects.create(sender=sender, group=group, content="first")
-    second = Message.objects.create(sender=sender, group=group, content="second")
+    first = Message.objects.create(sender=sender, group=group, body="first")
+    second = Message.objects.create(sender=sender, group=group, body="second")
     Media.objects.create(
-        base_message=second,
+        message=second,
         file="message_media/backlog.pdf",
-        file_type="application/pdf",
+        content_type="application/pdf",
         file_size=100,
     )
 
@@ -127,7 +127,7 @@ def test_history_pagination_next_link_points_past_the_current_page(spaces):
     group = spaces["group"]
     sender = spaces["sender"]
     for index in range(3):
-        Message.objects.create(sender=sender, group=group, content=f"msg-{index}")
+        Message.objects.create(sender=sender, group=group, body=f"msg-{index}")
 
     response = client_for(sender).get(
         f"/api/messages/?group_id={group.id}&limit=1&offset=0"
@@ -144,8 +144,8 @@ def test_history_pagination_next_link_points_past_the_current_page(spaces):
 def test_search_only_returns_content_matches_in_authorized_space(spaces):
     group = spaces["group"]
     sender = spaces["sender"]
-    Message.objects.create(sender=sender, group=group, content="sprint backlog")
-    Message.objects.create(sender=sender, group=group, content="unrelated")
+    Message.objects.create(sender=sender, group=group, body="sprint backlog")
+    Message.objects.create(sender=sender, group=group, body="unrelated")
 
     response = client_for(sender).get(
         f"/api/messages/search/?q=sprint&group_id={group.id}"
@@ -168,8 +168,8 @@ def test_search_matches_word_stems_not_just_substrings(spaces):
     # substring match in the other direction.
     group = spaces["group"]
     sender = spaces["sender"]
-    Message.objects.create(sender=sender, group=group, content="running the migration")
-    Message.objects.create(sender=sender, group=group, content="sprint planning")
+    Message.objects.create(sender=sender, group=group, body="running the migration")
+    Message.objects.create(sender=sender, group=group, body="sprint planning")
 
     stem_match = client_for(sender).get(
         f"/api/messages/search/?q=run&group_id={group.id}"
@@ -190,7 +190,7 @@ def test_edit_writes_old_content_to_history(spaces):
     message = Message.objects.create(
         sender=sender,
         direct_chat=spaces["direct_chat"],
-        content="old",
+        body="old",
     )
 
     response = client_for(sender).patch(
@@ -201,8 +201,8 @@ def test_edit_writes_old_content_to_history(spaces):
     assert response.status_code == 200
     assert response.json()["content"] == "new"
     assert response.json()["is_edited"] is True
-    assert message.content == "new"
-    assert MessageHistory.objects.get(base_message=message).old_content == "old"
+    assert message.body == "new"
+    assert MessageHistory.objects.get(message=message).previous_body == "old"
 
 
 @pytest.mark.django_db
@@ -210,7 +210,7 @@ def test_only_sender_can_edit(spaces):
     message = Message.objects.create(
         sender=spaces["sender"],
         direct_chat=spaces["direct_chat"],
-        content="old",
+        body="old",
     )
 
     response = client_for(spaces["participant"]).patch(
@@ -234,7 +234,7 @@ def test_delete_messages_permission_does_not_grant_edit_access(spaces):
     message = Message.objects.create(
         sender=spaces["sender"],
         topic=spaces["topic"],
-        content="old",
+        body="old",
     )
 
     response = client_for(moderator).patch(
@@ -244,7 +244,7 @@ def test_delete_messages_permission_does_not_grant_edit_access(spaces):
     assert response.status_code == 403
     assert MessageHistory.objects.count() == 0
     message.refresh_from_db()
-    assert message.content == "old"
+    assert message.body == "old"
 
 
 @pytest.mark.django_db
@@ -263,10 +263,10 @@ def test_sender_and_channel_moderator_can_hard_delete(spaces):
         role=role,
     )
     by_sender = Message.objects.create(
-        sender=sender, topic=spaces["topic"], content="sender deletes"
+        sender=sender, topic=spaces["topic"], body="sender deletes"
     )
     by_moderator = Message.objects.create(
-        sender=sender, topic=spaces["topic"], content="moderator deletes"
+        sender=sender, topic=spaces["topic"], body="moderator deletes"
     )
 
     sender_response = client_for(sender).delete(f"/api/messages/{by_sender.id}/")
@@ -284,7 +284,7 @@ def test_non_sender_cannot_delete_direct_message(spaces):
     message = Message.objects.create(
         sender=spaces["sender"],
         direct_chat=spaces["direct_chat"],
-        content="keep",
+        body="keep",
     )
 
     response = client_for(spaces["participant"]).delete(f"/api/messages/{message.id}/")
@@ -298,7 +298,7 @@ def test_group_admin_can_delete_another_members_message(spaces):
     message = Message.objects.create(
         sender=spaces["participant"],
         group=spaces["group"],
-        content="moderated",
+        body="moderated",
     )
 
     response = client_for(spaces["sender"]).delete(f"/api/messages/{message.id}/")
@@ -314,7 +314,7 @@ def test_channel_media_requires_sender_and_send_media_permission(spaces, tmp_pat
     message = Message.objects.create(
         sender=sender,
         topic=spaces["topic"],
-        content="attachment",
+        body="attachment",
     )
     client = client_for(sender)
 
@@ -361,7 +361,7 @@ def test_oversized_media_upload_is_rejected(spaces, tmp_path):
     message = Message.objects.create(
         sender=sender,
         topic=spaces["topic"],
-        content="attachment",
+        body="attachment",
     )
     role = ChannelRole.objects.create(
         channel=channel,
@@ -389,7 +389,7 @@ def test_disallowed_content_type_upload_is_rejected(spaces, tmp_path):
     message = Message.objects.create(
         sender=sender,
         topic=spaces["topic"],
-        content="attachment",
+        body="attachment",
     )
     role = ChannelRole.objects.create(
         channel=channel,
@@ -420,7 +420,7 @@ def test_image_upload_triggers_thumbnail_task(spaces, tmp_path):
     message = Message.objects.create(
         sender=sender,
         topic=spaces["topic"],
-        content="attachment",
+        body="attachment",
     )
     role = ChannelRole.objects.create(
         channel=channel,
@@ -453,7 +453,7 @@ def test_non_image_upload_does_not_trigger_thumbnail_task(spaces, tmp_path):
     message = Message.objects.create(
         sender=sender,
         topic=spaces["topic"],
-        content="attachment",
+        body="attachment",
     )
     role = ChannelRole.objects.create(
         channel=channel,
