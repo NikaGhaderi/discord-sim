@@ -36,6 +36,21 @@ vi.mock('../index', () => ({
   },
 }));
 
+vi.mock('../../notifications', () => ({
+  notificationsApi: {
+    listNotifications: vi.fn().mockResolvedValue([]),
+    markNotificationAsRead: vi.fn(),
+  },
+  socketClient: {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    subscribe: vi.fn(),
+    onNewMessage: vi.fn(() => vi.fn()),
+    onMessageDeleted: vi.fn(() => vi.fn()),
+    onNewNotification: vi.fn(() => vi.fn()),
+  },
+}));
+
 const channel: Channel = {
   channel_id: 1,
   name: 'general',
@@ -124,6 +139,23 @@ describe('ChannelSidebar', () => {
     fireEvent.click(screen.getByLabelText('Add channel'));
     fireEvent.click(screen.getByText('Join Channel'));
     expect(screen.getByText('Join a Channel')).toBeInTheDocument();
+  });
+
+  it('opens the notification feed from the sidebar nav', async () => {
+    render(
+      <ChannelSidebar
+        channels={[]}
+        selectedChannelId={null}
+        onSelectChannel={vi.fn()}
+        onChannelCreated={vi.fn()}
+        onChannelJoined={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Notifications'));
+
+    expect(screen.getByText('Notifications', { selector: 'h2' })).toBeInTheDocument();
+    expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
   });
 });
 

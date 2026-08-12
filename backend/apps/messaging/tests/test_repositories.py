@@ -23,7 +23,7 @@ def test_failed_history_insert_rolls_back_message_edit():
     message = Message.objects.create(
         sender=sender,
         direct_chat=direct_chat,
-        content="original",
+        body="original",
     )
 
     with (
@@ -37,7 +37,7 @@ def test_failed_history_insert_rolls_back_message_edit():
         DjangoMessagingRepository().write_message_edit(message.id, "must roll back")
 
     message.refresh_from_db()
-    assert message.content == "original"
+    assert message.body == "original"
     assert message.is_edited is False
     assert MessageHistory.objects.count() == 0
 
@@ -56,7 +56,7 @@ def test_failed_message_update_rolls_back_history_insert():
     message = Message.objects.create(
         sender=sender,
         direct_chat=direct_chat,
-        content="original",
+        body="original",
     )
 
     with (
@@ -70,7 +70,7 @@ def test_failed_message_update_rolls_back_history_insert():
         DjangoMessagingRepository().write_message_edit(message.id, "must roll back")
 
     message.refresh_from_db()
-    assert message.content == "original"
+    assert message.body == "original"
     assert message.is_edited is False
     assert MessageHistory.objects.count() == 0
 
@@ -89,13 +89,13 @@ def test_hard_delete_cascades_to_history_and_media():
     message = Message.objects.create(
         sender=sender,
         direct_chat=direct_chat,
-        content="delete me",
+        body="delete me",
     )
-    MessageHistory.objects.create(base_message=message, old_content="older body")
+    MessageHistory.objects.create(message=message, previous_body="older body")
     Media.objects.create(
-        base_message=message,
+        message=message,
         file="message_media/cascade.txt",
-        file_type="text/plain",
+        content_type="text/plain",
         file_size=10,
     )
 

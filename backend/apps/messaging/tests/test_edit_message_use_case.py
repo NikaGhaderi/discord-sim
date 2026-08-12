@@ -10,12 +10,14 @@ from apps.messaging.domain.models import MessageEntity
 
 def _message(sender_id: int = 1) -> MessageEntity:
     return MessageEntity(
-        base_message_id=10,
+        id=10,
         sender_id=sender_id,
-        content="old body",
-        sent_at=datetime.now(timezone.utc),
-        is_edited=False,
         topic_id=5,
+        group_id=None,
+        direct_chat_id=None,
+        body="old body",
+        is_edited=False,
+        created_at=datetime.now(timezone.utc),
     )
 
 
@@ -34,7 +36,7 @@ def test_edit_message_uses_atomic_repository_operation_for_sender():
     repository = Mock()
     repository.get_message.return_value = _message(sender_id=1)
     updated = _message(sender_id=1)
-    updated.content = "new body"
+    updated.body = "new body"
     updated.is_edited = True
     repository.write_message_edit.return_value = updated
 

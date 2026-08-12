@@ -59,7 +59,7 @@ class DeleteMessageUseCase:
         if self._notifier is None and self._notification_recorder is None:
             return
 
-        payload = {"base_message_id": message.base_message_id}
+        payload = {"base_message_id": message.id}
         if self._notifier is not None:
             self._notifier.notify(
                 _realtime_group_name(message),
