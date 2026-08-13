@@ -1,6 +1,7 @@
 import {
   Channel,
   ChannelMember,
+  ChannelPermission,
   ChannelUpdateResponse,
   CreateRolePayload,
   Role,
@@ -96,6 +97,12 @@ export const listMembers = async (
   _channelId: number
 ): Promise<ChannelMember[]> => {
   return Promise.resolve([MOCK_MEMBER]);
+};
+
+export const getMyPermissions = async (
+  _channelId: number
+): Promise<ChannelPermission[]> => {
+  return Promise.resolve(['DELETE_MESSAGES', 'MANAGE_TOPICS', 'KICK_MEMBERS', 'SEND_MEDIA']);
 };
 
 export const updateMemberNickname = async (

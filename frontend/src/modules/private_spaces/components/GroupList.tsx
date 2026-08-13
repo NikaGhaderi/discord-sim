@@ -4,9 +4,18 @@ import { Group } from '../types';
 
 interface GroupListProps {
   onSelectGroup?: (group: Group) => void;
+  /**
+   * Set by the parent right after a delete/leave succeeds elsewhere (in
+   * GroupSettingsPanel) so this list -- which owns its own fetched state --
+   * drops the now-gone group without waiting for a full refetch.
+   */
+  removedGroupId?: number | null;
 }
 
-export const GroupList: React.FC<GroupListProps> = ({ onSelectGroup }) => {
+export const GroupList: React.FC<GroupListProps> = ({
+  onSelectGroup,
+  removedGroupId,
+}) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<number, number>>(
     {}
@@ -55,6 +64,11 @@ export const GroupList: React.FC<GroupListProps> = ({ onSelectGroup }) => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (removedGroupId == null) return;
+    setGroups((prev) => prev.filter((g) => g.group_id !== removedGroupId));
+  }, [removedGroupId]);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();

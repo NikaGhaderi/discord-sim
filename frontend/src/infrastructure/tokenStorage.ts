@@ -29,6 +29,15 @@ export const setTokens = ({ access_token, refresh_token }: TokenPair): void => {
   window.localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
 };
 
+/**
+ * Updates only the access token, leaving the refresh token untouched. Used
+ * after a refresh-token exchange, since TokenRefreshView only issues a new
+ * access token (refresh tokens aren't rotated server-side).
+ */
+export const setAccessToken = (accessToken: string): void => {
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+};
+
 export const clearTokens = (): void => {
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);

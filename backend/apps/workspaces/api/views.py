@@ -250,6 +250,20 @@ class ChannelMemberListView(APIView):
         return Response(ChannelMemberSerializer(members, many=True).data, status=200)
 
 
+class ChannelMyPermissionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, channel_id):
+        # Non-members get an empty list rather than a 404/403 -- this mirrors
+        # get_user_permissions itself, which has no concept of membership,
+        # only role assignments, and lets the frontend gate UI purely on the
+        # returned codes without a separate membership check.
+        permissions = DjangoChannelRepository().get_user_permissions(
+            channel_id, request.user.id
+        )
+        return Response({"permissions": permissions}, status=200)
+
+
 class ChannelMemberDetailView(APIView):
     permission_classes = [IsAuthenticated]
 

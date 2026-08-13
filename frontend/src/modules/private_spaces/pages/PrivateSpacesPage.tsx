@@ -8,6 +8,7 @@ import { Group } from '../types';
 
 export const PrivateSpacesPage: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [removedGroupId, setRemovedGroupId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState(false);
@@ -57,7 +58,10 @@ export const PrivateSpacesPage: React.FC = () => {
       <aside className="private-spaces-sidebar" style={{ width: '300px' }}>
         <DirectMessageList currentUserId={currentUserId} />
         <hr style={{ margin: '20px 0' }} />
-        <GroupList onSelectGroup={(group) => setSelectedGroup(group)} />
+        <GroupList
+          onSelectGroup={(group) => setSelectedGroup(group)}
+          removedGroupId={removedGroupId}
+        />
       </aside>
 
       <main className="private-spaces-main" style={{ flex: 1 }}>
@@ -66,9 +70,11 @@ export const PrivateSpacesPage: React.FC = () => {
           <div style={{ marginTop: '30px' }}>
             <GroupSettingsPanel
               group={selectedGroup}
-              isAdmin={selectedGroup.creator_id === currentUserId}
               onUpdateGroup={(updated) => setSelectedGroup(updated)}
-              onDeleteOrLeave={() => setSelectedGroup(null)}
+              onDeleteOrLeave={(groupId) => {
+                setSelectedGroup(null);
+                setRemovedGroupId(groupId);
+              }}
             />
           </div>
         )}

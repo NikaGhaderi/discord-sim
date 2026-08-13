@@ -3,9 +3,11 @@ from rest_framework import serializers
 from apps.private_spaces.models import DirectChat, Group, GroupInvitation
 
 
-# TODO(private-spaces): the doc (§8-3-1) says list responses should show
-# participant/member profile pictures. Not implemented here -- deferred
-# pending real avatar/media support (SCRUM-46). See SCRUM-24 comment.
+# The doc (§8-3-1) asks for participant profile pictures on list responses.
+# Deliberately not embedded here -- this serializer only returns user1_id/
+# user2_id, and the frontend bulk-resolves avatar_url (a plain URL field,
+# unrelated to SCRUM-46's message-attachment media infra) via a separate
+# profileApi.listPublicProfilesByIds call, see DirectMessageList.tsx.
 class DirectChatSerializer(serializers.ModelSerializer):
     direct_chat_id = serializers.IntegerField(source="id", read_only=True)
 
@@ -18,7 +20,8 @@ class CreateDirectChatSerializer(serializers.Serializer):
     target_user_id = serializers.IntegerField(min_value=1)
 
 
-# TODO(private-spaces): same profile-picture gap as DirectChatSerializer above.
+# Same profile-picture note as DirectChatSerializer above -- member avatars
+# are resolved by the frontend, see GroupSettingsPanel.tsx.
 class GroupSerializer(serializers.ModelSerializer):
     group_id = serializers.IntegerField(source="id", read_only=True)
 

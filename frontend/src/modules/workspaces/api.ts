@@ -2,6 +2,7 @@ import { apiClient } from '@infrastructure/apiClient';
 import {
   Channel,
   ChannelMember,
+  ChannelPermission,
   ChannelUpdateResponse,
   CreateRolePayload,
   Role,
@@ -30,6 +31,8 @@ export interface WorkspacesApi {
   leaveChannel(channelId: number): Promise<void>;
 
   listMembers(channelId: number): Promise<ChannelMember[]>;
+  /** Effective PermissionCode values the current user holds in this channel. */
+  getMyPermissions(channelId: number): Promise<ChannelPermission[]>;
   /** Self-service only -- the backend rejects renaming another member. */
   updateMemberNickname(
     channelId: number,
@@ -58,6 +61,7 @@ const ENDPOINTS = {
   channelInviteJoin: (inviteToken: string) =>
     `/api/channels/invite/${inviteToken}/join/`,
   members: (channelId: number) => `/api/channels/${channelId}/members/`,
+  myPermissions: (channelId: number) => `/api/channels/${channelId}/my-permissions/`,
   member: (channelId: number, userId: number) =>
     `/api/channels/${channelId}/members/${userId}/`,
   memberRoles: (channelId: number, userId: number) =>
@@ -129,6 +133,15 @@ export const leaveChannel = async (channelId: number): Promise<void> => {
 export const listMembers = async (channelId: number): Promise<ChannelMember[]> => {
   const response = await apiClient.get<ChannelMember[]>(ENDPOINTS.members(channelId));
   return response.data;
+};
+
+export const getMyPermissions = async (
+  channelId: number
+): Promise<ChannelPermission[]> => {
+  const response = await apiClient.get<{ permissions: ChannelPermission[] }>(
+    ENDPOINTS.myPermissions(channelId)
+  );
+  return response.data.permissions;
 };
 
 export const updateMemberNickname = async (

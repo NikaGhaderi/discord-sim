@@ -43,6 +43,7 @@ vi.mock('../modules/workspaces', () => ({
     joinChannelByInviteToken: vi.fn(),
     leaveChannel: vi.fn(),
     listMembers: vi.fn(),
+    getMyPermissions: vi.fn().mockResolvedValue([]),
     updateMemberNickname: vi.fn(),
     kickMember: vi.fn(),
     listRoles: vi.fn(),

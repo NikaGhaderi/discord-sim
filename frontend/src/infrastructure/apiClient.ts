@@ -5,17 +5,21 @@
  *  1. Build the axios instance with baseURL from an env var.
  *  2. Request interceptor: read access_token from local storage and attach an
  *     `Authorization: Bearer <token>` header to every outbound request.
- *
- * Current scope: no automatic token refresh yet; if the access token expires,
- * the request fails with a 401. See the note at the bottom of this file for
- * where that will be added.
+ *  3. Response interceptor: on a 401 (expired access token), use the
+ *     refresh_token to get a fresh one and retry the original request once.
  */
 
 import axios, {
+  type AxiosError,
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { getAccessToken } from "./tokenStorage";
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+} from "./tokenStorage";
 
 // Base URL from env. In local dev, Nginx sits on port 80 and proxies requests
 // to Django (internal port 8000), so the browser-reachable address is
@@ -48,10 +52,64 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TECH DEBT: add a response interceptor that catches a 401, uses the
-// refresh_token to get a fresh access_token, and retries the original
-// request once. Kept centralized here so refresh applies to every request.
-// ─────────────────────────────────────────────────────────────────────────────
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+const REFRESH_PATH = "/api/auth/refresh/";
+
+/** Dispatched when the refresh_token itself is invalid/expired, so the
+ *  identity module can drop the user back to the login screen without this
+ *  infrastructure module depending on React state. */
+export const SESSION_EXPIRED_EVENT = "auth:session-expired";
+
+// Concurrent 401s share one in-flight refresh call instead of each firing
+// their own -- a page that fires several requests at once with a stale
+// token would otherwise exchange the same refresh_token multiple times.
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new Error("No refresh token available.");
+  }
+  // Plain axios, not apiClient -- this call must never carry a stale
+  // Authorization header or route back through this same interceptor.
+  const { data } = await axios.post<{ access_token: string }>(
+    `${baseURL}${REFRESH_PATH}`,
+    { refresh_token: refreshToken },
+  );
+  setAccessToken(data.access_token);
+  return data.access_token;
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+
+    if (
+      error.response?.status !== 401 ||
+      !originalRequest ||
+      originalRequest._retry
+    ) {
+      return Promise.reject(error);
+    }
+    originalRequest._retry = true;
+
+    try {
+      refreshPromise ??= refreshAccessToken().finally(() => {
+        refreshPromise = null;
+      });
+      const newAccessToken = await refreshPromise;
+      originalRequest.headers.set("Authorization", `Bearer ${newAccessToken}`);
+      return apiClient(originalRequest);
+    } catch {
+      clearTokens();
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      return Promise.reject(error);
+    }
+  },
+);
 
 export default apiClient;
