@@ -80,3 +80,12 @@ export const listPublicProfilesByIds = async (
     }, 200);
   });
 };
+
+export const uploadAvatar = async (file: File): Promise<UserProfile> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      mockProfileDatabase.avatar_url = URL.createObjectURL(file);
+      resolve({ ...mockProfileDatabase });
+    }, 200);
+  });
+};

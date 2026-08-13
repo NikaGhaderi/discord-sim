@@ -24,7 +24,10 @@ class MessageTargetSerializer(serializers.Serializer):
 
 
 class SendMessageSerializer(MessageTargetSerializer):
-    content = serializers.CharField(allow_blank=False, trim_whitespace=False)
+    # Blank is allowed so a message can carry only an attachment (media is
+    # attached in a second call, against this message's id, so the message
+    # itself must exist first regardless of whether it has any text).
+    content = serializers.CharField(allow_blank=True, trim_whitespace=False)
 
 
 class CreateScheduledMessageSerializer(SendMessageSerializer):

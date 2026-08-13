@@ -1,11 +1,25 @@
+import base64
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.users.api.views import OwnProfileView, PublicProfileView, UsersByIdsView
+from apps.users.api.views import (
+    OwnProfileView,
+    PublicProfileView,
+    UploadAvatarView,
+    UsersByIdsView,
+)
 from apps.users.domain.exceptions import ProfileNotFoundError
 from apps.users.domain.models import UserProfileEntity
+
+# Smallest possible valid PNG -- ImageField's validation actually decodes the
+# file, so an arbitrary byte string isn't enough to pass it.
+_ONE_PIXEL_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY"
+    "42YAAAAASUVORK5CYII="
+)
 
 
 def _profile(**overrides) -> UserProfileEntity:
@@ -84,6 +98,54 @@ class TestOwnProfileView:
             bio="Updating my bio for the sprint!",
             allow_group_invitations=False,
         )
+
+
+class TestUploadAvatarView:
+    @patch("apps.users.api.views.UploadAvatarUseCase")
+    def test_post_uploads_and_returns_the_updated_profile(self, use_case_class):
+        use_case_class.return_value.execute.return_value = _profile(
+            avatar_url="/media/avatars/2026/08/13/photo.png"
+        )
+        avatar = SimpleUploadedFile("photo.png", _ONE_PIXEL_PNG, "image/png")
+        request = _authenticate(
+            APIRequestFactory().post(
+                "/api/users/me/avatar/", {"avatar": avatar}, format="multipart"
+            )
+        )
+
+        response = UploadAvatarView.as_view()(request)
+
+        assert response.status_code == 200
+        assert response.data["avatar_url"] == "/media/avatars/2026/08/13/photo.png"
+        use_case_class.return_value.execute.assert_called_once()
+        called_args = use_case_class.return_value.execute.call_args
+        assert called_args.args[0] == 1
+        assert called_args.args[1].name == "photo.png"
+
+    def test_post_without_a_file_returns_400(self):
+        request = _authenticate(
+            APIRequestFactory().post("/api/users/me/avatar/", {}, format="multipart")
+        )
+
+        response = UploadAvatarView.as_view()(request)
+
+        assert response.status_code == 400
+
+    @patch("apps.users.api.views.UploadAvatarUseCase")
+    def test_post_returns_404_when_profile_is_missing(self, use_case_class):
+        use_case_class.return_value.execute.side_effect = ProfileNotFoundError(
+            "Profile not found."
+        )
+        avatar = SimpleUploadedFile("photo.png", _ONE_PIXEL_PNG, "image/png")
+        request = _authenticate(
+            APIRequestFactory().post(
+                "/api/users/me/avatar/", {"avatar": avatar}, format="multipart"
+            )
+        )
+
+        response = UploadAvatarView.as_view()(request)
+
+        assert response.status_code == 404
 
 
 class TestPublicProfileView:

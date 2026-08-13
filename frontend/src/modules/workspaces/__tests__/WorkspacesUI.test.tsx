@@ -22,7 +22,7 @@ vi.mock('../index', () => ({
     joinChannel: vi.fn(),
     joinChannelByInviteToken: vi.fn(),
     leaveChannel: vi.fn(),
-    listMembers: vi.fn(),
+    listMembers: vi.fn().mockResolvedValue([]),
     getMyPermissions: vi.fn().mockResolvedValue([]),
     updateMemberNickname: vi.fn(),
     kickMember: vi.fn(),
@@ -323,6 +323,24 @@ describe('ChannelSettingsModal', () => {
       expect(workspacesApi.updateMemberNickname).toHaveBeenCalledWith(1, 42, 'Sprint Master');
     });
     expect(await screen.findByText('Saved!')).toBeInTheDocument();
+  });
+
+  it('pre-fills the nickname field with the current value, if one is already set', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      { channel_id: 1, user_id: 42, nickname_in_channel: 'Existing Nick', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        currentUserId={42}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByDisplayValue('Existing Nick')).toBeInTheDocument();
   });
 
   it('asks for confirmation before deleting, and does nothing if declined', async () => {
@@ -659,6 +677,34 @@ describe('WorkspacePage', () => {
       20,
       0
     );
+  });
+
+  it('shows a member\'s channel nickname as their message sender name', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      { channel_id: 1, user_id: 9, nickname_in_channel: 'The Boss', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 1,
+          sender_id: 9,
+          sender_username: 'User #9',
+          content: 'hello from the boss',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+
+    expect(await screen.findByText('The Boss')).toBeInTheDocument();
+    expect(screen.queryByText('User #9')).not.toBeInTheDocument();
   });
 
   it('hides the topic tab bar when the channel has only one topic', async () => {

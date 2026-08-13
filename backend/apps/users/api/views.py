@@ -1,8 +1,10 @@
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.users.api.serializers import (
+    AvatarUploadSerializer,
     OwnProfileSerializer,
     PublicProfileSerializer,
     UpdateProfileSerializer,
@@ -14,6 +16,7 @@ from apps.users.application.use_cases.get_profile import (
     ListPublicProfilesByIdsUseCase,
 )
 from apps.users.application.use_cases.update_profile import UpdateProfileUseCase
+from apps.users.application.use_cases.upload_avatar import UploadAvatarUseCase
 from apps.users.domain.exceptions import ProfileNotFoundError
 from apps.users.repositories import DjangoProfileRepository
 
@@ -42,6 +45,24 @@ class OwnProfileView(APIView):
             profile = UpdateProfileUseCase(DjangoProfileRepository()).execute(
                 request.user.id,
                 **serializer.validated_data,
+            )
+        except ProfileNotFoundError:
+            return _profile_not_found_response()
+        return Response(OwnProfileSerializer(profile).data, status=200)
+
+
+class UploadAvatarView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        serializer = AvatarUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            profile = UploadAvatarUseCase(DjangoProfileRepository()).execute(
+                request.user.id,
+                serializer.validated_data["avatar"],
             )
         except ProfileNotFoundError:
             return _profile_not_found_response()

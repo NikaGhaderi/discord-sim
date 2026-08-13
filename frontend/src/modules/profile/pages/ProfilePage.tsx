@@ -15,6 +15,8 @@ export const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +57,19 @@ export const ProfilePage: React.FC = () => {
     setIsEditing(false);
   };
 
+  const handleAvatarUpload = async (file: File) => {
+    setAvatarError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const updated = await profileApi.uploadAvatar(file);
+      setProfile(updated);
+    } catch {
+      setAvatarError('Failed to upload photo.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   if (isLoading) {
     return <div>Loading…</div>;
   }
@@ -72,11 +87,16 @@ export const ProfilePage: React.FC = () => {
           onCancel={() => setIsEditing(false)}
         />
       ) : (
-        <ProfileView
-          profile={toProfileData(profile)}
-          isOwnProfile
-          onEditClick={() => setIsEditing(true)}
-        />
+        <>
+          {avatarError && <p role="alert" style={{ textAlign: 'center', color: '#c0392b' }}>{avatarError}</p>}
+          <ProfileView
+            profile={toProfileData(profile)}
+            isOwnProfile
+            onEditClick={() => setIsEditing(true)}
+            onAvatarUpload={(file) => void handleAvatarUpload(file)}
+            isUploadingAvatar={isUploadingAvatar}
+          />
+        </>
       )}
     </div>
   );

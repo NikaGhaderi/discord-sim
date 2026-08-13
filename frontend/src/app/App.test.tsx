@@ -60,7 +60,7 @@ vi.mock('../modules/workspaces', () => ({
     joinChannel: vi.fn(),
     joinChannelByInviteToken: vi.fn(),
     leaveChannel: vi.fn(),
-    listMembers: vi.fn(),
+    listMembers: vi.fn().mockResolvedValue([]),
     getMyPermissions: vi.fn().mockResolvedValue([]),
     updateMemberNickname: vi.fn(),
     kickMember: vi.fn(),
@@ -135,6 +135,7 @@ describe('App Component', () => {
     expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Direct Messages' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
   });
 
   test('renders profile page when navigated to /profile', async () => {

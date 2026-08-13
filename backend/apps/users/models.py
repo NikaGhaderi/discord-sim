@@ -10,6 +10,10 @@ class Profile(models.Model):
     )
     display_name = models.CharField(max_length=150, blank=True, default="")
     avatar_url = models.URLField(blank=True, default="")
+    # Real uploaded photo. avatar_url stays the single field every consumer
+    # (serializers, frontend) reads -- uploading here just sets avatar_url
+    # to this file's URL, same as pasting a URL directly ever did.
+    avatar = models.ImageField(upload_to="avatars/%Y/%m/%d", null=True, blank=True)
     bio = models.TextField(blank=True, default="")
     allow_group_invitations = models.BooleanField(default=True)
 

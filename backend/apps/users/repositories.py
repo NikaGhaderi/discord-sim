@@ -46,3 +46,18 @@ class DjangoProfileRepository(AbstractProfileRepository):
         if fields:
             profile.save(update_fields=list(fields))
         return _to_entity(profile)
+
+    def update_avatar(self, user_id: int, uploaded_file) -> UserProfileEntity:
+        try:
+            profile = Profile.objects.select_related("user").get(user_id=user_id)
+        except Profile.DoesNotExist as exc:
+            raise ProfileNotFoundError("Profile not found.") from exc
+
+        profile.avatar = uploaded_file
+        profile.save(update_fields=["avatar"])
+        # avatar_url stays the single field every consumer reads -- only
+        # readable/correct once the above save has assigned the file its
+        # final (collision-deduplicated) storage path.
+        profile.avatar_url = profile.avatar.url
+        profile.save(update_fields=["avatar_url"])
+        return _to_entity(profile)

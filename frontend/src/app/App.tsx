@@ -13,18 +13,20 @@ function AppRoutes() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <main>
+    <main style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {isAuthenticated && <AppNav />}
-      <Routes>
-        <Route
-          path="/"
-          element={<AuthPage onAuthenticated={() => navigate('/workspaces')} />}
-        />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/private-spaces" element={<PrivateSpacesPage />} />
-        <Route path="/workspaces" element={<WorkspacePage />} />
-      </Routes>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Routes>
+          <Route
+            path="/"
+            element={<AuthPage onAuthenticated={() => navigate('/workspaces')} />}
+          />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/private-spaces" element={<PrivateSpacesPage />} />
+          <Route path="/workspaces" element={<WorkspacePage />} />
+        </Routes>
+      </div>
     </main>
   );
 }

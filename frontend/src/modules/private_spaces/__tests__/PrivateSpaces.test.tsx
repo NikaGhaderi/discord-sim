@@ -7,6 +7,7 @@ import { InvitationList } from '../components/InvitationList';
 import { PrivateSpacesPage } from '../pages/PrivateSpacesPage';
 import { privateSpacesApi } from '../index';
 import { profileApi } from '../../profile';
+import { messagingApi } from '../../messaging';
 
 vi.mock('../index', () => ({
   privateSpacesApi: {
@@ -31,6 +32,35 @@ vi.mock('../../profile', () => ({
     updateProfile: vi.fn(),
     getPublicProfile: vi.fn(),
     listPublicProfilesByIds: vi.fn(),
+  },
+}));
+
+vi.mock('../../notifications', () => ({
+  notificationsApi: {
+    listNotifications: vi.fn().mockResolvedValue([]),
+    markNotificationAsRead: vi.fn(),
+  },
+  socketClient: {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    subscribe: vi.fn(),
+    onNewMessage: vi.fn(() => vi.fn()),
+    onMessageDeleted: vi.fn(() => vi.fn()),
+    onNewNotification: vi.fn(() => vi.fn()),
+  },
+}));
+
+vi.mock('../../messaging', () => ({
+  messagingApi: {
+    sendMessage: vi.fn(),
+    listMessages: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    editMessage: vi.fn(),
+    deleteMessage: vi.fn(),
+    attachMedia: vi.fn(),
+    searchMessages: vi.fn(),
+    createScheduledMessage: vi.fn(),
+    cancelScheduledMessage: vi.fn(),
+    listScheduledMessages: vi.fn(),
   },
 }));
 
@@ -190,6 +220,56 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       fireEvent.click(await screen.findByRole('button', { name: /delete group/i }));
 
       expect(privateSpacesApi.deleteOrLeaveGroup).not.toHaveBeenCalled();
+    });
+
+    it('invites a member by username, resolving it to a user_id first', async () => {
+      vi.mocked(profileApi.getPublicProfile).mockResolvedValueOnce({
+        user_id: 555,
+        username: 'new_teammate',
+        display_name: 'New Teammate',
+        avatar_url: null,
+        bio: '',
+      });
+      vi.mocked(privateSpacesApi.sendGroupInvitation).mockResolvedValueOnce({
+        invitation: {
+          invitation_id: 1,
+          group_id: 1,
+          inviter_id: currentUserId,
+          invitee_id: 555,
+          status: 'PENDING',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+        created: true,
+      });
+      render(<GroupSettingsPanel group={group} />);
+
+      fireEvent.change(screen.getByLabelText(/invite a member/i), {
+        target: { value: 'new_teammate' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /send invite/i }));
+
+      await waitFor(() => {
+        expect(profileApi.getPublicProfile).toHaveBeenCalledWith('new_teammate');
+      });
+      await waitFor(() => {
+        expect(privateSpacesApi.sendGroupInvitation).toHaveBeenCalledWith(1, 555);
+      });
+      expect(await screen.findByText('Invitation sent to new_teammate.')).toBeInTheDocument();
+    });
+
+    it('shows an error when inviting an unknown username', async () => {
+      vi.mocked(profileApi.getPublicProfile).mockRejectedValueOnce(new Error('not found'));
+      render(<GroupSettingsPanel group={group} />);
+
+      fireEvent.change(screen.getByLabelText(/invite a member/i), {
+        target: { value: 'ghost' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /send invite/i }));
+
+      expect(
+        await screen.findByText(`Couldn't invite "ghost". Check the username and try again.`)
+      ).toBeInTheDocument();
+      expect(privateSpacesApi.sendGroupInvitation).not.toHaveBeenCalled();
     });
 
     it('fetches and displays members with resolved usernames and an admin badge', async () => {
@@ -424,7 +504,100 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       const groupItem = await screen.findByText('Admin Room');
       fireEvent.click(groupItem);
 
+      fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+
       expect(await screen.findByRole('button', { name: /delete group/i })).toBeInTheDocument();
+    });
+
+    it('shows a real chat thread for the selected group', async () => {
+      vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+        user_id: currentUserId,
+        username: 'me',
+        display_name: 'Me',
+        avatar_url: null,
+        bio: '',
+        allow_group_invitations: true,
+      });
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
+      vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+      vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+        count: 1,
+        next: null,
+        previous: null,
+        results: [
+          {
+            base_message_id: 1,
+            sender_id: currentUserId,
+            sender_username: 'me',
+            content: 'hello group',
+            sent_at: '2026-01-01T00:00:00Z',
+            is_edited: false,
+            media: [],
+          },
+        ],
+      });
+
+      render(<PrivateSpacesPage />);
+
+      fireEvent.click(await screen.findByText('Admin Room'));
+
+      expect(await screen.findByText('hello group')).toBeInTheDocument();
+      expect(messagingApi.listMessages).toHaveBeenCalledWith({ group_id: 1 }, 20, 0);
+    });
+
+    it('shows a real chat thread for a selected DM, resolving the other participant\'s username', async () => {
+      vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+        user_id: currentUserId,
+        username: 'me',
+        display_name: 'Me',
+        avatar_url: null,
+        bio: '',
+        allow_group_invitations: true,
+      });
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
+        { direct_chat_id: 9, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([
+        {
+          user_id: 777,
+          username: 'ftm_roosta',
+          display_name: 'Fatemeh Roosta',
+          avatar_url: null,
+          bio: '',
+        },
+      ]);
+      vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([]);
+      vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+      vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+
+      render(<PrivateSpacesPage />);
+
+      fireEvent.click(await screen.findByText('ftm_roosta'));
+
+      await waitFor(() => {
+        expect(messagingApi.listMessages).toHaveBeenCalledWith({ direct_chat_id: 9 }, 20, 0);
+      });
+      // "ftm_roosta" now legitimately appears twice: once in the sidebar DM
+      // list item, once in the chat header above the thread.
+      expect(screen.getAllByText('ftm_roosta')).toHaveLength(2);
     });
 
     it('removes a deleted group from the sidebar immediately, without a manual refresh', async () => {
@@ -453,15 +626,15 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
       const groupItem = await screen.findByText('Admin Room');
       fireEvent.click(groupItem);
+      fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
 
       fireEvent.click(await screen.findByRole('button', { name: /delete group/i }));
 
       await waitFor(() => {
         expect(privateSpacesApi.deleteOrLeaveGroup).toHaveBeenCalledWith(1, 'delete');
       });
-      // Only the sidebar's <li> should remain gone -- the group name also
-      // briefly appears in the settings panel heading, but that panel is
-      // unmounted too once selectedGroup clears.
+      // The sidebar entry, the chat header, and the settings modal all key
+      // off the same `selected` state, so all three disappear together.
       await waitFor(() =>
         expect(screen.queryByText('Admin Room')).not.toBeInTheDocument()
       );

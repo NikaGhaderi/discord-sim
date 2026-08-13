@@ -22,6 +22,7 @@ export const WorkspacePage: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [hasDeletePermission, setHasDeletePermission] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
+  const [memberNicknames, setMemberNicknames] = useState<Record<number, string>>({});
 
   useEffect(() => {
     workspacesApi.listChannels().then((list) => {
@@ -43,6 +44,33 @@ export const WorkspacePage: React.FC = () => {
       cancelled = true;
     };
   }, [selectedChannelId]);
+
+  // Members' channel nicknames aren't returned on the message itself (the
+  // backend only ever sends sender_id), so they're resolved separately here
+  // and merged into how the thread renders each sender's name. Re-fetched
+  // whenever Settings closes, since that's the only place a nickname can
+  // change.
+  useEffect(() => {
+    if (selectedChannelId === null) {
+      setMemberNicknames({});
+      return;
+    }
+    if (isSettingsOpen) return;
+    let cancelled = false;
+    workspacesApi.listMembers(selectedChannelId).then((members) => {
+      if (cancelled) return;
+      const nicknames: Record<number, string> = {};
+      for (const member of members) {
+        if (member.nickname_in_channel) {
+          nicknames[member.user_id] = member.nickname_in_channel;
+        }
+      }
+      setMemberNicknames(nicknames);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChannelId, isSettingsOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +144,7 @@ export const WorkspacePage: React.FC = () => {
                 topicId={activeTopicId}
                 currentUserId={currentUserId ?? undefined}
                 hasDeletePermission={hasDeletePermission}
+                senderNameOverrides={memberNicknames}
               />
             </div>
           </>

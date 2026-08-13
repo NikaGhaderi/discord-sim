@@ -15,3 +15,6 @@ class AbstractProfileRepository(ABC):
 
     @abstractmethod
     def update_profile(self, user_id: int, **fields) -> UserProfileEntity: ...
+
+    @abstractmethod
+    def update_avatar(self, user_id: int, uploaded_file) -> UserProfileEntity: ...

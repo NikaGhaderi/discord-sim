@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveMediaUrl } from '@infrastructure/apiClient';
 
 interface AvatarProps {
   avatarUrl?: string | null;
@@ -14,7 +15,7 @@ interface AvatarProps {
  */
 export const Avatar: React.FC<AvatarProps> = ({ avatarUrl, label, size = 28 }) => (
   <img
-    src={avatarUrl || 'https://via.placeholder.com/150'}
+    src={avatarUrl ? resolveMediaUrl(avatarUrl) : 'https://via.placeholder.com/150'}
     alt={label}
     style={{
       width: size,

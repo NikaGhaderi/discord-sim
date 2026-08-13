@@ -88,6 +88,24 @@ def test_send_text_matches_contract_and_checks_membership(spaces):
 
 
 @pytest.mark.django_db
+def test_send_allows_blank_content_for_a_media_only_message(spaces):
+    topic = spaces["topic"]
+    payload = {
+        "topic_id": topic.id,
+        "group_id": None,
+        "direct_chat_id": None,
+        "content": "",
+    }
+
+    response = client_for(spaces["sender"]).post(
+        "/api/messages/", payload, format="json"
+    )
+
+    assert response.status_code == 201
+    assert response.json()["content"] == ""
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("target_field", "space_name"),
     (("group_id", "group"), ("direct_chat_id", "direct_chat")),

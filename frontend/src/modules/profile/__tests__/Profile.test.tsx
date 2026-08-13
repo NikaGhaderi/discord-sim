@@ -9,6 +9,7 @@ vi.mock('../index', () => ({
     getMyProfile: vi.fn(),
     updateProfile: vi.fn(),
     getPublicProfile: vi.fn(),
+    uploadAvatar: vi.fn(),
   },
 }));
 
@@ -129,6 +130,32 @@ describe('Profile Module (SCRUM-28)', () => {
       });
 
       expect(await screen.findByText('New Name')).toBeInTheDocument();
+    });
+
+    it('uploads a new avatar photo and reflects it immediately', async () => {
+      vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce(mockUserProfile);
+      vi.mocked(profileApi.uploadAvatar).mockResolvedValueOnce({
+        ...mockUserProfile,
+        avatar_url: '/media/avatars/new-photo.png',
+      });
+
+      render(<ProfilePage />);
+      await screen.findByText('Test User');
+
+      const file = new File(['x'], 'new-photo.png', { type: 'image/png' });
+      fireEvent.change(screen.getByTestId('avatar-file-input'), {
+        target: { files: [file] },
+      });
+
+      await waitFor(() => {
+        expect(profileApi.uploadAvatar).toHaveBeenCalledWith(file);
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('img')).toHaveAttribute(
+          'src',
+          'http://localhost/media/avatars/new-photo.png'
+        );
+      });
     });
   });
 });

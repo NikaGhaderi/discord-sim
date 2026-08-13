@@ -7,12 +7,16 @@ vi.mock('@infrastructure/apiClient', () => ({
   apiClient: {
     get: vi.fn(),
     patch: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
 describe('Profile API (SCRUM-29)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // jsdom doesn't implement createObjectURL; mockApi's uploadAvatar calls
+    // it to build a real-looking local preview URL for the selected file.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock-url') });
   });
 
   describe('Real API', () => {
@@ -68,6 +72,22 @@ describe('Profile API (SCRUM-29)', () => {
       expect(apiClient.get).not.toHaveBeenCalled();
       expect(result).toEqual([]);
     });
+
+    it('uploadAvatar posts multipart form data to /api/users/me/avatar/', async () => {
+      const mockData = { user_id: 1, username: 'user1', display_name: 'User 1', avatar_url: '/media/avatars/x.png', bio: '', allow_group_invitations: true };
+      vi.mocked(apiClient.post).mockResolvedValueOnce({ data: mockData });
+      const file = new File(['x'], 'photo.png', { type: 'image/png' });
+
+      const result = await realApi.uploadAvatar(file);
+
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      const [url, body, config] = vi.mocked(apiClient.post).mock.calls[0];
+      expect(url).toBe('/api/users/me/avatar/');
+      expect(body).toBeInstanceOf(FormData);
+      expect((body as FormData).get('avatar')).toBe(file);
+      expect(config).toEqual({ headers: { 'Content-Type': 'multipart/form-data' } });
+      expect(result).toEqual(mockData);
+    });
   });
 
   describe('Mock API Contract Verification', () => {
@@ -99,6 +119,16 @@ describe('Profile API (SCRUM-29)', () => {
       const [resolved] = await mockApi.listPublicProfilesByIds([myProfile.user_id]);
 
       expect(resolved.username).toBe(myProfile.username);
+    });
+
+    it('uploadAvatar mock updates and returns the mock current user\'s avatar_url', async () => {
+      const file = new File(['x'], 'photo.png', { type: 'image/png' });
+
+      const updated = await mockApi.uploadAvatar(file);
+
+      expect(updated.avatar_url).toBeTruthy();
+      const myProfile = await mockApi.getMyProfile();
+      expect(myProfile.avatar_url).toBe(updated.avatar_url);
     });
   });
 });

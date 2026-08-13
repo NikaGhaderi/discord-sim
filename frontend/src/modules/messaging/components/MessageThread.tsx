@@ -11,15 +11,25 @@ import { MediaUploadButton, SelectedFile } from './MediaUploadButton';
 const PAGE_SIZE = 20;
 
 interface MessageThreadProps {
-  /** Optional -- when omitted, this thread receives no live updates and
-   * can't send/schedule messages (same read-only behavior as before
-   * SCRUM-55/the messaging UI integration). */
+  /** Exactly one of topicId/groupId/directChatId should be set -- whichever
+   * kind of room this thread is showing. When none are set, this thread
+   * receives no live updates and can't send/schedule messages (same
+   * read-only behavior as before SCRUM-55/the messaging UI integration). */
   topicId?: number;
+  groupId?: number;
+  directChatId?: number;
   currentUserId?: number;
   /** True if the current user holds DELETE_MESSAGES in this channel --
    * lets them delete others' messages, mirroring the backend's
-   * sender-OR-permission rule. Editing is always sender-only regardless. */
+   * sender-OR-permission rule. Editing is always sender-only regardless.
+   * Not applicable to groups/DMs, which have no such permission concept. */
   hasDeletePermission?: boolean;
+  /** sender_id -> display name overrides (e.g. a channel nickname). The
+   * backend never sends a real username on a message, only sender_id --
+   * msg.sender_username is a client-side "User #<id>" placeholder computed
+   * in api.ts, and this is the mechanism for replacing it with something
+   * more meaningful when the caller has that information available. */
+  senderNameOverrides?: Record<number, string>;
 }
 
 function addMessageIfNew(messages: Message[], incoming: Message): Message[] {
@@ -31,10 +41,18 @@ function addMessageIfNew(messages: Message[], incoming: Message): Message[] {
 
 export const MessageThread: React.FC<MessageThreadProps> = ({
   topicId,
+  groupId,
+  directChatId,
   currentUserId,
   hasDeletePermission = false,
+  senderNameOverrides,
 }) => {
-  const target: MessageTarget = { topic_id: topicId };
+  const target: MessageTarget = {
+    topic_id: topicId,
+    group_id: groupId,
+    direct_chat_id: directChatId,
+  };
+  const hasTarget = topicId !== undefined || groupId !== undefined || directChatId !== undefined;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [offset, setOffset] = useState<number>(0);
@@ -48,7 +66,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   // fetching the last PAGE_SIZE of it -- there's no "give me the tail"
   // shortcut on this endpoint.
   useEffect(() => {
-    if (topicId === undefined) {
+    if (!hasTarget) {
       setMessages([]);
       setLoading(false);
       return;
@@ -86,7 +104,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicId]);
+  }, [topicId, groupId, directChatId]);
 
   const handleNewMessage = useCallback((data: NewMessageData) => {
     setMessages((prev) =>
@@ -108,6 +126,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   useLiveMessages({
     topicId,
+    groupId,
+    directChatId,
     onNewMessage: handleNewMessage,
     onMessageDeleted: handleMessageDeleted,
   });
@@ -126,7 +146,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }, [messages]);
 
   const loadMoreMessages = () => {
-    if (loading || !hasMore || topicId === undefined) return;
+    if (loading || !hasMore || !hasTarget) return;
 
     setLoading(true);
     if (containerRef.current) {
@@ -152,7 +172,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const handleSendMessage = async (content: string) => {
-    if (topicId === undefined) return;
+    if (!hasTarget) return;
     setError(null);
     try {
       const sent = await messagingApi.sendMessage({ ...target, content });
@@ -181,7 +201,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const handleScheduleMessage = async (content: string, scheduledAt: string) => {
-    if (topicId === undefined) return;
+    if (!hasTarget) return;
     setError(null);
     try {
       await messagingApi.createScheduledMessage({
@@ -229,7 +249,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         onScroll={handleScroll}
         data-testid="message-thread-scroll"
         className="flex-1 overflow-y-auto p-4 space-y-4"
-        style={{ maxHeight: 'calc(100vh - 120px)' }}
+        style={{ minHeight: 0 }}
       >
         {loading && (
           <div className="text-center py-2 text-sm text-gray-400">
@@ -246,7 +266,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         {messages.map((msg) => (
           <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
             <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white">{msg.sender_username}</span>
+              <span className="font-semibold text-white">
+                {senderNameOverrides?.[msg.sender_id] ?? msg.sender_username}
+              </span>
               <span className="text-xs text-gray-400">{msg.sent_at}</span>
               {msg.is_edited && (
                 <span className="text-xs text-gray-500 italic">(edited)</span>
@@ -298,11 +320,15 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         ))}
       </div>
 
-      {topicId !== undefined && currentUserId !== undefined && (
+      {hasTarget && currentUserId !== undefined && (
         <div className="flex items-end gap-2 border-t border-gray-200 p-2">
           <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
           <div className="flex-1">
-            <Composer onSendMessage={handleSendMessage} onScheduleMessage={handleScheduleMessage} />
+            <Composer
+              onSendMessage={handleSendMessage}
+              onScheduleMessage={handleScheduleMessage}
+              hasAttachment={selectedFile !== null}
+            />
           </div>
         </div>
       )}

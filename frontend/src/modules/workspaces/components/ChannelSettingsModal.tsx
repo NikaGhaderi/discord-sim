@@ -1,4 +1,4 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useEffect, useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
 import { workspacesApi } from '../index';
 import { Channel } from '../types';
@@ -36,6 +36,23 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   const [nickname, setNickname] = useState('');
   const [isSavingNickname, setIsSavingNickname] = useState(false);
   const [didSaveNickname, setDidSaveNickname] = useState(false);
+
+  // Pre-fills with whatever nickname is already set, so this field acts as
+  // an editor, not just a one-shot "set once" input.
+  useEffect(() => {
+    if (currentUserId === undefined) return;
+    let cancelled = false;
+    workspacesApi.listMembers(channel.channel_id).then((members) => {
+      if (cancelled) return;
+      const self = members.find((m) => m.user_id === currentUserId);
+      if (self?.nickname_in_channel) {
+        setNickname(self.nickname_in_channel);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [channel.channel_id, currentUserId]);
 
   const handleCopyInvite = async () => {
     await navigator.clipboard.writeText(channel.invite_token);

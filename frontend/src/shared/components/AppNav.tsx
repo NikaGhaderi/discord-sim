@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../modules/identity/context';
+import { ThemePicker } from './ThemePicker';
 
 const linkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
   padding: '8px 12px',
@@ -17,6 +18,7 @@ const linkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => 
  */
 export const AppNav: React.FC = () => {
   const { logout } = useAuth();
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
 
   return (
     <nav
@@ -40,7 +42,7 @@ export const AppNav: React.FC = () => {
       </NavLink>
       <button
         type="button"
-        onClick={() => void logout()}
+        onClick={() => setIsThemePickerOpen(true)}
         style={{
           marginLeft: 'auto',
           background: 'none',
@@ -51,8 +53,24 @@ export const AppNav: React.FC = () => {
           font: 'inherit',
         }}
       >
+        Theme
+      </button>
+      <button
+        type="button"
+        onClick={() => void logout()}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: '#5865F2',
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          font: 'inherit',
+        }}
+      >
         Logout
       </button>
+
+      {isThemePickerOpen && <ThemePicker onClose={() => setIsThemePickerOpen(false)} />}
     </nav>
   );
 };
