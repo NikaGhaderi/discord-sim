@@ -27,10 +27,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   return (
     <aside className="sidebar">
+      {/*
+        "Home"/"Friends"/"Direct Messages" used to live here as
+        non-functional placeholders (no onClick at all, and "Friends" has
+        no backing feature anywhere in the backend). Real cross-page
+        navigation now lives in the persistent <AppNav>; only this
+        channel-scoped Notifications entry belongs here.
+      */}
       <nav>
-        <div className="channel-item">Home</div>
-        <div className="channel-item">Friends</div>
-        <div className="channel-item">Direct Messages</div>
         <div className="channel-item" onClick={() => setOpenModal('notifications')}>
           Notifications
         </div>

@@ -1,10 +1,28 @@
 import { describe, test, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from './App';
 import { profileApi } from '../modules/profile';
 import { privateSpacesApi } from '../modules/private_spaces';
 import { workspacesApi } from '../modules/workspaces';
 import { messagingApi } from '../modules/messaging';
+import { identityApi } from '../modules/identity';
+
+vi.mock('../modules/identity', async () => {
+  const actual = await vi.importActual<typeof import('../modules/identity/types')>(
+    '../modules/identity/types'
+  );
+  return {
+    ...actual,
+    identityApi: {
+      registerUser: vi.fn(),
+      loginUser: vi.fn(),
+      verify2FA: vi.fn(),
+      logoutUser: vi.fn(),
+      requestPasswordReset: vi.fn(),
+      confirmPasswordReset: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../modules/profile', () => ({
   profileApi: {
@@ -51,7 +69,7 @@ vi.mock('../modules/workspaces', () => ({
     updateRole: vi.fn(),
     deleteRole: vi.fn(),
     assignRole: vi.fn(),
-    listTopics: vi.fn(),
+    listTopics: vi.fn().mockResolvedValue([]),
     getTopic: vi.fn(),
     createTopic: vi.fn(),
     deleteTopic: vi.fn(),
@@ -76,6 +94,47 @@ describe('App Component', () => {
   test('renders login form by default on root path', () => {
     render(<App />);
     expect(screen.getByText(/Login/i)).toBeInTheDocument();
+  });
+
+  test('after registering, redirects to /workspaces and shows the persistent nav', async () => {
+    vi.mocked(identityApi.registerUser).mockResolvedValueOnce({
+      user_id: 1,
+      username: 'new_user',
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+    });
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([]);
+    vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+      user_id: 1,
+      username: 'new_user',
+      display_name: 'New User',
+      avatar_url: null,
+      bio: '',
+      allow_group_invitations: true,
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /register/i }));
+    fireEvent.change(screen.getByLabelText(/username/i), {
+      target: { value: 'new_user' },
+    });
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: 'new_user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'StrongPassw0rd!' },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: 'StrongPassw0rd!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^register$/i }));
+
+    await waitFor(() => expect(identityApi.registerUser).toHaveBeenCalled());
+    expect(await screen.findByText('Select or create a channel to get started.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Direct Messages' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
   });
 
   test('renders profile page when navigated to /profile', async () => {

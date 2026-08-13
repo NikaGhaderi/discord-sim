@@ -311,6 +311,29 @@ describe('MessageThread', () => {
     await waitFor(() =>
       expect(messagingApi.attachMedia).toHaveBeenCalledWith(6, file)
     );
-    expect(await screen.findByText('a.png')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'a.png' })).toHaveAttribute(
+      'src',
+      'http://localhost/media/a.png'
+    );
+  });
+
+  it('renders a non-image attachment as a plain link, not inline', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
+      page([
+        makeMessage({
+          base_message_id: 9,
+          content: 'a doc',
+          media: [{ file_url: '/media/notes.txt', file_type: 'text/plain' }],
+        }),
+      ])
+    );
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+
+    expect(await screen.findByRole('link', { name: 'notes.txt' })).toHaveAttribute(
+      'href',
+      'http://localhost/media/notes.txt'
+    );
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 });

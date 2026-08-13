@@ -3,6 +3,7 @@ import { workspacesApi } from '../index';
 import { Channel, ChannelMember } from '../types';
 import { ChannelSidebar } from '../components/ChannelSidebar';
 import { ChannelSettingsModal } from '../components/ChannelSettingsModal';
+import { TopicTabs } from '../components/TopicTabs';
 import { profileApi } from '../../profile';
 import { messagingApi } from '../../messaging';
 import { MessageThread } from '../../messaging/components/MessageThread';
@@ -20,6 +21,7 @@ export const WorkspacePage: React.FC = () => {
   const [openPanel, setOpenPanel] = useState<OpenPanel>('none');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [hasDeletePermission, setHasDeletePermission] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 
   useEffect(() => {
     workspacesApi.listChannels().then((list) => {
@@ -56,6 +58,14 @@ export const WorkspacePage: React.FC = () => {
   }, []);
 
   const selectedChannel = channels.find((c) => c.channel_id === selectedChannelId) ?? null;
+  const activeTopicId = selectedTopicId ?? selectedChannel?.default_topic_id;
+
+  // Switching channels resets the active topic back to that channel's
+  // default -- a topic id from the previous channel would otherwise leak
+  // across and either point at the wrong channel or not exist there at all.
+  useEffect(() => {
+    setSelectedTopicId(null);
+  }, [selectedChannelId]);
 
   const removeChannelFromList = (channelId: number) => {
     setChannels((prev) => prev.filter((c) => c.channel_id !== channelId));
@@ -95,9 +105,15 @@ export const WorkspacePage: React.FC = () => {
                 </button>
               </div>
             </header>
+            <TopicTabs
+              channelId={selectedChannel.channel_id}
+              selectedTopicId={activeTopicId}
+              onSelectTopic={setSelectedTopicId}
+              refreshKey={isSettingsOpen ? 1 : 0}
+            />
             <div className="main-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <MessageThread
-                topicId={selectedChannel.default_topic_id}
+                topicId={activeTopicId}
                 currentUserId={currentUserId ?? undefined}
                 hasDeletePermission={hasDeletePermission}
               />
@@ -111,6 +127,7 @@ export const WorkspacePage: React.FC = () => {
       {isSettingsOpen && selectedChannel && (
         <ChannelSettingsModal
           channel={selectedChannel}
+          currentUserId={currentUserId ?? undefined}
           onClose={() => setIsSettingsOpen(false)}
           onUpdated={(channelId, name) => {
             setChannels((prev) =>
@@ -128,13 +145,13 @@ export const WorkspacePage: React.FC = () => {
         />
       )}
 
-      {openPanel === 'search' && selectedChannel && (
+      {openPanel === 'search' && selectedChannel && activeTopicId !== undefined && (
         <Modal title="Search Messages" onClose={() => setOpenPanel('none')}>
           <SearchBar
             searchFn={async (query): Promise<SearchResultItem[]> => {
               const page = await messagingApi.searchMessages({
                 query,
-                topic_id: selectedChannel.default_topic_id,
+                topic_id: activeTopicId,
               });
               return page.results.map((m) => ({
                 id: String(m.base_message_id),
@@ -147,9 +164,9 @@ export const WorkspacePage: React.FC = () => {
         </Modal>
       )}
 
-      {openPanel === 'scheduled' && selectedChannel && (
+      {openPanel === 'scheduled' && selectedChannel && activeTopicId !== undefined && (
         <Modal title="Scheduled Messages" onClose={() => setOpenPanel('none')}>
-          <ScheduledMessagesPanel target={{ topic_id: selectedChannel.default_topic_id }} />
+          <ScheduledMessagesPanel target={{ topic_id: activeTopicId }} />
         </Modal>
       )}
     </div>

@@ -3,7 +3,7 @@ from typing import BinaryIO
 
 from django.contrib.postgres.search import SearchQuery, SearchVector
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 
 from apps.messaging.application.interfaces import AbstractMessagingRepository
 from apps.messaging.domain.exceptions import (
@@ -237,11 +237,18 @@ class DjangoMessagingRepository(AbstractMessagingRepository):
         limit: int,
         offset: int,
     ) -> MessagePage:
+        # Full-text search (stemming: "running" query matches "run" in a
+        # message body, and vice versa) OR'd with a plain substring match --
+        # Postgres's default "english" text-search config treats common
+        # words ("will", "the", "is", ...) as stopwords and drops them from
+        # both the index and the query entirely, so a literal, in-message
+        # word can otherwise match nothing. The substring side guarantees
+        # "contains this text" always works regardless of stopwords.
         queryset = (
             self._messages()
             .annotate(search=SearchVector("body"))
             .filter(
-                search=SearchQuery(query),
+                Q(search=SearchQuery(query)) | Q(body__icontains=query),
                 **self._target_filter(
                     topic_id=topic_id,
                     group_id=group_id,

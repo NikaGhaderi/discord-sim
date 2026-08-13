@@ -31,7 +31,7 @@ vi.mock('../index', () => ({
     updateRole: vi.fn(),
     deleteRole: vi.fn(),
     assignRole: vi.fn(),
-    listTopics: vi.fn(),
+    listTopics: vi.fn().mockResolvedValue([]),
     getTopic: vi.fn(),
     createTopic: vi.fn(),
     deleteTopic: vi.fn(),
@@ -280,6 +280,49 @@ describe('ChannelSettingsModal', () => {
     fireEvent.click(screen.getByText('Save Name'));
 
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(1, 'renamed'));
+  });
+
+  it('does not render the nickname field when currentUserId is unknown', () => {
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByLabelText(/my nickname/i)).not.toBeInTheDocument();
+  });
+
+  it('saves the current user\'s own nickname for the channel', async () => {
+    vi.mocked(workspacesApi.updateMemberNickname).mockResolvedValueOnce({
+      channel_id: 1,
+      user_id: 42,
+      nickname_in_channel: 'Sprint Master',
+      joined_at: '2026-01-01T00:00:00Z',
+    });
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        currentUserId={42}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/my nickname/i), {
+      target: { value: 'Sprint Master' },
+    });
+    fireEvent.click(screen.getByText('Save Nickname'));
+
+    await waitFor(() => {
+      expect(workspacesApi.updateMemberNickname).toHaveBeenCalledWith(1, 42, 'Sprint Master');
+    });
+    expect(await screen.findByText('Saved!')).toBeInTheDocument();
   });
 
   it('asks for confirmation before deleting, and does nothing if declined', async () => {
@@ -615,6 +658,108 @@ describe('WorkspacePage', () => {
       { topic_id: channel.default_topic_id },
       20,
       0
+    );
+  });
+
+  it('hides the topic tab bar when the channel has only one topic', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValueOnce([topic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    await waitFor(() => expect(workspacesApi.listTopics).toHaveBeenCalledWith(1));
+    // "# general" legitimately appears twice already (sidebar item + main
+    // header) even with no topic tab bar -- a third instance would mean the
+    // (single-topic) tab bar rendered anyway.
+    expect(screen.queryAllByText('# general')).toHaveLength(2);
+  });
+
+  it('shows a topic tab bar and switches the active thread when a channel has multiple topics', async () => {
+    const secondTopic: Topic = {
+      topic_id: 6,
+      channel_id: 1,
+      title: 'random',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValueOnce([topic, secondTopic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    const generalTab = await screen.findByRole('button', { name: '# general' });
+    const randomTab = screen.getByRole('button', { name: '# random' });
+    expect(generalTab).toBeInTheDocument();
+    expect(randomTab).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: topic.topic_id },
+        20,
+        0
+      )
+    );
+
+    fireEvent.click(randomTab);
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: secondTopic.topic_id },
+        20,
+        0
+      )
+    );
+  });
+
+  it('resets the active topic back to the new channel\'s default when switching channels', async () => {
+    const secondChannel: Channel = {
+      channel_id: 2,
+      name: 'random-chat',
+      creator_id: 9,
+      default_topic_id: 8,
+      created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'def456',
+    };
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel, secondChannel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValue([topic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: channel.default_topic_id },
+        20,
+        0
+      )
+    );
+
+    fireEvent.click(screen.getByText('# random-chat'));
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: secondChannel.default_topic_id },
+        20,
+        0
+      )
     );
   });
 

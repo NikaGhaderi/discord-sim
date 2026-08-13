@@ -206,6 +206,31 @@ def test_search_matches_word_stems_not_just_substrings(spaces):
 
 
 @pytest.mark.django_db
+def test_search_matches_a_common_stopword_as_a_literal_substring(spaces):
+    # Postgres's default "english" text-search config treats words like
+    # "will" as stopwords and drops them from indexing/querying entirely --
+    # SearchVector/SearchQuery alone would find nothing here even though
+    # "will" is literally in the message body. The substring fallback in
+    # search_messages must still catch it.
+    group = spaces["group"]
+    sender = spaces["sender"]
+    Message.objects.create(
+        sender=sender, group=group, body="I will not freak out under any circumstances."
+    )
+
+    response = client_for(sender).get(
+        f"/api/messages/search/?q=will&group_id={group.id}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert (
+        response.json()["results"][0]["content"]
+        == "I will not freak out under any circumstances."
+    )
+
+
+@pytest.mark.django_db
 def test_search_stems_query_and_scopes_results_to_requested_group(spaces):
     sender = spaces["sender"]
     group = spaces["group"]

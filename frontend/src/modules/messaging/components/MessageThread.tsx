@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef, useLayoutEffect, UIEvent } from 'react';
+import { resolveMediaUrl } from '@infrastructure/apiClient';
 import { Message } from '../types';
 import { messagingApi, MessageTarget } from '../index';
 import { useLiveMessages } from '../useLiveMessages';
@@ -254,18 +255,32 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             <p className="text-gray-200 mt-1">{msg.content}</p>
             {msg.media && msg.media.length > 0 && (
               <ul className="mt-1 space-y-1">
-                {msg.media.map((item, index) => (
-                  <li key={index}>
-                    <a
-                      href={item.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-indigo-400 hover:underline"
-                    >
-                      {item.file_url.split('/').pop()}
-                    </a>
-                  </li>
-                ))}
+                {msg.media.map((item, index) => {
+                  const resolvedUrl = resolveMediaUrl(item.file_url);
+                  const isImage = item.file_type.startsWith('image/');
+                  return (
+                    <li key={index}>
+                      {isImage ? (
+                        <a href={resolvedUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={resolvedUrl}
+                            alt={item.file_url.split('/').pop()}
+                            className="mt-1 max-w-xs max-h-64 rounded"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          href={resolvedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-indigo-400 hover:underline"
+                        >
+                          {item.file_url.split('/').pop()}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {currentUserId !== undefined && (

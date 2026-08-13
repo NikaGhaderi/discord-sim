@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach, vi } from 'vitest';
 import axios, { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
-import apiClient, { SESSION_EXPIRED_EVENT } from '../apiClient';
+import apiClient, { resolveMediaUrl, SESSION_EXPIRED_EVENT } from '../apiClient';
 import { clearTokens, getAccessToken, setTokens } from '../tokenStorage';
 
 /** Captures the fully-resolved request config (post-interceptors) without making a real network call. */
@@ -43,6 +43,20 @@ describe('apiClient', () => {
     const headers = config.headers as AxiosHeaders;
 
     expect(headers.get('Authorization')).toBe('Bearer token-123');
+  });
+});
+
+describe('resolveMediaUrl', () => {
+  test('prefixes a root-relative backend path with the API base URL', () => {
+    expect(resolveMediaUrl('/media/message_media/x.png')).toBe(
+      'http://localhost/media/message_media/x.png'
+    );
+  });
+
+  test('leaves an already-absolute URL untouched', () => {
+    expect(resolveMediaUrl('https://cdn.example.com/x.png')).toBe(
+      'https://cdn.example.com/x.png'
+    );
   });
 });
 

@@ -7,6 +7,10 @@ import { TopicManagerModal } from './TopicManagerModal';
 
 interface ChannelSettingsModalProps {
   channel: Channel;
+  /** Needed only for the "My Nickname" self-service field below -- omitted
+   * entirely (no crash, field just doesn't render) if the caller hasn't
+   * loaded the current user's id yet. */
+  currentUserId?: number;
   onClose: () => void;
   onUpdated: (channelId: number, name: string) => void;
   onDeleted: (channelId: number) => void;
@@ -17,6 +21,7 @@ type SubPanel = 'none' | 'roles' | 'topics';
 
 export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   channel,
+  currentUserId,
   onClose,
   onUpdated,
   onDeleted,
@@ -28,6 +33,9 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   const [isLeaving, setIsLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didCopyInvite, setDidCopyInvite] = useState(false);
+  const [nickname, setNickname] = useState('');
+  const [isSavingNickname, setIsSavingNickname] = useState(false);
+  const [didSaveNickname, setDidSaveNickname] = useState(false);
 
   const handleCopyInvite = async () => {
     await navigator.clipboard.writeText(channel.invite_token);
@@ -60,6 +68,26 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
       onClose();
     } catch {
       setError('Failed to delete channel.');
+    }
+  };
+
+  const handleSaveNickname = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (currentUserId === undefined || !nickname.trim()) return;
+    setError(null);
+    setIsSavingNickname(true);
+    try {
+      await workspacesApi.updateMemberNickname(
+        channel.channel_id,
+        currentUserId,
+        nickname.trim()
+      );
+      setDidSaveNickname(true);
+      setTimeout(() => setDidSaveNickname(false), 2000);
+    } catch {
+      setError('Failed to update your nickname.');
+    } finally {
+      setIsSavingNickname(false);
     }
   };
 
@@ -116,6 +144,24 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {currentUserId !== undefined && (
+        <form onSubmit={handleSaveNickname} style={{ marginTop: 16 }}>
+          <div className="field">
+            <label htmlFor="settings-my-nickname">My Nickname (this channel)</label>
+            <input
+              id="settings-my-nickname"
+              type="text"
+              placeholder="Set a nickname for this channel"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="btn btn-block" disabled={isSavingNickname}>
+            {isSavingNickname ? 'Saving...' : didSaveNickname ? 'Saved!' : 'Save Nickname'}
+          </button>
+        </form>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
         <button type="button" className="btn btn-block" onClick={() => setSubPanel('roles')}>
