@@ -6,15 +6,12 @@ import { Group, GroupMember } from '../types';
 
 interface GroupSettingsPanelProps {
   group: Group;
-  /** Computed once by the parent from `group.creator_id === currentUserId`. */
-  isAdmin: boolean;
   onUpdateGroup?: (updatedGroup: Group) => void;
   onDeleteOrLeave?: (groupId: number) => void;
 }
 
 export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   group,
-  isAdmin,
   onUpdateGroup,
   onDeleteOrLeave,
 }) => {
@@ -85,22 +82,25 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
     }
   };
 
-  const handleDeleteOrLeave = async () => {
+  const handleDeleteOrLeave = async (mode: 'delete' | 'leave') => {
+    const confirmed =
+      mode === 'delete'
+        ? window.confirm(
+            `Delete group "${group.name}" for everyone? This cannot be undone.`
+          )
+        : window.confirm(`Leave group "${group.name}"?`);
+    if (!confirmed) return;
+
     setIsRemoving(true);
     setError(null);
     try {
-      await privateSpacesApi.deleteOrLeaveGroup(
-        group.group_id,
-        isAdmin ? 'delete' : 'leave'
-      );
+      await privateSpacesApi.deleteOrLeaveGroup(group.group_id, mode);
       onDeleteOrLeave?.(group.group_id);
     } catch {
       setError('Failed to update group membership.');
       setIsRemoving(false);
     }
   };
-
-  const actionButtonText = isAdmin ? 'Delete Group' : 'Leave Group';
 
   return (
     <div className="group-settings-panel">
@@ -144,14 +144,28 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         )}
       </div>
 
-      <div className="danger-zone" style={{ marginTop: '20px' }}>
+      {/*
+        Both actions are offered to every member, not just admins: the
+        backend has no admin check on either endpoint (DeleteGroupUseCase
+        docstring cites Phase 1 doc §8-3-6 -- any member may delete the
+        whole group, superseding SCRUM-26's original admin-only AC).
+      */}
+      <div className="danger-zone" style={{ marginTop: '20px', display: 'flex', gap: 8 }}>
         <button
           type="button"
-          onClick={() => void handleDeleteOrLeave()}
+          onClick={() => void handleDeleteOrLeave('leave')}
+          className="btn"
+          disabled={isRemoving}
+        >
+          Leave Group
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleDeleteOrLeave('delete')}
           className="btn-danger"
           disabled={isRemoving}
         >
-          {actionButtonText}
+          Delete Group
         </button>
       </div>
     </div>

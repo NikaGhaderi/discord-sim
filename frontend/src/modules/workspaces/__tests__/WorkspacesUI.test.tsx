@@ -23,6 +23,7 @@ vi.mock('../index', () => ({
     joinChannelByInviteToken: vi.fn(),
     leaveChannel: vi.fn(),
     listMembers: vi.fn(),
+    getMyPermissions: vi.fn().mockResolvedValue([]),
     updateMemberNickname: vi.fn(),
     kickMember: vi.fn(),
     listRoles: vi.fn(),
@@ -615,6 +616,59 @@ describe('WorkspacePage', () => {
       20,
       0
     );
+  });
+
+  it('shows a delete button on another member\'s message when the current user holds DELETE_MESSAGES for the channel', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.getMyPermissions).mockResolvedValueOnce(['DELETE_MESSAGES']);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 1,
+          sender_id: 999,
+          sender_username: 'someone-else',
+          content: 'a message from someone else',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+
+    expect(await screen.findByText('a message from someone else')).toBeInTheDocument();
+    expect(workspacesApi.getMyPermissions).toHaveBeenCalledWith(channel.channel_id);
+    expect(await screen.findByRole('button', { name: 'Delete Message' })).toBeInTheDocument();
+  });
+
+  it('does not show a delete button on another member\'s message without DELETE_MESSAGES', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.getMyPermissions).mockResolvedValueOnce([]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 1,
+          sender_id: 999,
+          sender_username: 'someone-else',
+          content: 'a message from someone else',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+
+    expect(await screen.findByText('a message from someone else')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Message' })).not.toBeInTheDocument();
   });
 
   it('opens the search panel and shows real search results', async () => {

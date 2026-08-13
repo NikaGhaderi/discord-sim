@@ -144,42 +144,52 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       created_at: '2026-01-01T00:00:00Z',
     };
 
-    it('displays "Delete Group" label for admin users', async () => {
-      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+    // The backend has no admin check on either endpoint -- DeleteGroupUseCase
+    // explicitly allows any member to delete the whole group (Phase 1 doc
+    // §8-3-6 supersedes SCRUM-26's original admin-only AC) -- so both actions
+    // are offered to every member, gated only by a confirm() dialog.
+    it('always offers both "Leave Group" and "Delete Group"', async () => {
+      render(<GroupSettingsPanel group={group} />);
 
       expect(
         await screen.findByRole('button', { name: /delete group/i })
       ).toBeInTheDocument();
-    });
-
-    it('displays "Leave Group" label for non-admin users', async () => {
-      render(<GroupSettingsPanel group={group} isAdmin={false} />);
-
       expect(
-        await screen.findByRole('button', { name: /leave group/i })
+        screen.getByRole('button', { name: /leave group/i })
       ).toBeInTheDocument();
     });
 
-    it('calls deleteOrLeaveGroup with mode "delete" for admins', async () => {
+    it('calls deleteOrLeaveGroup with mode "delete" after confirming', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
       vi.mocked(privateSpacesApi.deleteOrLeaveGroup).mockResolvedValueOnce(undefined);
-      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+      render(<GroupSettingsPanel group={group} />);
 
-      fireEvent.click(screen.getByRole('button', { name: /delete group/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /delete group/i }));
 
       await waitFor(() => {
         expect(privateSpacesApi.deleteOrLeaveGroup).toHaveBeenCalledWith(1, 'delete');
       });
     });
 
-    it('calls deleteOrLeaveGroup with mode "leave" for non-admins', async () => {
+    it('calls deleteOrLeaveGroup with mode "leave" after confirming', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
       vi.mocked(privateSpacesApi.deleteOrLeaveGroup).mockResolvedValueOnce(undefined);
-      render(<GroupSettingsPanel group={group} isAdmin={false} />);
+      render(<GroupSettingsPanel group={group} />);
 
-      fireEvent.click(screen.getByRole('button', { name: /leave group/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /leave group/i }));
 
       await waitFor(() => {
         expect(privateSpacesApi.deleteOrLeaveGroup).toHaveBeenCalledWith(1, 'leave');
       });
+    });
+
+    it('does not call deleteOrLeaveGroup when the confirm dialog is dismissed', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      render(<GroupSettingsPanel group={group} />);
+
+      fireEvent.click(await screen.findByRole('button', { name: /delete group/i }));
+
+      expect(privateSpacesApi.deleteOrLeaveGroup).not.toHaveBeenCalled();
     });
 
     it('fetches and displays members with resolved usernames and an admin badge', async () => {
@@ -204,7 +214,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         },
       ]);
 
-      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+      render(<GroupSettingsPanel group={group} />);
 
       expect(await screen.findByText(/me \(admin\)/)).toBeInTheDocument();
       expect(screen.getByText('teammate')).toBeInTheDocument();
@@ -221,7 +231,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       ]);
       vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([]);
 
-      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+      render(<GroupSettingsPanel group={group} />);
 
       expect(await screen.findByText('User #333')).toBeInTheDocument();
     });
@@ -231,7 +241,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         new Error('boom')
       );
 
-      render(<GroupSettingsPanel group={group} isAdmin={true} />);
+      render(<GroupSettingsPanel group={group} />);
 
       expect(await screen.findByText(/couldn't load members/i)).toBeInTheDocument();
     });
@@ -365,10 +375,29 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       expect(privateSpacesApi.createGroup).toHaveBeenCalledWith('New Test Group');
       expect(await screen.findByText(/1 member\)/)).toBeInTheDocument();
     });
+
+    it('drops a group from the list when removedGroupId is set, without a refetch', async () => {
+      vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
+        { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 2, name: 'Backend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+
+      const { rerender } = render(<GroupList removedGroupId={null} />);
+      expect(await screen.findByText('Frontend Team')).toBeInTheDocument();
+      expect(screen.getByText('Backend Team')).toBeInTheDocument();
+
+      rerender(<GroupList removedGroupId={1} />);
+
+      await waitFor(() =>
+        expect(screen.queryByText('Frontend Team')).not.toBeInTheDocument()
+      );
+      expect(screen.getByText('Backend Team')).toBeInTheDocument();
+      expect(privateSpacesApi.listGroups).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('PrivateSpacesPage', () => {
-    it('loads the current user id via profileApi before rendering, then computes is_admin per group', async () => {
+    it('loads the current user id via profileApi before rendering, then shows group settings for the selected group', async () => {
       vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
         user_id: currentUserId,
         username: 'me',
@@ -396,6 +425,46 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       fireEvent.click(groupItem);
 
       expect(await screen.findByRole('button', { name: /delete group/i })).toBeInTheDocument();
+    });
+
+    it('removes a deleted group from the sidebar immediately, without a manual refresh', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+        user_id: currentUserId,
+        username: 'me',
+        display_name: 'Me',
+        avatar_url: null,
+        bio: '',
+        allow_group_invitations: true,
+      });
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
+      vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+      vi.mocked(privateSpacesApi.deleteOrLeaveGroup).mockResolvedValueOnce(undefined);
+
+      render(<PrivateSpacesPage />);
+
+      const groupItem = await screen.findByText('Admin Room');
+      fireEvent.click(groupItem);
+
+      fireEvent.click(await screen.findByRole('button', { name: /delete group/i }));
+
+      await waitFor(() => {
+        expect(privateSpacesApi.deleteOrLeaveGroup).toHaveBeenCalledWith(1, 'delete');
+      });
+      // Only the sidebar's <li> should remain gone -- the group name also
+      // briefly appears in the settings panel heading, but that panel is
+      // unmounted too once selectedGroup clears.
+      await waitFor(() =>
+        expect(screen.queryByText('Admin Room')).not.toBeInTheDocument()
+      );
     });
   });
 });

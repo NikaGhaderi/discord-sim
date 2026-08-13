@@ -410,6 +410,81 @@ class TestListRolesEndpoint:
 
 
 @pytest.mark.django_db
+class TestMyPermissionsEndpoint:
+    def test_owner_gets_every_permission_code(self, users):
+        body = create_channel_via_api(users[0])
+
+        response = authenticated_client(users[0]).get(
+            f"/api/channels/{body['channel_id']}/my-permissions/"
+        )
+
+        assert response.status_code == 200
+        from apps.permissions.domain.permissions import PermissionCode
+
+        assert set(response.json()["permissions"]) == {
+            code.value for code in PermissionCode
+        }
+
+    def test_plain_member_gets_no_permissions_by_default(self, users):
+        body = create_channel_via_api(users[0])
+        member = users[1]
+        authenticated_client(member).post(
+            f"/api/channels/{body['channel_id']}/join/", {}, format="json"
+        )
+
+        response = authenticated_client(member).get(
+            f"/api/channels/{body['channel_id']}/my-permissions/"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["permissions"] == []
+
+    def test_member_sees_permissions_granted_by_an_assigned_role(self, users):
+        from apps.permissions.domain.permissions import PermissionCode
+
+        body = create_channel_via_api(users[0])
+        member = users[1]
+        authenticated_client(member).post(
+            f"/api/channels/{body['channel_id']}/join/", {}, format="json"
+        )
+        role = (
+            authenticated_client(users[0])
+            .post(
+                f"/api/channels/{body['channel_id']}/roles/",
+                {
+                    "name": "Moderator",
+                    "permissions": [PermissionCode.DELETE_MESSAGES.value],
+                },
+                format="json",
+            )
+            .json()
+        )
+        authenticated_client(users[0]).post(
+            f"/api/channels/{body['channel_id']}/members/{member.id}/roles/",
+            {"role_id": role["role_id"]},
+            format="json",
+        )
+
+        response = authenticated_client(member).get(
+            f"/api/channels/{body['channel_id']}/my-permissions/"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["permissions"] == [PermissionCode.DELETE_MESSAGES.value]
+
+    def test_non_member_gets_no_permissions_rather_than_an_error(self, users):
+        body = create_channel_via_api(users[0])
+        outsider = users[1]
+
+        response = authenticated_client(outsider).get(
+            f"/api/channels/{body['channel_id']}/my-permissions/"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["permissions"] == []
+
+
+@pytest.mark.django_db
 class TestUpdateMemberNickname:
     def test_member_can_update_own_nickname(self, users):
         body = create_channel_via_api(users[0])

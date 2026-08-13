@@ -19,6 +19,7 @@ export const WorkspacePage: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<OpenPanel>('none');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [hasDeletePermission, setHasDeletePermission] = useState(false);
 
   useEffect(() => {
     workspacesApi.listChannels().then((list) => {
@@ -26,6 +27,20 @@ export const WorkspacePage: React.FC = () => {
       setSelectedChannelId((current) => current ?? list[0]?.channel_id ?? null);
     });
   }, []);
+
+  useEffect(() => {
+    if (selectedChannelId === null) {
+      setHasDeletePermission(false);
+      return;
+    }
+    let cancelled = false;
+    workspacesApi.getMyPermissions(selectedChannelId).then((permissions) => {
+      if (!cancelled) setHasDeletePermission(permissions.includes('DELETE_MESSAGES'));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChannelId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +99,7 @@ export const WorkspacePage: React.FC = () => {
               <MessageThread
                 topicId={selectedChannel.default_topic_id}
                 currentUserId={currentUserId ?? undefined}
+                hasDeletePermission={hasDeletePermission}
               />
             </div>
           </>

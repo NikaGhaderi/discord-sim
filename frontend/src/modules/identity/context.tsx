@@ -24,6 +24,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { SESSION_EXPIRED_EVENT } from "@infrastructure/apiClient";
 import {
   clearTokens,
   hasAccessToken,
@@ -86,6 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (hasAccessToken()) {
       setAuthStep("AUTHENTICATED");
     }
+  }, []);
+
+  /**
+   * apiClient's response interceptor clears localStorage tokens itself (it
+   * has no access to this context) and dispatches this event when a 401's
+   * refresh-token retry also fails -- react by dropping back to the login
+   * screen so the UI doesn't keep believing the user is authenticated.
+   */
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setTempToken(null);
+      setAuthStep("LOGIN");
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
   }, []);
 
   const register = useCallback(async (payload: RegisterPayload) => {
