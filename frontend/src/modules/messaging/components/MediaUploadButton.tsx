@@ -51,6 +51,7 @@ export const MediaUploadButton: React.FC<MediaUploadButtonProps> = ({
         onChange={handleFileChange}
         disabled={disabled}
         className="hidden"
+        style={{ display: 'none' }}
         data-testid="media-file-input"
       />
       

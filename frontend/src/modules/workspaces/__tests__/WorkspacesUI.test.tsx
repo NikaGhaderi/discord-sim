@@ -9,6 +9,7 @@ import { RoleFormModal } from '../components/RoleFormModal';
 import { TopicManagerModal } from '../components/TopicManagerModal';
 import { WorkspacePage } from '../pages/WorkspacePage';
 import { workspacesApi } from '../index';
+import { messagingApi } from '../../messaging';
 import { Channel, ChannelMember, Role, Topic, CHANNEL_PERMISSIONS } from '../types';
 
 vi.mock('../index', () => ({
@@ -48,6 +49,36 @@ vi.mock('../../notifications', () => ({
     onNewMessage: vi.fn(() => vi.fn()),
     onMessageDeleted: vi.fn(() => vi.fn()),
     onNewNotification: vi.fn(() => vi.fn()),
+  },
+}));
+
+vi.mock('../../profile', () => ({
+  profileApi: {
+    getMyProfile: vi.fn().mockResolvedValue({
+      user_id: 1,
+      username: 'nika_lead',
+      display_name: 'Nika',
+      avatar_url: '',
+      bio: '',
+      allow_group_invitations: true,
+    }),
+    updateProfile: vi.fn(),
+    getPublicProfile: vi.fn(),
+    listPublicProfilesByIds: vi.fn(),
+  },
+}));
+
+vi.mock('../../messaging', () => ({
+  messagingApi: {
+    sendMessage: vi.fn(),
+    listMessages: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    editMessage: vi.fn(),
+    deleteMessage: vi.fn(),
+    attachMedia: vi.fn(),
+    searchMessages: vi.fn(),
+    createScheduledMessage: vi.fn(),
+    cancelScheduledMessage: vi.fn(),
+    listScheduledMessages: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -555,5 +586,109 @@ describe('WorkspacePage', () => {
     fireEvent.click(screen.getByText('Settings'));
 
     expect(screen.getByText('Channel Settings')).toBeInTheDocument();
+  });
+
+  it('renders the real message thread for the selected channel default topic', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 1,
+          sender_id: 1,
+          sender_username: 'User #1',
+          content: 'hello from the thread',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+
+    expect(await screen.findByText('hello from the thread')).toBeInTheDocument();
+    expect(messagingApi.listMessages).toHaveBeenCalledWith(
+      { topic_id: channel.default_topic_id },
+      20,
+      0
+    );
+  });
+
+  it('opens the search panel and shows real search results', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+    vi.mocked(messagingApi.searchMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 9,
+          sender_id: 1,
+          sender_username: 'nika_lead',
+          content: 'sprint backlog',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }));
+    fireEvent.change(screen.getByPlaceholderText('Search messages...'), {
+      target: { value: 'sprint' },
+    });
+    const searchButtons = screen.getAllByRole('button', { name: /^search$/i });
+    fireEvent.click(searchButtons[searchButtons.length - 1]);
+
+    expect(await screen.findByText('sprint backlog')).toBeInTheDocument();
+    expect(messagingApi.searchMessages).toHaveBeenCalledWith({
+      query: 'sprint',
+      topic_id: channel.default_topic_id,
+    });
+  });
+
+  it('opens the scheduled messages panel, lists, and cancels a pending message', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+    vi.mocked(messagingApi.listScheduledMessages).mockResolvedValueOnce([
+      {
+        scheduled_id: 3,
+        content: 'standup reminder',
+        scheduled_time: '2030-01-01T10:00:00Z',
+        topic_id: channel.default_topic_id,
+      },
+    ]);
+    vi.mocked(messagingApi.cancelScheduledMessage).mockResolvedValueOnce(undefined);
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    fireEvent.click(screen.getByText('Scheduled'));
+
+    expect(await screen.findByText('standup reminder')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel scheduled message/i }));
+
+    expect(messagingApi.cancelScheduledMessage).toHaveBeenCalledWith(3);
+    await waitFor(() =>
+      expect(screen.queryByText('standup reminder')).not.toBeInTheDocument()
+    );
   });
 });
