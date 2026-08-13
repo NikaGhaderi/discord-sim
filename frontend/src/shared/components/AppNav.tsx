@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../modules/identity/context';
 import { ThemePicker } from './ThemePicker';
+import { NotificationBell } from './NotificationBell';
 
 const linkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
   padding: '8px 12px',
   textDecoration: 'none',
-  color: isActive ? '#5865F2' : '#333',
+  color: isActive ? 'var(--ws-primary)' : 'var(--ws-text)',
   fontWeight: isActive ? 700 : 400,
 });
 
@@ -27,8 +28,8 @@ export const AppNav: React.FC = () => {
         alignItems: 'center',
         gap: 4,
         padding: '10px 20px',
-        borderBottom: '1px solid #e0e0e0',
-        background: '#fff',
+        borderBottom: '1px solid var(--ws-border)',
+        background: 'var(--ws-bg-nav)',
       }}
     >
       <NavLink to="/workspaces" style={linkStyle}>
@@ -40,35 +41,16 @@ export const AppNav: React.FC = () => {
       <NavLink to="/profile" style={linkStyle}>
         Profile
       </NavLink>
-      <button
-        type="button"
-        onClick={() => setIsThemePickerOpen(true)}
-        style={{
-          marginLeft: 'auto',
-          background: 'none',
-          border: 'none',
-          color: '#5865F2',
-          cursor: 'pointer',
-          textDecoration: 'underline',
-          font: 'inherit',
-        }}
-      >
-        Theme
-      </button>
-      <button
-        type="button"
-        onClick={() => void logout()}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: '#5865F2',
-          cursor: 'pointer',
-          textDecoration: 'underline',
-          font: 'inherit',
-        }}
-      >
-        Logout
-      </button>
+
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <NotificationBell />
+        <button type="button" className="btn" onClick={() => setIsThemePickerOpen(true)}>
+          Theme
+        </button>
+        <button type="button" className="btn btn-danger" onClick={() => void logout()}>
+          Logout
+        </button>
+      </div>
 
       {isThemePickerOpen && <ThemePicker onClose={() => setIsThemePickerOpen(false)} />}
     </nav>

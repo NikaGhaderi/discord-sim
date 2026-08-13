@@ -90,35 +90,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onChange={handleInputChange}
           placeholder="Search messages..."
           required
-          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-2 border-[var(--ws-border)] text-[var(--ws-text)] bg-[var(--ws-bg)] focus:ring-[var(--ws-primary)]"
           aria-label="Search Messages"
         />
         <button
           type="submit"
           disabled={!query.trim()}
-          className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+          className="px-3 py-1.5 rounded-md text-sm font-medium disabled:opacity-50 bg-[var(--ws-primary)] text-[var(--ws-text-on-bubble)] hover:bg-[var(--ws-primary-hover)]"
         >
           Search
         </button>
       </form>
 
       {hasSearched && (
-        <div className="flex flex-col gap-1 mt-2 border border-gray-200 rounded-md p-2 bg-white max-h-60 overflow-y-auto">
+        <div className="flex flex-col gap-1 mt-2 border rounded-md p-2 max-h-60 overflow-y-auto border-[var(--ws-border)] bg-[var(--ws-bg)]">
           {results.length === 0 ? (
-            <p className="text-xs text-gray-500 p-2 text-center">No results found.</p>
+            <p className="text-xs p-2 text-center text-[var(--ws-text-secondary)]">No results found.</p>
           ) : (
             results.map((item) => (
               <div
                 key={item.id}
                 onClick={() => onResultClick?.(item)}
-                className="p-2 hover:bg-gray-50 rounded cursor-pointer border-b border-gray-100 last:border-0"
+                className="p-2 rounded cursor-pointer border-b last:border-0 hover:bg-[var(--ws-bg-hover)] border-[var(--ws-border)]"
                 data-testid="search-result-item"
               >
-                <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
-                  <span className="font-semibold text-gray-800">{item.sender}</span>
+                <div className="flex justify-between items-center text-xs mb-1 text-[var(--ws-text-secondary)]">
+                  <span className="font-semibold text-[var(--ws-text)]">{item.sender}</span>
                   <span>{item.timestamp}</span>
                 </div>
-                <p className="text-xs text-gray-700 line-clamp-2">{item.snippet}</p>
+                <p className="text-xs line-clamp-2 text-[var(--ws-text)]">{item.snippet}</p>
               </div>
             ))
           )}

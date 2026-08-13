@@ -44,12 +44,17 @@ class CreateInvitationSerializer(serializers.Serializer):
 
 class GroupInvitationSerializer(serializers.ModelSerializer):
     invitation_id = serializers.IntegerField(source="id", read_only=True)
+    # Only populated on the my-invitations list (see
+    # list_pending_invitations_for_user) -- null everywhere else this
+    # serializer is reused, since GroupInvitation itself has no such field.
+    group_name = serializers.CharField(read_only=True, allow_null=True, default=None)
 
     class Meta:
         model = GroupInvitation
         fields = (
             "invitation_id",
             "group_id",
+            "group_name",
             "inviter_id",
             "invitee_id",
             "status",

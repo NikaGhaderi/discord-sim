@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Modal } from '@shared/components/Modal';
-import { NotificationFeed } from '../../notifications/components/NotificationFeed';
 import { Channel, ChannelMember } from '../types';
 import { CreateChannelModal } from './CreateChannelModal';
 import { JoinChannelModal } from './JoinChannelModal';
@@ -13,7 +11,7 @@ interface ChannelSidebarProps {
   onChannelJoined: (membership: ChannelMember) => void;
 }
 
-type OpenModal = 'none' | 'create' | 'join' | 'notifications';
+type OpenModal = 'none' | 'create' | 'join';
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   channels,
@@ -31,15 +29,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         "Home"/"Friends"/"Direct Messages" used to live here as
         non-functional placeholders (no onClick at all, and "Friends" has
         no backing feature anywhere in the backend). Real cross-page
-        navigation now lives in the persistent <AppNav>; only this
-        channel-scoped Notifications entry belongs here.
+        navigation, and the notifications bell (which used to live here as
+        a channels-only entry, invisible from private-spaces), now both
+        live in the persistent <AppNav>.
       */}
-      <nav>
-        <div className="channel-item" onClick={() => setOpenModal('notifications')}>
-          Notifications
-        </div>
-      </nav>
-
       <div className="sidebar-section-title">
         <span>CHANNELS</span>
         <div style={{ position: 'relative' }}>
@@ -111,11 +104,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       )}
       {openModal === 'join' && (
         <JoinChannelModal onClose={() => setOpenModal('none')} onJoined={onChannelJoined} />
-      )}
-      {openModal === 'notifications' && (
-        <Modal title="Notifications" onClose={() => setOpenModal('none')}>
-          <NotificationFeed />
-        </Modal>
       )}
     </aside>
   );

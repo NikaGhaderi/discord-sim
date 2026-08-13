@@ -32,7 +32,9 @@ def _to_group_entity(group: Group) -> GroupEntity:
     )
 
 
-def _to_invitation_entity(invitation: GroupInvitation) -> GroupInvitationEntity:
+def _to_invitation_entity(
+    invitation: GroupInvitation, *, group_name: str | None = None
+) -> GroupInvitationEntity:
     return GroupInvitationEntity(
         id=invitation.id,
         group_id=invitation.group_id,
@@ -40,6 +42,7 @@ def _to_invitation_entity(invitation: GroupInvitation) -> GroupInvitationEntity:
         invitee_id=invitation.invitee_id,
         status=invitation.status,
         created_at=invitation.created_at,
+        group_name=group_name,
     )
 
 
@@ -145,13 +148,25 @@ class DjangoPrivateSpacesRepository(AbstractPrivateSpacesRepository):
     def list_pending_invitations_for_user(
         self, user_id: int, *, limit: int, offset: int
     ) -> GroupInvitationPage:
-        queryset = GroupInvitation.objects.filter(
-            invitee_id=user_id, status=GroupInvitation.Status.PENDING
-        ).order_by("-created_at", "-id")
+        # select_related("group"): the invitee isn't a group member yet, so
+        # GetGroupUseCase (which requires membership) can't be used to show
+        # them what they're being invited to -- the invitation row itself
+        # already reveals the group_id to this specific invitee, so
+        # including the name here is no extra exposure.
+        queryset = (
+            GroupInvitation.objects.filter(
+                invitee_id=user_id, status=GroupInvitation.Status.PENDING
+            )
+            .select_related("group")
+            .order_by("-created_at", "-id")
+        )
         count = queryset.count()
         results = queryset[offset : offset + limit]
         return GroupInvitationPage(
-            count=count, results=[_to_invitation_entity(i) for i in results]
+            count=count,
+            results=[
+                _to_invitation_entity(i, group_name=i.group.name) for i in results
+            ],
         )
 
     def respond_to_invitation_as_invitee(

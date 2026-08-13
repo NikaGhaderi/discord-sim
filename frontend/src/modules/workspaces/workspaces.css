@@ -1,14 +1,27 @@
 :root {
   --ws-bg: #ffffff;
+  --ws-bg-nav: #ffffff;
   --ws-bg-sidebar: #f4f4f5;
   --ws-bg-hover: #e8e8ea;
+  /* The chat backdrop is deliberately darker than the message bubbles
+     sitting on it, so bubbles read as raised cards. */
+  --ws-bg-chat: #111827;
+  --ws-text-on-chat: #9ca3af;
+  --ws-bg-bubble: #1f2937;
   --ws-border: #e2e2e5;
   --ws-text: #18181b;
   --ws-text-secondary: #6b7280;
+  --ws-text-on-bubble: #ffffff;
+  --ws-text-secondary-on-bubble: #9ca3af;
   --ws-primary: #3f3f46;
   --ws-primary-hover: #27272a;
   --ws-danger: #dc2626;
   --ws-radius: 8px;
+}
+
+body {
+  background: var(--ws-bg);
+  color: var(--ws-text);
 }
 
 .btn {

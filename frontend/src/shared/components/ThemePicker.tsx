@@ -38,7 +38,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({ onClose }) => {
               borderColor: selected === palette.name ? 'var(--ws-primary)' : undefined,
             }}
           >
-            <span style={{ display: 'flex', gap: 3 }}>
+            <span style={{ display: 'flex', gap: 3, width: 112, flexShrink: 0 }}>
               {palette.colors.map((color, index) => (
                 <span
                   key={index}

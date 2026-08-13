@@ -239,7 +239,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   return (
     <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
       {error && (
-        <div className="text-center py-1 text-xs text-red-400" role="alert">
+        <div className="text-center py-1 text-xs text-[var(--ws-danger)]" role="alert">
           {error}
         </div>
       )}
@@ -248,33 +248,36 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         ref={containerRef}
         onScroll={handleScroll}
         data-testid="message-thread-scroll"
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--ws-bg-chat)]"
         style={{ minHeight: 0 }}
       >
         {loading && (
-          <div className="text-center py-2 text-sm text-gray-400">
+          <div className="text-center py-2 text-sm text-[var(--ws-text-on-chat)]">
             Loading messages...
           </div>
         )}
 
         {!loading && !hasMore && messages.length > 0 && (
-          <div className="text-center py-2 text-xs text-gray-500">
+          <div className="text-center py-2 text-xs text-[var(--ws-text-on-chat)]">
             Beginning of message history
           </div>
         )}
 
         {messages.map((msg) => (
-          <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
+          <div
+            key={msg.base_message_id}
+            className="flex flex-col bg-[var(--ws-bg-bubble)] text-[var(--ws-text-on-bubble)] p-3 rounded-lg"
+          >
             <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white">
+              <span className="font-semibold">
                 {senderNameOverrides?.[msg.sender_id] ?? msg.sender_username}
               </span>
-              <span className="text-xs text-gray-400">{msg.sent_at}</span>
+              <span className="text-xs text-[var(--ws-text-secondary-on-bubble)]">{msg.sent_at}</span>
               {msg.is_edited && (
-                <span className="text-xs text-gray-500 italic">(edited)</span>
+                <span className="text-xs text-[var(--ws-text-secondary-on-bubble)] italic">(edited)</span>
               )}
             </div>
-            <p className="text-gray-200 mt-1">{msg.content}</p>
+            <p className="mt-1">{msg.content}</p>
             {msg.media && msg.media.length > 0 && (
               <ul className="mt-1 space-y-1">
                 {msg.media.map((item, index) => {
@@ -295,7 +298,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
                           href={resolvedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs text-indigo-400 hover:underline"
+                          className="text-xs text-[var(--ws-text-secondary-on-bubble)] hover:underline"
                         >
                           {item.file_url.split('/').pop()}
                         </a>
@@ -321,7 +324,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       </div>
 
       {hasTarget && currentUserId !== undefined && (
-        <div className="flex items-end gap-2 border-t border-gray-200 p-2">
+        <div className="flex items-end gap-2 border-t p-2 border-[var(--ws-border)] bg-[var(--ws-bg)]">
           <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
           <div className="flex-1">
             <Composer

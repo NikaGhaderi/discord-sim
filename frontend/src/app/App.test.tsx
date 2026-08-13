@@ -24,6 +24,21 @@ vi.mock('../modules/identity', async () => {
   };
 });
 
+vi.mock('../modules/notifications', () => ({
+  notificationsApi: {
+    listNotifications: vi.fn().mockResolvedValue([]),
+    markNotificationAsRead: vi.fn(),
+  },
+  socketClient: {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    subscribe: vi.fn(),
+    onNewMessage: vi.fn(() => vi.fn()),
+    onMessageDeleted: vi.fn(() => vi.fn()),
+    onNewNotification: vi.fn(() => vi.fn()),
+  },
+}));
+
 vi.mock('../modules/profile', () => ({
   profileApi: {
     getMyProfile: vi.fn(),

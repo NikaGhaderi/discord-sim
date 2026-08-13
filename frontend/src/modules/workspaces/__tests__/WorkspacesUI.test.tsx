@@ -173,22 +173,6 @@ describe('ChannelSidebar', () => {
     expect(screen.getByText('Join a Channel')).toBeInTheDocument();
   });
 
-  it('opens the notification feed from the sidebar nav', async () => {
-    render(
-      <ChannelSidebar
-        channels={[]}
-        selectedChannelId={null}
-        onSelectChannel={vi.fn()}
-        onChannelCreated={vi.fn()}
-        onChannelJoined={vi.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByText('Notifications'));
-
-    expect(screen.getByText('Notifications', { selector: 'h2' })).toBeInTheDocument();
-    expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
-  });
 });
 
 describe('CreateChannelModal', () => {

@@ -56,21 +56,21 @@ export const Composer: React.FC<ComposerProps> = ({
           already provides that around both Composer and MediaUploadButton
           together, so this stays flush with the Attach button next to it. */}
       {isScheduling && (
-        <div className="flex items-center gap-2 bg-indigo-50 p-2 rounded-md border border-indigo-200 text-xs">
-          <span className="font-medium text-indigo-800">Schedule for:</span>
+        <div className="flex items-center gap-2 p-2 rounded-md border text-xs bg-[var(--ws-bg-hover)] border-[var(--ws-border)]">
+          <span className="font-medium text-[var(--ws-text)]">Schedule for:</span>
           <input
             type="datetime-local"
             value={scheduledAt}
             min={nowMin}
             onChange={(e) => setScheduledAt(e.target.value)}
             disabled={disabled}
-            className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 border-[var(--ws-border)] text-[var(--ws-text)] focus:ring-[var(--ws-primary)]"
             data-testid="schedule-datetime-input"
           />
           <button
             type="button"
             onClick={() => setIsScheduling(false)}
-            className="text-gray-500 hover:text-red-500 font-bold ml-auto"
+            className="font-bold ml-auto text-[var(--ws-text-secondary)] hover:text-[var(--ws-danger)]"
             aria-label="Cancel Schedule Mode"
           >
             ×
@@ -86,18 +86,18 @@ export const Composer: React.FC<ComposerProps> = ({
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none rounded-md border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 resize-none rounded-md border p-2 text-sm focus:outline-none focus:ring-2 border-[var(--ws-border)] text-[var(--ws-text)] bg-[var(--ws-bg)] focus:ring-[var(--ws-primary)]"
         />
 
         <button
           type="button"
           onClick={() => setIsScheduling(!isScheduling)}
           disabled={disabled}
-          className={`p-2 rounded-md text-sm font-medium border ${
+          className={
             isScheduling
-              ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
-              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-          }`}
+              ? 'p-2 rounded-md text-sm font-medium border bg-[var(--ws-bg-hover)] border-[var(--ws-primary)] text-[var(--ws-primary)]'
+              : 'p-2 rounded-md text-sm font-medium border border-[var(--ws-border)] text-[var(--ws-text-secondary)] hover:bg-[var(--ws-bg-hover)]'
+          }
           aria-label="Toggle Schedule"
           title="Schedule message"
         >
@@ -111,7 +111,7 @@ export const Composer: React.FC<ComposerProps> = ({
             disabled ||
             (isScheduling ? !content.trim() || !scheduledAt : !content.trim() && !hasAttachment)
           }
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--ws-primary)] text-[var(--ws-text-on-bubble)] hover:bg-[var(--ws-primary-hover)]"
         >
           {isScheduling ? 'Schedule' : 'Send'}
         </button>

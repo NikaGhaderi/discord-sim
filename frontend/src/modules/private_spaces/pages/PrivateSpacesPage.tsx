@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { profileApi } from '../../profile';
+import { privateSpacesApi } from '../index';
 import { DirectMessageList } from '../components/DirectMessageList';
 import { GroupList } from '../components/GroupList';
 import { GroupSettingsPanel } from '../components/GroupSettingsPanel';
@@ -17,9 +18,14 @@ export const PrivateSpacesPage: React.FC = () => {
   const [selected, setSelected] = useState<SelectedSpace>(null);
   const [removedGroupId, setRemovedGroupId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState(false);
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
+  // sender_id -> real username, for whichever group/DM is currently open --
+  // like channels, the backend never sends a username on a message, only
+  // sender_id, so it has to be resolved client-side per thread.
+  const [senderNameOverrides, setSenderNameOverrides] = useState<Record<number, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +40,7 @@ export const PrivateSpacesPage: React.FC = () => {
         const profile = await profileApi.getMyProfile();
         if (!cancelled) {
           setCurrentUserId(profile.user_id);
+          setCurrentUsername(profile.username);
         }
       } catch {
         if (!cancelled) {
@@ -52,6 +59,38 @@ export const PrivateSpacesPage: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selected || currentUserId === null) {
+      setSenderNameOverrides({});
+      return;
+    }
+    let cancelled = false;
+
+    const resolveNames = async () => {
+      const overrides: Record<number, string> = {};
+      if (currentUsername) overrides[currentUserId] = currentUsername;
+
+      if (selected.kind === 'dm') {
+        const otherId =
+          selected.dm.user1_id === currentUserId ? selected.dm.user2_id : selected.dm.user1_id;
+        overrides[otherId] = selected.otherUsername;
+      } else {
+        const members = await privateSpacesApi.listGroupMembers(selected.group.group_id);
+        const profiles = await profileApi.listPublicProfilesByIds(members.map((m) => m.user_id));
+        for (const profile of profiles) {
+          overrides[profile.user_id] = profile.username;
+        }
+      }
+
+      if (!cancelled) setSenderNameOverrides(overrides);
+    };
+
+    void resolveNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, currentUserId, currentUsername]);
 
   const handleSelectDm = async (dm: DirectChat) => {
     if (currentUserId === null) return;
@@ -73,22 +112,22 @@ export const PrivateSpacesPage: React.FC = () => {
   }
 
   return (
-    <div className="private-spaces-layout" style={{ display: 'flex', height: '100%' }}>
-      <aside className="private-spaces-sidebar" style={{ width: '300px', padding: '20px', overflowY: 'auto' }}>
+    <div className="private-spaces-layout workspace-layout">
+      <aside
+        className="private-spaces-sidebar sidebar"
+        style={{ width: '300px', overflowY: 'auto' }}
+      >
         <DirectMessageList currentUserId={currentUserId} onSelectDm={(dm) => void handleSelectDm(dm)} />
-        <hr style={{ margin: '20px 0' }} />
+        <hr style={{ margin: '20px 0', borderColor: 'var(--ws-border)' }} />
         <GroupList
           onSelectGroup={(group) => setSelected({ kind: 'group', group })}
           removedGroupId={removedGroupId}
         />
-        <hr style={{ margin: '20px 0' }} />
+        <hr style={{ margin: '20px 0', borderColor: 'var(--ws-border)' }} />
         <InvitationList />
       </aside>
 
-      <main
-        className="private-spaces-main"
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}
-      >
+      <main className="private-spaces-main main-panel" style={{ minWidth: 0 }}>
         {selected ? (
           <>
             <header className="main-header">
@@ -106,6 +145,7 @@ export const PrivateSpacesPage: React.FC = () => {
                 groupId={selected.kind === 'group' ? selected.group.group_id : undefined}
                 directChatId={selected.kind === 'dm' ? selected.dm.direct_chat_id : undefined}
                 currentUserId={currentUserId}
+                senderNameOverrides={senderNameOverrides}
               />
             </div>
           </>

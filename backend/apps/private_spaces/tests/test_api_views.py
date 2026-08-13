@@ -197,6 +197,10 @@ class TestGroupInvitations:
         assert body == {
             "invitation_id": invitation_id,
             "group_id": group.id,
+            # Only populated on the my-invitations list, where the invitee
+            # (not yet a member) needs it to know what group they're
+            # looking at -- null here since this is the create response.
+            "group_name": None,
             "inviter_id": inviter.id,
             "invitee_id": invitee.id,
             "status": "PENDING",
@@ -249,6 +253,19 @@ class TestInvitationList:
         assert response.json()["count"] == 1
         assert response.json()["results"][0]["invitation_id"] == mine.id
         assert response.json()["results"][0]["created_at"]
+
+    def test_includes_the_group_name_even_though_the_invitee_is_not_yet_a_member(
+        self, users
+    ):
+        inviter, invitee = users[:2]
+        group = Group.objects.create(name="Sprint Planning", creator=inviter)
+        GroupMember.objects.create(group=group, user=inviter, is_admin=True)
+        GroupInvitation.objects.create(group=group, inviter=inviter, invitee=invitee)
+
+        response = authenticated_client(invitee).get("/api/invitations/")
+
+        assert response.status_code == 200
+        assert response.json()["results"][0]["group_name"] == "Sprint Planning"
 
     def test_excludes_already_responded_invitations(self, users):
         inviter, invitee = users[:2]

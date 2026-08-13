@@ -43,27 +43,27 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
             type="text"
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none"
+            className="border rounded px-2 py-1 text-sm focus:outline-none border-[var(--ws-border)]"
           />
           <button
             onClick={handleSaveEdit}
-            className="text-xs text-green-600 hover:underline"
+            className="text-xs hover:underline text-[var(--ws-primary)]"
           >
             Save
           </button>
           <button
             onClick={handleCancelEdit}
-            className="text-xs text-gray-500 hover:underline"
+            className="text-xs hover:underline text-[var(--ws-text-secondary-on-bubble)]"
           >
             Cancel
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-[var(--ws-text-secondary-on-bubble)]">
           {canEdit && (
             <button
               onClick={() => setIsEditing(true)}
-              className="hover:text-indigo-600"
+              className="hover:opacity-75"
               aria-label="Edit Message"
             >
               Edit
@@ -72,7 +72,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           {canDelete && (
             <button
               onClick={() => onDeleteMessage(message.base_message_id)}
-              className="hover:text-red-600"
+              className="hover:text-[var(--ws-danger)]"
               aria-label="Delete Message"
             >
               Delete

@@ -65,6 +65,7 @@ const mockInvitations: GroupInvitation[] = [
   {
     invitation_id: 1,
     group_id: 2,
+    group_name: 'General Chat',
     inviter_id: 3001,
     invitee_id: MOCK_CURRENT_USER_ID,
     status: 'PENDING',
@@ -191,6 +192,9 @@ export const sendGroupInvitation = async (
   const invitation: GroupInvitation = {
     invitation_id: nextInvitationId++,
     group_id: groupId,
+    // Matches the real create-invitation response, which also leaves this
+    // null -- only the my-invitations list populates it.
+    group_name: null,
     inviter_id: MOCK_CURRENT_USER_ID,
     invitee_id: inviteeId,
     status: 'PENDING',

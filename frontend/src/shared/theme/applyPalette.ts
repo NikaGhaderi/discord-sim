@@ -1,8 +1,10 @@
 /**
  * applyPalette — turns a flat list of palette swatches into the app's nine
- * `--ws-*` design tokens (already consumed throughout workspaces.css: every
- * button, modal, sidebar, and list row in the app reads these, so setting
- * them on :root re-themes the whole chrome without touching component code).
+ * `--ws-*` design tokens (already consumed throughout workspaces.css and,
+ * for the chat surfaces specifically, MessageThread/Composer/etc.'s own
+ * Tailwind arbitrary-value classes -- every button, modal, sidebar, and
+ * message bubble in the app reads these, so setting them on :root re-themes
+ * the whole app without touching component code).
  *
  * Role assignment is algorithmic, not hand-picked per palette: each color's
  * luminance and saturation (chroma) decide whether it becomes the
@@ -26,11 +28,19 @@ interface RGB {
 
 export interface ThemeTokens {
   bg: string;
+  bgNav: string;
   bgSidebar: string;
   bgHover: string;
+  /** The message thread's own dark backdrop -- deliberately darker than
+   * bgBubble, so message cards read as "raised" surfaces against it. */
+  bgChat: string;
+  textOnChat: string;
+  bgBubble: string;
   border: string;
   text: string;
   textSecondary: string;
+  textOnBubble: string;
+  textSecondaryOnBubble: string;
   primary: string;
   primaryHover: string;
   danger: string;
@@ -42,11 +52,17 @@ const DEFAULT_DANGER = '#dc2626';
 const STORAGE_KEY = 'discord-sim:palette';
 const CSS_VAR_BY_TOKEN: Record<keyof ThemeTokens, string> = {
   bg: '--ws-bg',
+  bgNav: '--ws-bg-nav',
   bgSidebar: '--ws-bg-sidebar',
   bgHover: '--ws-bg-hover',
+  bgChat: '--ws-bg-chat',
+  textOnChat: '--ws-text-on-chat',
+  bgBubble: '--ws-bg-bubble',
   border: '--ws-border',
   text: '--ws-text',
   textSecondary: '--ws-text-secondary',
+  textOnBubble: '--ws-text-on-bubble',
+  textSecondaryOnBubble: '--ws-text-secondary-on-bubble',
   primary: '--ws-primary',
   primaryHover: '--ws-primary-hover',
   danger: '--ws-danger',
@@ -136,25 +152,110 @@ export function deriveTheme(colors: string[]): ThemeTokens {
     bg = mix(bg, WHITE, 0.6);
   }
 
-  const vivid = withMeta
-    .filter((m) => m.c !== textMeta.c && m.c !== bgMeta.c)
-    .sort((a, b) => b.chroma - a.chroma);
-  const primary = (vivid[0] ?? withMeta[withMeta.length - 1]).c;
+  // Every other swatch in the palette, spent one at a time on a distinct
+  // role below instead of being ignored in favor of interpolating bg/text
+  // -- the whole point of a "19 palettes" feature is that different
+  // surfaces (nav/sidebar panel, borders, accent, danger) actually look
+  // like different colors from the chosen palette, not shades of the same
+  // two extremes.
+  type Swatch = (typeof withMeta)[number];
+  const remaining = withMeta.filter((m) => m.c !== textMeta.c && m.c !== bgMeta.c);
+  const used = new Set<Swatch>([textMeta, bgMeta]);
+  const take = (
+    list: Swatch[],
+    pick: (candidates: Swatch[]) => Swatch | undefined
+  ): Swatch | undefined => {
+    const candidates = list.filter((m) => !used.has(m));
+    const picked = pick(candidates);
+    if (picked) used.add(picked);
+    return picked;
+  };
 
-  const dangerCandidate = withMeta.find(
-    (m) => m.chroma >= 40 && (m.hue <= 20 || m.hue >= 345)
+  const primaryMeta = take(remaining, (c) => [...c].sort((a, b) => b.chroma - a.chroma)[0]);
+  const primary = (primaryMeta ?? bgMeta).c;
+
+  const dangerMeta = take(remaining, (c) =>
+    c.find((m) => m.chroma >= 40 && (m.hue <= 20 || m.hue >= 345))
   );
+
+  // A second, genuinely different swatch for the nav bar/sidebar panel --
+  // prefers whatever's left that's closest to bg's own lightness, so the
+  // chrome stays a light, readable panel rather than jumping to an
+  // unrelated hue, while still being a real distinct palette color instead
+  // of bg blended with text.
+  const bgSidebarMeta = take(remaining, (c) =>
+    [...c].sort((a, b) => Math.abs(a.lum - bgMeta.lum) - Math.abs(b.lum - bgMeta.lum))[0]
+  );
+  let bgSidebar = bgSidebarMeta ? mix(bgSidebarMeta.c, bg, 0.35) : mix(bg, text, 0.06);
+  // Both sidebars (channel list and DM/group list) render plain --ws-text
+  // on top of this -- unlike bg, bgSidebar isn't guaranteed to contrast
+  // with text on its own, since it can come from any swatch in the
+  // palette. Pull it toward bg until it does, rather than risking
+  // light-text-on-light-panel or dark-on-dark.
+  while (contrastRatio(bgSidebar, text) < 4.5) {
+    bgSidebar = mix(bgSidebar, bg, 0.5);
+  }
+
+  // The top nav bar reads as its own distinct strip, not a continuation of
+  // the left sidebar -- carries a hint of the accent color so it doesn't
+  // just look like a copy of bgSidebar. Nudged back toward bg if that
+  // tint ever made text on it hard to read.
+  let bgNav = mix(bgSidebar, primary, 0.14);
+  while (contrastRatio(bgNav, text) < 4.5) {
+    bgNav = mix(bgNav, bg, 0.5);
+  }
+
+  // A third leftover swatch for borders, same lightness-proximity logic,
+  // blended further toward bg since a border only needs to read as a
+  // subtle edge, not a solid color block.
+  const borderMeta = take(remaining, (c) =>
+    [...c].sort((a, b) => Math.abs(a.lum - bgMeta.lum) - Math.abs(b.lum - bgMeta.lum))[0]
+  );
+  const border = borderMeta ? mix(borderMeta.c, bg, 0.55) : mix(bg, text, 0.18);
+
+  // The message thread gets its own dark backdrop, reusing the palette's
+  // own dark-neutral "text" color rather than a fixed gray -- this is the
+  // piece that makes the chat area itself change per palette, not just
+  // buttons and borders around it. Guaranteed dark enough for white text
+  // since it's already passed the >=4.5 contrast-against-bg check above;
+  // darkened further only in the rare case that isn't quite enough alone.
+  let bgChat = text;
+  if (contrastRatio(bgChat, WHITE) < 4.5) {
+    bgChat = mix(bgChat, BLACK, 0.5);
+  }
+  const textOnChat = WHITE;
+
+  // Message bubbles sit lighter than the chat backdrop they're on, so they
+  // read as raised cards rather than blending into it. Text color falls
+  // back from white to the palette's own dark "text" tone (and, failing
+  // that, pushes the bubble itself lighter) so it's always legible however
+  // light the bubble ends up.
+  let bgBubble = mix(bgChat, WHITE, 0.22);
+  let textOnBubble = WHITE;
+  if (contrastRatio(bgBubble, textOnBubble) < 4.5) {
+    textOnBubble = text;
+    if (contrastRatio(bgBubble, textOnBubble) < 4.5) {
+      bgBubble = mix(bgBubble, WHITE, 0.4);
+    }
+  }
+  const textSecondaryOnBubble = mix(textOnBubble, bgBubble, 0.45);
 
   return {
     bg: toHex(bg),
-    bgSidebar: toHex(mix(bg, text, 0.06)),
-    bgHover: toHex(mix(bg, text, 0.12)),
-    border: toHex(mix(bg, text, 0.18)),
+    bgNav: toHex(bgNav),
+    bgSidebar: toHex(bgSidebar),
+    bgHover: toHex(mix(bgSidebar, text, 0.1)),
+    bgChat: toHex(bgChat),
+    textOnChat: toHex(textOnChat),
+    bgBubble: toHex(bgBubble),
+    border: toHex(border),
     text: toHex(text),
     textSecondary: toHex(mix(text, bg, 0.45)),
+    textOnBubble: toHex(textOnBubble),
+    textSecondaryOnBubble: toHex(textSecondaryOnBubble),
     primary: toHex(primary),
     primaryHover: toHex(mix(primary, BLACK, 0.18)),
-    danger: dangerCandidate ? toHex(dangerCandidate.c) : DEFAULT_DANGER,
+    danger: dangerMeta ? toHex(dangerMeta.c) : DEFAULT_DANGER,
   };
 }
 
