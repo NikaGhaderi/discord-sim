@@ -82,5 +82,19 @@ describe('SCRUM-44 Media & Search UI', () => {
 
       expect(screen.queryByTestId('search-result-item')).not.toBeInTheDocument();
     });
+
+    it('delegates to searchFn instead of filtering mockData when provided', async () => {
+      const searchFn = vi.fn().mockResolvedValue([
+        { id: '9', sender: 'nika_lead', timestamp: '10:10', snippet: 'from the real backend' },
+      ]);
+      render(<SearchBar mockData={mockResults} searchFn={searchFn} />);
+
+      const input = screen.getByPlaceholderText('Search messages...');
+      fireEvent.change(input, { target: { value: 'backend' } });
+      fireEvent.click(screen.getByRole('button', { name: /search/i }));
+
+      expect(await screen.findByText('from the real backend')).toBeInTheDocument();
+      expect(searchFn).toHaveBeenCalledWith('backend');
+    });
   });
 });

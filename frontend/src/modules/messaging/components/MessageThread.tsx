@@ -1,50 +1,104 @@
-import React, { useCallback, useState, useRef, useLayoutEffect, UIEvent } from 'react';
+import React, { useCallback, useEffect, useState, useRef, useLayoutEffect, UIEvent } from 'react';
 import { Message } from '../types';
+import { messagingApi, MessageTarget } from '../index';
 import { useLiveMessages } from '../useLiveMessages';
 import { NewMessageData, MessageDeletedData } from '../../notifications';
-
-const MOCK_ALL_MESSAGES: Message[] = Array.from({ length: 60 }, (_, index) => {
-  const msgNum = 60 - index;
-  return {
-    base_message_id: msgNum,
-    sender_id: msgNum % 2 === 0 ? 1 : 2,
-    sender_username: msgNum % 2 === 0 ? 'nika_lead' : 'ftm_roosta',
-    content: `Message content #${msgNum}`,
-    sent_at: '12:34 PM',
-    is_edited: msgNum % 3 === 0,
-  };
-});
+import { Composer } from './Composer';
+import { MessageActions } from './MessageActions';
+import { MediaUploadButton, SelectedFile } from './MediaUploadButton';
 
 const PAGE_SIZE = 20;
 
 interface MessageThreadProps {
-  /** Optional -- when omitted, this thread receives no live updates (same
-   * behavior as before SCRUM-55). */
+  /** Optional -- when omitted, this thread receives no live updates and
+   * can't send/schedule messages (same read-only behavior as before
+   * SCRUM-55/the messaging UI integration). */
   topicId?: number;
+  currentUserId?: number;
+  /** True if the current user holds DELETE_MESSAGES in this channel --
+   * lets them delete others' messages, mirroring the backend's
+   * sender-OR-permission rule. Editing is always sender-only regardless. */
+  hasDeletePermission?: boolean;
 }
 
-export const MessageThread: React.FC<MessageThreadProps> = ({ topicId }) => {
-  const [page, setPage] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [hasMore, setHasMore] = useState<boolean>(true);
+function addMessageIfNew(messages: Message[], incoming: Message): Message[] {
+  if (messages.some((m) => m.base_message_id === incoming.base_message_id)) {
+    return messages;
+  }
+  return [...messages, incoming];
+}
 
-  // نمایش پیام‌ها به ترتیب زمانی (قدیمی‌ترین بالا، جدیدترین پایین)
-  const [messages, setMessages] = useState<Message[]>(() =>
-    MOCK_ALL_MESSAGES.slice(-PAGE_SIZE)
-  );
+export const MessageThread: React.FC<MessageThreadProps> = ({
+  topicId,
+  currentUserId,
+  hasDeletePermission = false,
+}) => {
+  const target: MessageTarget = { topic_id: topicId };
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [offset, setOffset] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+
+  // The backend orders messages oldest-first and paginates from the start,
+  // so "give me the latest page" means first learning the total count, then
+  // fetching the last PAGE_SIZE of it -- there's no "give me the tail"
+  // shortcut on this endpoint.
+  useEffect(() => {
+    if (topicId === undefined) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    messagingApi
+      .listMessages(target, PAGE_SIZE, 0)
+      .then(async (firstPage) => {
+        if (cancelled) return;
+        if (firstPage.count <= PAGE_SIZE) {
+          setMessages(firstPage.results);
+          setOffset(0);
+          setHasMore(false);
+          return;
+        }
+        const latestOffset = firstPage.count - PAGE_SIZE;
+        const latestPage = await messagingApi.listMessages(target, PAGE_SIZE, latestOffset);
+        if (cancelled) return;
+        setMessages(latestPage.results);
+        setOffset(latestOffset);
+        setHasMore(latestOffset > 0);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load messages.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicId]);
 
   const handleNewMessage = useCallback((data: NewMessageData) => {
-    setMessages((prev) => [
-      ...prev,
-      {
+    setMessages((prev) =>
+      addMessageIfNew(prev, {
         base_message_id: data.base_message_id,
         sender_id: data.sender_id,
         sender_username: `User #${data.sender_id}`,
         content: data.content,
         sent_at: data.sent_at,
         is_edited: data.is_edited,
-      },
-    ]);
+        media: data.media,
+      })
+    );
   }, []);
 
   const handleMessageDeleted = useCallback((data: MessageDeletedData) => {
@@ -71,32 +125,23 @@ export const MessageThread: React.FC<MessageThreadProps> = ({ topicId }) => {
   }, [messages]);
 
   const loadMoreMessages = () => {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore || topicId === undefined) return;
 
     setLoading(true);
     if (containerRef.current) {
       scrollHeightBeforeLoad.current = containerRef.current.scrollHeight;
     }
 
-    // شبیه‌سازی API call
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const startIndex = Math.max(0, MOCK_ALL_MESSAGES.length - nextPage * PAGE_SIZE);
-      const endIndex = MOCK_ALL_MESSAGES.length - page * PAGE_SIZE;
-
-      const olderMessages = MOCK_ALL_MESSAGES.slice(startIndex, endIndex);
-
-      if (olderMessages.length > 0) {
-        setMessages((prev) => [...olderMessages, ...prev]);
-        setPage(nextPage);
-      }
-
-      if (startIndex === 0) {
-        setHasMore(false);
-      }
-
-      setLoading(false);
-    }, 500);
+    const previousOffset = Math.max(0, offset - PAGE_SIZE);
+    messagingApi
+      .listMessages(target, PAGE_SIZE, previousOffset)
+      .then((page) => {
+        setMessages((prev) => [...page.results, ...prev]);
+        setOffset(previousOffset);
+        setHasMore(previousOffset > 0);
+      })
+      .catch(() => setError('Failed to load older messages.'))
+      .finally(() => setLoading(false));
   };
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -105,38 +150,147 @@ export const MessageThread: React.FC<MessageThreadProps> = ({ topicId }) => {
     }
   };
 
+  const handleSendMessage = async (content: string) => {
+    if (topicId === undefined) return;
+    setError(null);
+    try {
+      const sent = await messagingApi.sendMessage({ ...target, content });
+      setMessages((prev) => addMessageIfNew(prev, sent));
+      if (selectedFile) {
+        const file = selectedFile;
+        setSelectedFile(null);
+        const attachment = await messagingApi.attachMedia(sent.base_message_id, file.file);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.base_message_id === sent.base_message_id
+              ? {
+                  ...m,
+                  media: [
+                    ...(m.media ?? []),
+                    { file_url: attachment.file_url, file_type: attachment.file_type },
+                  ],
+                }
+              : m
+          )
+        );
+      }
+    } catch {
+      setError('Failed to send message.');
+    }
+  };
+
+  const handleScheduleMessage = async (content: string, scheduledAt: string) => {
+    if (topicId === undefined) return;
+    setError(null);
+    try {
+      await messagingApi.createScheduledMessage({
+        ...target,
+        content,
+        scheduled_time: new Date(scheduledAt).toISOString(),
+      });
+    } catch {
+      setError('Failed to schedule message.');
+    }
+  };
+
+  const handleEditMessage = async (messageId: number, newContent: string) => {
+    setError(null);
+    try {
+      const updated = await messagingApi.editMessage(messageId, newContent);
+      setMessages((prev) =>
+        prev.map((m) => (m.base_message_id === messageId ? { ...m, ...updated } : m))
+      );
+    } catch {
+      setError('Failed to edit message.');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    setError(null);
+    try {
+      await messagingApi.deleteMessage(messageId);
+      setMessages((prev) => prev.filter((m) => m.base_message_id !== messageId));
+    } catch {
+      setError('Failed to delete message.');
+    }
+  };
+
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      data-testid="message-thread-scroll"
-      className="flex-1 overflow-y-auto p-4 space-y-4"
-      style={{ maxHeight: 'calc(100vh - 120px)' }}
-    >
-      {loading && (
-        <div className="text-center py-2 text-sm text-gray-400">
-          Loading older messages...
+    <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+      {error && (
+        <div className="text-center py-1 text-xs text-red-400" role="alert">
+          {error}
         </div>
       )}
 
-      {!hasMore && (
-        <div className="text-center py-2 text-xs text-gray-500">
-          Beginning of message history
-        </div>
-      )}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        data-testid="message-thread-scroll"
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        style={{ maxHeight: 'calc(100vh - 120px)' }}
+      >
+        {loading && (
+          <div className="text-center py-2 text-sm text-gray-400">
+            Loading messages...
+          </div>
+        )}
 
-      {messages.map((msg) => (
-        <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">{msg.sender_username}</span>
-            <span className="text-xs text-gray-400">{msg.sent_at}</span>
-            {msg.is_edited && (
-              <span className="text-xs text-gray-500 italic">(edited)</span>
+        {!loading && !hasMore && messages.length > 0 && (
+          <div className="text-center py-2 text-xs text-gray-500">
+            Beginning of message history
+          </div>
+        )}
+
+        {messages.map((msg) => (
+          <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <span className="font-semibold text-white">{msg.sender_username}</span>
+              <span className="text-xs text-gray-400">{msg.sent_at}</span>
+              {msg.is_edited && (
+                <span className="text-xs text-gray-500 italic">(edited)</span>
+              )}
+            </div>
+            <p className="text-gray-200 mt-1">{msg.content}</p>
+            {msg.media && msg.media.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {msg.media.map((item, index) => (
+                  <li key={index}>
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-400 hover:underline"
+                    >
+                      {item.file_url.split('/').pop()}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {currentUserId !== undefined && (
+              <div className="mt-1">
+                <MessageActions
+                  message={msg}
+                  currentUserId={currentUserId}
+                  hasDeletePermission={hasDeletePermission}
+                  onEditMessage={handleEditMessage}
+                  onDeleteMessage={handleDeleteMessage}
+                />
+              </div>
             )}
           </div>
-          <p className="text-gray-200 mt-1">{msg.content}</p>
+        ))}
+      </div>
+
+      {topicId !== undefined && currentUserId !== undefined && (
+        <div className="flex items-end gap-2 border-t border-gray-200 p-2">
+          <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
+          <div className="flex-1">
+            <Composer onSendMessage={handleSendMessage} onScheduleMessage={handleScheduleMessage} />
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 };

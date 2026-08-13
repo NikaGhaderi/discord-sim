@@ -10,6 +10,9 @@ export interface SearchResultItem {
 interface SearchBarProps {
   mockData?: SearchResultItem[];
   onResultClick?: (item: SearchResultItem) => void;
+  /** When provided, search is delegated to this (e.g. the real backend's
+   * full-text search) instead of filtering mockData locally. */
+  searchFn?: (query: string) => Promise<SearchResultItem[]>;
 }
 
 const DEFAULT_MOCK_RESULTS: SearchResultItem[] = [
@@ -36,18 +39,26 @@ const DEFAULT_MOCK_RESULTS: SearchResultItem[] = [
 export const SearchBar: React.FC<SearchBarProps> = ({
   mockData = DEFAULT_MOCK_RESULTS,
   onResultClick,
+  searchFn,
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = query.trim();
-    
+
     if (!trimmed) {
       setResults([]);
       setHasSearched(false);
+      return;
+    }
+
+    if (searchFn) {
+      const found = await searchFn(trimmed);
+      setResults(found);
+      setHasSearched(true);
       return;
     }
 

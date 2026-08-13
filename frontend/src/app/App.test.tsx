@@ -4,6 +4,7 @@ import { App } from './App';
 import { profileApi } from '../modules/profile';
 import { privateSpacesApi } from '../modules/private_spaces';
 import { workspacesApi } from '../modules/workspaces';
+import { messagingApi } from '../modules/messaging';
 
 vi.mock('../modules/profile', () => ({
   profileApi: {
@@ -56,6 +57,20 @@ vi.mock('../modules/workspaces', () => ({
   },
 }));
 
+vi.mock('../modules/messaging', () => ({
+  messagingApi: {
+    sendMessage: vi.fn(),
+    listMessages: vi.fn(),
+    editMessage: vi.fn(),
+    deleteMessage: vi.fn(),
+    attachMedia: vi.fn(),
+    searchMessages: vi.fn(),
+    createScheduledMessage: vi.fn(),
+    cancelScheduledMessage: vi.fn(),
+    listScheduledMessages: vi.fn(),
+  },
+}));
+
 describe('App Component', () => {
   test('renders login form by default on root path', () => {
     render(<App />);
@@ -102,14 +117,6 @@ describe('App Component', () => {
     expect(screen.getByText('Groups')).toBeInTheDocument();
   });
 
-  test('renders the channel thread page when navigated to /channels/demo', () => {
-    window.history.pushState({}, 'Channel Thread Page', '/channels/demo');
-    render(<App />);
-
-    expect(screen.getByText('# general')).toBeInTheDocument();
-    expect(screen.getByText('Message content #1')).toBeInTheDocument();
-  });
-
   test('renders the workspaces page when navigated to /workspaces', async () => {
     vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([
       {
@@ -121,6 +128,20 @@ describe('App Component', () => {
         invite_token: 'abc123',
       },
     ]);
+    vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+      user_id: 1,
+      username: 'ftm_roosta',
+      display_name: 'Fatemeh Roosta',
+      avatar_url: 'https://via.placeholder.com/150',
+      bio: 'Frontend developer working on Discord Sim.',
+      allow_group_invitations: true,
+    });
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
     window.history.pushState({}, 'Workspaces Page', '/workspaces');
 
     render(<App />);
