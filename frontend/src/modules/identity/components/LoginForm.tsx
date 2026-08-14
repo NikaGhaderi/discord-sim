@@ -21,11 +21,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isSubmitting = f
 
   return (
     <form onSubmit={handleSubmit} className="identity-form" style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '350px', margin: '0 auto' }}>
-      <h2 style={{ textAlign: 'center' }}>Welcome Back</h2>
+      <h2 style={{ textAlign: 'center', color: '#666' }}>Welcome Back</h2>
       <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>Please enter your credentials to access your account.</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        <label htmlFor="email" style={{ fontSize: '14px', fontWeight: 'bold' }}>Email</label>
+        <label htmlFor="email" style={{ fontSize: '14px', fontWeight: 'bold', color: '#666' }}>Email</label>
         <input
           id="email"
           type="email"
@@ -38,7 +38,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isSubmitting = f
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        <label htmlFor="password" style={{ fontSize: '14px', fontWeight: 'bold' }}>Password</label>
+        <label htmlFor="password" style={{ fontSize: '14px', fontWeight: 'bold', color: '#666' }}>Password</label>
         <input
           id="password"
           type="password"
