@@ -61,7 +61,12 @@ class DeleteMessageUseCase:
         if self._notifier is None and self._notification_recorder is None:
             return
 
-        payload = {"base_message_id": message.id}
+        payload = {
+            "base_message_id": message.id,
+            "topic_id": message.topic_id,
+            "group_id": message.group_id,
+            "direct_chat_id": message.direct_chat_id,
+        }
         if self._notifier is not None:
             self._notifier.notify(
                 _realtime_group_name(message),

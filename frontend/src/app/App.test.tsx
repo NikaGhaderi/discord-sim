@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from './App';
 import { profileApi } from '../modules/profile';
@@ -6,6 +6,7 @@ import { privateSpacesApi } from '../modules/private_spaces';
 import { workspacesApi } from '../modules/workspaces';
 import { messagingApi } from '../modules/messaging';
 import { identityApi } from '../modules/identity';
+import { setTokens } from '@infrastructure/tokenStorage';
 
 vi.mock('../modules/identity', async () => {
   const actual = await vi.importActual<typeof import('../modules/identity/types')>(
@@ -106,6 +107,10 @@ vi.mock('../modules/messaging', () => ({
 }));
 
 describe('App Component', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   test('renders login form by default on root path', () => {
     render(<App />);
     expect(screen.getByText(/Login/i)).toBeInTheDocument();
@@ -153,6 +158,29 @@ describe('App Component', () => {
     expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
   });
 
+  test('logging out returns to the login form, even from a deep page', async () => {
+    setTokens({ access_token: 'test-access', refresh_token: 'test-refresh' });
+    vi.mocked(identityApi.logoutUser).mockResolvedValueOnce(undefined as never);
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([]);
+    vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+      user_id: 1,
+      username: 'ftm_roosta',
+      display_name: 'Fatemeh Roosta',
+      avatar_url: null,
+      bio: '',
+      allow_group_invitations: true,
+    });
+    window.history.pushState({}, 'Workspaces Page', '/workspaces');
+
+    render(<App />);
+    await screen.findByRole('button', { name: 'Logout' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+
+    expect(await screen.findByText(/Login/i)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
+  });
+
   test('renders profile page when navigated to /profile', async () => {
     vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
       user_id: 1,
@@ -162,6 +190,7 @@ describe('App Component', () => {
       bio: 'Frontend developer working on Discord Sim.',
       allow_group_invitations: true,
     });
+    setTokens({ access_token: 'test-access', refresh_token: 'test-refresh' });
     window.history.pushState({}, 'Profile Page', '/profile');
     render(<App />);
 
@@ -185,6 +214,7 @@ describe('App Component', () => {
       previous: null,
       results: [],
     });
+    setTokens({ access_token: 'test-access', refresh_token: 'test-refresh' });
     window.history.pushState({}, 'Private Spaces Page', '/private-spaces');
 
     render(<App />);
@@ -218,6 +248,7 @@ describe('App Component', () => {
       previous: null,
       results: [],
     });
+    setTokens({ access_token: 'test-access', refresh_token: 'test-refresh' });
     window.history.pushState({}, 'Workspaces Page', '/workspaces');
 
     render(<App />);

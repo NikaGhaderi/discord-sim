@@ -49,6 +49,7 @@ def test_send_message_rejects_non_member_before_creating_row():
 def test_send_message_creates_message_for_member():
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     created_message = _message()
     repository.create_message.return_value = created_message
 
@@ -62,3 +63,30 @@ def test_send_message_creates_message_for_member():
         group_id=None,
         direct_chat_id=None,
     )
+
+
+def test_send_message_creates_message_for_group_member_without_a_permission_check():
+    # Groups/DMs have no permission concept -- membership alone is enough,
+    # so get_permissions_for_topic must never even be consulted.
+    repository = Mock()
+    repository.can_access_target.return_value = True
+    created_message = _message()
+    created_message.topic_id = None
+    created_message.group_id = 7
+    repository.create_message.return_value = created_message
+
+    result = SendMessageUseCase(repository).execute(1, "Hello", group_id=7)
+
+    assert result is created_message
+    repository.get_permissions_for_topic.assert_not_called()
+
+
+def test_send_message_rejects_a_topic_member_without_send_messages_permission():
+    repository = Mock()
+    repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = []
+
+    with pytest.raises(MessageTargetForbiddenError):
+        SendMessageUseCase(repository).execute(1, "Hello", topic_id=5)
+
+    repository.create_message.assert_not_called()

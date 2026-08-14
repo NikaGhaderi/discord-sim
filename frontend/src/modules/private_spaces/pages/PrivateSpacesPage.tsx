@@ -7,6 +7,7 @@ import { GroupSettingsPanel } from '../components/GroupSettingsPanel';
 import { InvitationList } from '../components/InvitationList';
 import { MessageThread } from '../../messaging/components/MessageThread';
 import { Modal } from '@shared/components/Modal';
+import { UserProfileModal } from '@shared/components/UserProfileModal';
 import { DirectChat, Group } from '../types';
 
 type SelectedSpace =
@@ -17,11 +18,13 @@ type SelectedSpace =
 export const PrivateSpacesPage: React.FC = () => {
   const [selected, setSelected] = useState<SelectedSpace>(null);
   const [removedGroupId, setRemovedGroupId] = useState<number | null>(null);
+  const [groupsReloadToken, setGroupsReloadToken] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState(false);
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
+  const [viewingUserId, setViewingUserId] = useState<number | null>(null);
   // sender_id -> real username, for whichever group/DM is currently open --
   // like channels, the backend never sends a username on a message, only
   // sender_id, so it has to be resolved client-side per thread.
@@ -122,18 +125,34 @@ export const PrivateSpacesPage: React.FC = () => {
         <GroupList
           onSelectGroup={(group) => setSelected({ kind: 'group', group })}
           removedGroupId={removedGroupId}
+          reloadToken={groupsReloadToken}
         />
         <hr style={{ margin: '20px 0', borderColor: 'var(--ws-border)' }} />
-        <InvitationList />
+        <InvitationList onAccepted={() => setGroupsReloadToken((t) => t + 1)} />
       </aside>
 
       <main className="private-spaces-main main-panel" style={{ minWidth: 0 }}>
         {selected ? (
           <>
             <header className="main-header">
-              <strong>
-                {selected.kind === 'group' ? selected.group.name : selected.otherUsername}
-              </strong>
+              {selected.kind === 'dm' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const otherId =
+                      selected.dm.user1_id === currentUserId
+                        ? selected.dm.user2_id
+                        : selected.dm.user1_id;
+                    setViewingUserId(otherId);
+                  }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+                  title="View profile"
+                >
+                  <strong>{selected.otherUsername}</strong>
+                </button>
+              ) : (
+                <strong>{selected.group.name}</strong>
+              )}
               {selected.kind === 'group' && (
                 <button type="button" className="btn" onClick={() => setIsGroupSettingsOpen(true)}>
                   Settings
@@ -155,7 +174,7 @@ export const PrivateSpacesPage: React.FC = () => {
       </main>
 
       {isGroupSettingsOpen && selected?.kind === 'group' && (
-        <Modal title={`Group Settings: ${selected.group.name}`} onClose={() => setIsGroupSettingsOpen(false)}>
+        <Modal title="Group Settings" onClose={() => setIsGroupSettingsOpen(false)}>
           <GroupSettingsPanel
             group={selected.group}
             onUpdateGroup={(updated) => setSelected({ kind: 'group', group: updated })}
@@ -166,6 +185,10 @@ export const PrivateSpacesPage: React.FC = () => {
             }}
           />
         </Modal>
+      )}
+
+      {viewingUserId !== null && (
+        <UserProfileModal userId={viewingUserId} onClose={() => setViewingUserId(null)} />
       )}
     </div>
   );

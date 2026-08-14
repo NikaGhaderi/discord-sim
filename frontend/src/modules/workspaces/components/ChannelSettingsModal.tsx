@@ -1,7 +1,7 @@
 import React, { useEffect, useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
 import { workspacesApi } from '../index';
-import { Channel } from '../types';
+import { Channel, ChannelPermission } from '../types';
 import { ManageRolesModal } from './ManageRolesModal';
 import { TopicManagerModal } from './TopicManagerModal';
 
@@ -11,6 +11,11 @@ interface ChannelSettingsModalProps {
    * entirely (no crash, field just doesn't render) if the caller hasn't
    * loaded the current user's id yet. */
   currentUserId?: number;
+  /** Permissions the current user holds in this channel -- controls which
+   * of the actions below (rename, manage roles/topics, delete) even
+   * render, so a member without the permission never sees a button that
+   * would just 403 when clicked. */
+  myPermissions: ChannelPermission[];
   onClose: () => void;
   onUpdated: (channelId: number, name: string) => void;
   onDeleted: (channelId: number) => void;
@@ -22,11 +27,15 @@ type SubPanel = 'none' | 'roles' | 'topics';
 export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   channel,
   currentUserId,
+  myPermissions,
   onClose,
   onUpdated,
   onDeleted,
   onLeft,
 }) => {
+  const canManageChannel = myPermissions.includes('MANAGE_CHANNEL');
+  const canManageRoles = myPermissions.includes('MANAGE_ROLES');
+  const canManageTopics = myPermissions.includes('MANAGE_TOPICS');
   const [name, setName] = useState(channel.name);
   const [subPanel, setSubPanel] = useState<SubPanel>('none');
   const [isSaving, setIsSaving] = useState(false);
@@ -134,23 +143,25 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   return (
     <Modal title="Channel Settings" onClose={onClose}>
       {error && <p className="error-text">{error}</p>}
-      <form onSubmit={handleRename}>
-        <div className="field">
-          <label htmlFor="settings-channel-name">Channel Name</label>
-          <input
-            id="settings-channel-name"
-            type="text"
-            required
-            minLength={2}
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-        <button type="submit" className="btn btn-primary btn-block" disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save Name'}
-        </button>
-      </form>
+      {canManageChannel && (
+        <form onSubmit={handleRename}>
+          <div className="field">
+            <label htmlFor="settings-channel-name">Channel Name</label>
+            <input
+              id="settings-channel-name"
+              type="text"
+              required
+              minLength={2}
+              maxLength={100}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary btn-block" disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save Name'}
+          </button>
+        </form>
+      )}
 
       <div className="field">
         <label htmlFor="settings-invite-link">Invite Link</label>
@@ -181,18 +192,24 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
-        <button type="button" className="btn btn-block" onClick={() => setSubPanel('roles')}>
-          Manage Roles
-        </button>
-        <button type="button" className="btn btn-block" onClick={() => setSubPanel('topics')}>
-          Manage Topics
-        </button>
+        {canManageRoles && (
+          <button type="button" className="btn btn-block" onClick={() => setSubPanel('roles')}>
+            Manage Roles
+          </button>
+        )}
+        {canManageTopics && (
+          <button type="button" className="btn btn-block" onClick={() => setSubPanel('topics')}>
+            Manage Topics
+          </button>
+        )}
         <button type="button" className="btn btn-block" disabled={isLeaving} onClick={handleLeave}>
           {isLeaving ? 'Leaving...' : 'Leave Channel'}
         </button>
-        <button type="button" className="btn btn-danger btn-block" onClick={handleDelete}>
-          Delete Channel
-        </button>
+        {canManageChannel && (
+          <button type="button" className="btn btn-danger btn-block" onClick={handleDelete}>
+            Delete Channel
+          </button>
+        )}
       </div>
     </Modal>
   );

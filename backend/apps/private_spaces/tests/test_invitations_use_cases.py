@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 
 from apps.private_spaces.application.use_cases.invitations import (
@@ -123,6 +125,36 @@ class TestRespondToInvitationUseCase:
 
         assert result.status == "DECLINED"
         assert repo.is_group_member(1, 20) is False
+
+    def test_accepting_notifies_the_inviter(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        invitation, _ = repo.create_or_get_invitation(1, 10, 20)
+        recorder = Mock()
+
+        RespondToInvitationUseCase(repo, recorder).execute(
+            invitation_id=invitation.id, user_id=20, status="ACCEPTED"
+        )
+
+        recorder.record.assert_called_once_with(
+            [10], "INVITATION_ACCEPTED", {"group_id": 1, "invitee_id": 20}
+        )
+
+    def test_declining_does_not_notify(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        invitation, _ = repo.create_or_get_invitation(1, 10, 20)
+        recorder = Mock()
+
+        RespondToInvitationUseCase(repo, recorder).execute(
+            invitation_id=invitation.id, user_id=20, status="DECLINED"
+        )
+
+        recorder.record.assert_not_called()
 
     def test_only_the_invitee_can_respond(self):
         repo = InMemoryPrivateSpacesRepository()

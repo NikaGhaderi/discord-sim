@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DirectMessageList } from '../components/DirectMessageList';
 import { GroupList } from '../components/GroupList';
@@ -190,6 +190,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       name: 'Admin Room',
       creator_id: currentUserId,
       created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'test-invite-token',
     };
 
     // The backend has no admin check on either endpoint -- DeleteGroupUseCase
@@ -371,6 +372,20 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       );
     });
 
+    it('clicking the username in the sidebar selects the DM (profile-viewing lives in the chat header instead)', async () => {
+      const dm = { direct_chat_id: 1, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' };
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([dm]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        { user_id: 777, username: 'ftm_roosta', display_name: 'Fatemeh Roosta', avatar_url: null, bio: '' },
+      ]);
+      const onSelectDm = vi.fn();
+
+      render(<DirectMessageList currentUserId={currentUserId} onSelectDm={onSelectDm} />);
+      fireEvent.click(await screen.findByText('ftm_roosta'));
+
+      expect(onSelectDm).toHaveBeenCalledWith(dm);
+    });
+
     it('falls back to a generated initial when the participant has no avatar_url', async () => {
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
         { direct_chat_id: 1, user1_id: currentUserId, user2_id: 778, created_at: '2026-01-01T00:00:00Z' },
@@ -439,7 +454,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
   describe('GroupList', () => {
     it('renders fetched groups with a resolved member count and allows creating a new group', async () => {
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-fe' },
       ]);
       vi.mocked(privateSpacesApi.listGroupMembers).mockImplementation(async (groupId) => {
         if (groupId === 1) {
@@ -458,6 +473,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
         name: 'New Test Group',
         creator_id: currentUserId,
         created_at: '2026-01-01T00:00:00Z',
+        invite_token: 'tok-new',
       });
 
       render(<GroupList />);
@@ -477,8 +493,8 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
     it('drops a group from the list when removedGroupId is set, without a refetch', async () => {
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
-        { group_id: 2, name: 'Backend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Frontend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-fe' },
+        { group_id: 2, name: 'Backend Team', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-be' },
       ]);
 
       const { rerender } = render(<GroupList removedGroupId={null} />);
@@ -507,7 +523,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       });
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-admin' },
       ]);
       vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
         count: 0,
@@ -539,7 +555,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       });
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-admin' },
       ]);
       vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
         count: 0,
@@ -583,7 +599,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       });
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-admin' },
       ]);
       vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
         count: 0,
@@ -664,7 +680,11 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
 
       render(<PrivateSpacesPage />);
 
-      fireEvent.click(await screen.findByText('ftm_roosta'));
+      // Clicking the row selects the DM; clicking the username specifically
+      // opens their profile instead (covered by its own test), so click the
+      // row itself here rather than the username text.
+      const dmRow = (await screen.findByText('ftm_roosta')).closest('li') as HTMLElement;
+      fireEvent.click(dmRow);
 
       await waitFor(() => {
         expect(messagingApi.listMessages).toHaveBeenCalledWith({ direct_chat_id: 9 }, 20, 0);
@@ -672,6 +692,52 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       // "ftm_roosta" now legitimately appears twice: once in the sidebar DM
       // list item, once in the chat header above the thread.
       expect(screen.getAllByText('ftm_roosta')).toHaveLength(2);
+    });
+
+    it('clicking the DM header username (the top bar, not the sidebar) opens their profile', async () => {
+      vi.mocked(profileApi.getMyProfile).mockResolvedValueOnce({
+        user_id: currentUserId,
+        username: 'me',
+        display_name: 'Me',
+        avatar_url: null,
+        bio: '',
+        allow_group_invitations: true,
+      });
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
+        { direct_chat_id: 9, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([
+        {
+          user_id: 777,
+          username: 'ftm_roosta',
+          display_name: 'Fatemeh Roosta',
+          avatar_url: null,
+          bio: 'Loves Discord Sim.',
+        },
+      ]);
+      vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([]);
+      vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+      vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      });
+
+      render(<PrivateSpacesPage />);
+      const dmRow = (await screen.findByText('ftm_roosta')).closest('li') as HTMLElement;
+      fireEvent.click(dmRow);
+      await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+      const header = document.querySelector('.main-header') as HTMLElement;
+      fireEvent.click(within(header).getByText('ftm_roosta'));
+
+      expect(await screen.findByText('Loves Discord Sim.')).toBeInTheDocument();
     });
 
     it('removes a deleted group from the sidebar immediately, without a manual refresh', async () => {
@@ -686,7 +752,7 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       });
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([]);
       vi.mocked(privateSpacesApi.listGroups).mockResolvedValueOnce([
-        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z' },
+        { group_id: 1, name: 'Admin Room', creator_id: currentUserId, created_at: '2026-01-01T00:00:00Z', invite_token: 'tok-admin' },
       ]);
       vi.mocked(privateSpacesApi.listMyInvitations).mockResolvedValueOnce({
         count: 0,

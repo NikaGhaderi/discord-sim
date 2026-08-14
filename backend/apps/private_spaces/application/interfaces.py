@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Protocol
 
 from apps.private_spaces.domain.models import (
     DirectChatEntity,
@@ -49,6 +50,12 @@ class AbstractPrivateSpacesRepository(ABC):
     ) -> GroupEntity | None: ...
 
     @abstractmethod
+    def get_group_by_invite_token(self, invite_token: str) -> GroupEntity | None: ...
+
+    @abstractmethod
+    def add_group_member(self, group_id: int, user_id: int) -> GroupMemberEntity: ...
+
+    @abstractmethod
     def update_group(self, group_id: int, name: str) -> GroupEntity: ...
 
     @abstractmethod
@@ -79,3 +86,11 @@ class AbstractPrivateSpacesRepository(ABC):
     def list_pending_invitations_for_user(
         self, user_id: int, *, limit: int, offset: int
     ) -> GroupInvitationPage: ...
+
+
+class AbstractNotificationRecorder(Protocol):
+    """Same shape as apps.messaging.application.interfaces's version --
+    duplicated here (rather than imported) so private_spaces doesn't take a
+    dependency on the messaging app just for this one interface."""
+
+    def record(self, recipient_ids: list[int], event_type: str, payload: dict) -> None: ...

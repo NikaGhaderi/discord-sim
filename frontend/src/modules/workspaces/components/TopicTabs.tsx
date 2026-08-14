@@ -37,7 +37,7 @@ export const TopicTabs: React.FC<TopicTabsProps> = ({
         display: 'flex',
         gap: 4,
         padding: '8px 20px 0',
-        borderBottom: '1px solid #e0e0e0',
+        borderBottom: '1px solid var(--ws-border)',
       }}
     >
       {topics.map((topic) => (
@@ -50,12 +50,12 @@ export const TopicTabs: React.FC<TopicTabsProps> = ({
             border: 'none',
             borderBottom:
               topic.topic_id === selectedTopicId
-                ? '2px solid #5865F2'
+                ? '2px solid var(--ws-primary)'
                 : '2px solid transparent',
             background: 'none',
             cursor: 'pointer',
             fontWeight: topic.topic_id === selectedTopicId ? 700 : 400,
-            color: topic.topic_id === selectedTopicId ? '#5865F2' : '#333',
+            color: topic.topic_id === selectedTopicId ? 'var(--ws-text)' : 'var(--ws-text-secondary)',
           }}
         >
           # {topic.title}

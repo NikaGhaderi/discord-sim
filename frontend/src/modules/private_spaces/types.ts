@@ -20,6 +20,7 @@ export interface Group {
   name: string;
   creator_id: number;
   created_at: string;
+  invite_token: string;
 }
 
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';

@@ -221,10 +221,12 @@ class MessageDetailView(APIView):
 
     def delete(self, request, base_message_id):
         try:
+            # No notification_recorder here on purpose -- a deleted message
+            # shouldn't leave a bell notification behind, only the live
+            # in-thread removal via ChannelsRealtimeNotifier.
             DeleteMessageUseCase(
                 DjangoMessagingRepository(),
                 ChannelsRealtimeNotifier(),
-                DjangoNotificationRecorder(),
             ).execute(base_message_id, request.user.id)
         except MessageNotFoundError as exc:
             return _detail(str(exc), 404)

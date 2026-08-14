@@ -15,7 +15,8 @@ export type ChannelPermission =
   | 'MANAGE_TOPICS'
   | 'DELETE_MESSAGES'
   | 'KICK_MEMBERS'
-  | 'SEND_MEDIA';
+  | 'SEND_MEDIA'
+  | 'SEND_MESSAGES';
 
 export const CHANNEL_PERMISSIONS: ChannelPermission[] = [
   'MANAGE_CHANNEL',
@@ -24,6 +25,7 @@ export const CHANNEL_PERMISSIONS: ChannelPermission[] = [
   'DELETE_MESSAGES',
   'KICK_MEMBERS',
   'SEND_MEDIA',
+  'SEND_MESSAGES',
 ];
 
 export const PERMISSION_LABELS: Record<ChannelPermission, string> = {
@@ -33,6 +35,7 @@ export const PERMISSION_LABELS: Record<ChannelPermission, string> = {
   DELETE_MESSAGES: 'Delete Messages',
   KICK_MEMBERS: 'Kick Members',
   SEND_MEDIA: 'Send Media',
+  SEND_MESSAGES: 'Send Messages',
 };
 
 export interface Channel {

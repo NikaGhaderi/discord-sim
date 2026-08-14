@@ -100,6 +100,10 @@ body {
   padding: 20px;
 }
 
+.modal-card--wide {
+  width: 480px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;

@@ -33,7 +33,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         a channels-only entry, invisible from private-spaces), now both
         live in the persistent <AppNav>.
       */}
-      <div className="sidebar-section-title">
+      <div
+        className="sidebar-section-title"
+        style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '4px 10px', borderRadius: 9999 }}
+      >
         <span>CHANNELS</span>
         <div style={{ position: 'relative' }}>
           <button

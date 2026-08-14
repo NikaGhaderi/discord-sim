@@ -1,9 +1,12 @@
+from unittest.mock import Mock
+
 import pytest
 
 from apps.private_spaces.application.use_cases.groups import (
     CreateGroupUseCase,
     DeleteGroupUseCase,
     GetGroupUseCase,
+    JoinGroupByInviteTokenUseCase,
     LeaveGroupUseCase,
     ListGroupMembersUseCase,
     ListGroupsUseCase,
@@ -139,6 +142,66 @@ class TestLeaveGroupUseCase:
 
         with pytest.raises(GroupMembershipNotFoundError):
             LeaveGroupUseCase(repo).execute(group_id=1, user_id=999)
+
+    def test_notifies_remaining_members(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_membership(1, 20)
+        repo.seed_membership(1, 30)
+        recorder = Mock()
+
+        LeaveGroupUseCase(repo, recorder).execute(group_id=1, user_id=20)
+
+        recorder.record.assert_called_once_with(
+            [10, 30], "MEMBER_LEFT", {"group_id": 1, "user_id": 20}
+        )
+
+    def test_does_not_notify_when_no_members_remain(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10)
+        repo.seed_membership(1, 10)
+        recorder = Mock()
+
+        LeaveGroupUseCase(repo, recorder).execute(group_id=1, user_id=10)
+
+        recorder.record.assert_not_called()
+
+
+class TestJoinGroupByInviteTokenUseCase:
+    def test_joins_the_group_matching_the_token(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10, invite_token="tok-1")
+        repo.seed_membership(1, 10)
+
+        group = JoinGroupByInviteTokenUseCase(repo).execute(
+            invite_token="tok-1", user_id=20
+        )
+
+        assert group.id == 1
+        assert repo.is_group_member(1, 20) is True
+
+    def test_lets_a_user_join_even_when_they_have_group_invitations_disabled(self):
+        # The whole point of an invite link: it bypasses the by-username
+        # invite flow (and with it, allow_group_invitations) entirely, the
+        # same way a channel invite link doesn't check any such flag.
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Original", creator_id=10, invite_token="tok-1")
+        repo.seed_membership(1, 10)
+
+        group = JoinGroupByInviteTokenUseCase(repo).execute(
+            invite_token="tok-1", user_id=20
+        )
+
+        assert repo.is_group_member(group.id, 20) is True
+
+    def test_unknown_token_gets_not_found(self):
+        repo = InMemoryPrivateSpacesRepository()
+
+        with pytest.raises(GroupNotFoundError):
+            JoinGroupByInviteTokenUseCase(repo).execute(
+                invite_token="bogus", user_id=20
+            )
 
 
 class TestListGroupsUseCase:

@@ -97,20 +97,31 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
     <div className="dm-list-container">
       <h3>Direct Messages</h3>
       {!isCreating ? (
-        <button onClick={() => setIsCreating(true)} className="btn-primary">
+        <button
+          onClick={() => setIsCreating(true)}
+          className="btn btn-primary btn-block"
+          style={{ padding: '6px 10px', fontSize: 13 }}
+        >
           Start New DM
         </button>
       ) : (
-        <form onSubmit={(e) => void handleStartDm(e)} className="start-dm-form">
+        <form
+          onSubmit={(e) => void handleStartDm(e)}
+          className="start-dm-form"
+          style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+        >
           <input
             type="text"
             placeholder="Enter username..."
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             required
+            style={{ width: '100%', boxSizing: 'border-box' }}
           />
-          <button type="submit">Start</button>
-          <button type="button" onClick={() => setIsCreating(false)}>Cancel</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Start</button>
+            <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setIsCreating(false)}>Cancel</button>
+          </div>
         </form>
       )}
 
@@ -119,7 +130,7 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
       {error && <p role="alert">Couldn&apos;t load direct messages.</p>}
 
       {!isLoading && !error && (
-        <ul className="dm-list">
+        <ul className="dm-list" style={{ marginTop: 10 }}>
           {dms.map((dm) => {
             const otherId = otherParticipantId(dm, currentUserId);
             const otherProfile = profilesById[otherId];
@@ -129,10 +140,14 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
                 key={dm.direct_chat_id}
                 onClick={() => onSelectDm?.(dm)}
                 className="dm-item"
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
               >
                 {/* Falls back to the raw id (and a placeholder avatar) only
                     if the bulk lookup didn't resolve it, e.g. the other
-                    user was deleted. */}
+                    user was deleted. A flex row (rather than relying on
+                    inline flow) keeps the avatar and username on one line
+                    regardless of whether the avatar is an <img> or the
+                    text-initial fallback. */}
                 <Avatar avatarUrl={otherProfile?.avatar_url} label={label} />
                 <strong>{label}</strong>
               </li>

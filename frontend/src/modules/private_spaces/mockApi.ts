@@ -33,12 +33,14 @@ const mockGroups: Group[] = [
     name: 'Frontend Team',
     creator_id: MOCK_CURRENT_USER_ID,
     created_at: '2026-07-20T12:00:00Z',
+    invite_token: 'mock-invite-token-1',
   },
   {
     group_id: 2,
     name: 'General Chat',
     creator_id: 3001,
     created_at: '2026-07-22T08:00:00Z',
+    invite_token: 'mock-invite-token-2',
   },
 ];
 
@@ -121,11 +123,28 @@ export const createGroup = async (name: string): Promise<Group> => {
     name,
     creator_id: MOCK_CURRENT_USER_ID,
     created_at: new Date().toISOString(),
+    invite_token: `mock-invite-token-${nextGroupId}`,
   };
   mockGroups.push(group);
   mockGroupMembers[group.group_id] = [
     { user_id: MOCK_CURRENT_USER_ID, is_admin: true, joined_at: group.created_at },
   ];
+  return delay(group);
+};
+
+export const joinGroupByInviteToken = async (inviteToken: string): Promise<Group> => {
+  const group = mockGroups.find((g) => g.invite_token === inviteToken);
+  if (!group) {
+    throw new Error(`No mock group with invite token ${inviteToken}`);
+  }
+  const members = (mockGroupMembers[group.group_id] ??= []);
+  if (!members.some((m) => m.user_id === MOCK_CURRENT_USER_ID)) {
+    members.push({
+      user_id: MOCK_CURRENT_USER_ID,
+      is_admin: false,
+      joined_at: new Date().toISOString(),
+    });
+  }
   return delay(group);
 };
 

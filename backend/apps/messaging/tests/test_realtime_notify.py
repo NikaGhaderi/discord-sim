@@ -31,6 +31,7 @@ def test_send_message_notifies_the_topic_group_on_success():
     message = _message(topic_id=5)
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     repository.create_message.return_value = message
     notifier = Mock()
 
@@ -47,6 +48,9 @@ def test_send_message_notifies_the_topic_group_on_success():
             "content": "hello",
             "sent_at": "2026-01-01T00:00:00+00:00",
             "is_edited": False,
+            "topic_id": 5,
+            "group_id": None,
+            "direct_chat_id": None,
             "media": [],
         },
     )
@@ -67,6 +71,7 @@ def test_send_message_notification_payload_includes_attached_media():
     )
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     repository.create_message.return_value = message
     notifier = Mock()
 
@@ -101,6 +106,7 @@ def test_send_message_notifies_the_group_or_direct_chat_group_correctly():
 def test_send_message_works_with_no_notifier_configured():
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     repository.create_message.return_value = _message(topic_id=5)
 
     # No notifier passed -- must not raise (e.g. AttributeError on None).
@@ -124,7 +130,9 @@ def test_delete_message_notifies_after_the_repository_delete_succeeds():
 
     repository.delete_message.assert_called_once_with(1)
     notifier.notify.assert_called_once_with(
-        "topic_5", "MESSAGE_DELETED", {"base_message_id": 1}
+        "topic_5",
+        "MESSAGE_DELETED",
+        {"base_message_id": 1, "topic_id": 5, "group_id": None, "direct_chat_id": None},
     )
     assert calls == ["deleted", "notified"]
 
@@ -159,6 +167,7 @@ def test_delete_message_does_not_notify_when_the_delete_is_forbidden():
 def test_send_message_records_a_notification_for_every_other_member():
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     repository.create_message.return_value = _message(topic_id=5, sender_id=10)
     repository.list_target_member_ids.return_value = [11, 12]
     recorder = Mock()
@@ -179,6 +188,9 @@ def test_send_message_records_a_notification_for_every_other_member():
             "content": "hello",
             "sent_at": "2026-01-01T00:00:00+00:00",
             "is_edited": False,
+            "topic_id": 5,
+            "group_id": None,
+            "direct_chat_id": None,
             "media": [],
         },
     )
@@ -187,6 +199,7 @@ def test_send_message_records_a_notification_for_every_other_member():
 def test_send_message_works_with_no_notification_recorder_configured():
     repository = Mock()
     repository.can_access_target.return_value = True
+    repository.get_permissions_for_topic.return_value = ["SEND_MESSAGES"]
     repository.create_message.return_value = _message(topic_id=5)
 
     # No recorder passed -- must not raise, and must not even try to
@@ -212,7 +225,9 @@ def test_delete_message_records_a_notification_after_the_delete_succeeds():
         topic_id=5, group_id=None, direct_chat_id=None, user_id=10
     )
     recorder.record.assert_called_once_with(
-        [11, 12], "MESSAGE_DELETED", {"base_message_id": 1}
+        [11, 12],
+        "MESSAGE_DELETED",
+        {"base_message_id": 1, "topic_id": 5, "group_id": None, "direct_chat_id": None},
     )
 
 

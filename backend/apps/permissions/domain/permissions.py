@@ -8,6 +8,7 @@ class PermissionCode(str, Enum):
     DELETE_MESSAGES = "DELETE_MESSAGES"
     KICK_MEMBERS = "KICK_MEMBERS"
     SEND_MEDIA = "SEND_MEDIA"
+    SEND_MESSAGES = "SEND_MESSAGES"
 
     def __str__(self):
         return self.value

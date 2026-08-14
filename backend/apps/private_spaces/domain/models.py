@@ -20,6 +20,7 @@ class GroupEntity:
     creator_id: int
     id: int | None = None
     created_at: datetime | None = None
+    invite_token: str = ""
 
 
 @dataclass

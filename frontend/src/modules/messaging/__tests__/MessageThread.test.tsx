@@ -356,6 +356,51 @@ describe('MessageThread', () => {
     );
   });
 
+  it('hides the attach control when the caller has no SEND_MEDIA permission', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} hasSendMediaPermission={false} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('media-file-input')).not.toBeInTheDocument();
+    // Text sending must still work without the permission.
+    expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
+  });
+
+  it('hides the whole composer bar when the caller has no SEND_MESSAGES permission', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} hasSendMessagesPermission={false} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.queryByPlaceholderText('Type a message...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('media-file-input')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Add GIF')).not.toBeInTheDocument();
+  });
+
+  it('renders a message whose content is a GIF URL as an inline image', async () => {
+    const gifMessage = makeMessage({
+      base_message_id: 9,
+      content: 'https://media.giphy.com/abc/original.gif',
+    });
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([gifMessage]));
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+
+    const img = await screen.findByAltText('GIF');
+    expect(img).toHaveAttribute('src', 'https://media.giphy.com/abc/original.gif');
+    expect(screen.queryByText('https://media.giphy.com/abc/original.gif')).not.toBeInTheDocument();
+  });
+
+  it('shows the GIF picker button alongside attach when SEND_MEDIA is allowed', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('Add GIF')).toBeInTheDocument();
+  });
+
   it('sends a media-only message with no text at all', async () => {
     vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
     const sent = makeMessage({ base_message_id: 6, content: '' });

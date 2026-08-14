@@ -19,6 +19,7 @@
  */
 
 import { PALETTES } from './palettes';
+import { CURATED_THEMES } from './curatedThemes';
 
 interface RGB {
   r: number;
@@ -269,7 +270,8 @@ export function applyTheme(tokens: ThemeTokens): void {
 export function applyPaletteByName(name: string): void {
   const palette = PALETTES.find((p) => p.name === name);
   if (!palette) return;
-  applyTheme(deriveTheme(palette.colors));
+  const tokens = CURATED_THEMES[name] ?? deriveTheme(palette.colors);
+  applyTheme(tokens);
   window.localStorage.setItem(STORAGE_KEY, name);
 }
 

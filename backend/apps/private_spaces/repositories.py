@@ -1,3 +1,5 @@
+import secrets
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -29,6 +31,7 @@ def _to_group_entity(group: Group) -> GroupEntity:
         name=group.name,
         creator_id=group.creator_id,
         created_at=group.created_at,
+        invite_token=group.invite_token,
     )
 
 
@@ -84,17 +87,41 @@ class DjangoPrivateSpacesRepository(AbstractPrivateSpacesRepository):
 
     def list_groups_for_user(self, user_id: int) -> list[GroupEntity]:
         groups = Group.objects.filter(memberships__user_id=user_id).distinct()
-        return [_to_group_entity(g) for g in groups]
+        return [_to_group_entity(self._ensure_invite_token(g)) for g in groups]
+
+    def _ensure_invite_token(self, group: Group) -> Group:
+        # Backfills invite_token for groups created before it existed (its
+        # model default is "").
+        if not group.invite_token:
+            group.invite_token = secrets.token_urlsafe(16)
+            group.save(update_fields=("invite_token",))
+        return group
 
     def create_group_with_owner(self, name: str, creator_id: int) -> GroupEntity:
         with transaction.atomic():
-            group = Group.objects.create(name=name, creator_id=creator_id)
+            group = Group.objects.create(
+                name=name, creator_id=creator_id, invite_token=secrets.token_urlsafe(16)
+            )
             GroupMember.objects.create(group=group, user_id=creator_id, is_admin=True)
         return _to_group_entity(group)
 
     def get_group_for_member(self, group_id: int, user_id: int):
         group = Group.objects.filter(pk=group_id, memberships__user_id=user_id).first()
+        return _to_group_entity(self._ensure_invite_token(group)) if group else None
+
+    def get_group_by_invite_token(self, invite_token: str) -> GroupEntity | None:
+        group = Group.objects.filter(invite_token=invite_token).first()
         return _to_group_entity(group) if group else None
+
+    def add_group_member(self, group_id: int, user_id: int) -> GroupMemberEntity:
+        membership, _ = GroupMember.objects.get_or_create(
+            group_id=group_id, user_id=user_id, defaults={"is_admin": False}
+        )
+        return GroupMemberEntity(
+            user_id=membership.user_id,
+            is_admin=membership.is_admin,
+            joined_at=membership.joined_at,
+        )
 
     def update_group(self, group_id: int, name: str) -> GroupEntity:
         group = Group.objects.get(pk=group_id)

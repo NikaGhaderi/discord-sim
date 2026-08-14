@@ -25,6 +25,7 @@ from apps.private_spaces.application.use_cases.groups import (
     CreateGroupUseCase,
     DeleteGroupUseCase,
     GetGroupUseCase,
+    JoinGroupByInviteTokenUseCase,
     LeaveGroupUseCase,
     ListGroupMembersUseCase,
     ListGroupsUseCase,
@@ -47,6 +48,7 @@ from apps.private_spaces.domain.exceptions import (
     UserNotFoundError,
 )
 from apps.private_spaces.repositories import DjangoPrivateSpacesRepository
+from apps.notifications.recorder import DjangoNotificationRecorder
 from apps.users.repositories import DjangoProfileRepository
 
 
@@ -176,6 +178,19 @@ class GroupDetailView(APIView):
         return Response(status=204)
 
 
+class GroupJoinByInviteTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, invite_token):
+        try:
+            group = JoinGroupByInviteTokenUseCase(
+                DjangoPrivateSpacesRepository()
+            ).execute(invite_token=invite_token, user_id=request.user.id)
+        except GroupNotFoundError as exc:
+            return _detail(str(exc), 404)
+        return Response(GroupSerializer(group).data, status=200)
+
+
 class GroupMemberListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -194,9 +209,9 @@ class LeaveGroupView(APIView):
 
     def delete(self, request, group_id):
         try:
-            LeaveGroupUseCase(DjangoPrivateSpacesRepository()).execute(
-                group_id=group_id, user_id=request.user.id
-            )
+            LeaveGroupUseCase(
+                DjangoPrivateSpacesRepository(), DjangoNotificationRecorder()
+            ).execute(group_id=group_id, user_id=request.user.id)
         except GroupMembershipNotFoundError as exc:
             return _detail(str(exc), 404)
         return Response(status=204)
@@ -241,7 +256,7 @@ class GroupInvitationResponseView(APIView):
 
         try:
             invitation = RespondToInvitationUseCase(
-                DjangoPrivateSpacesRepository()
+                DjangoPrivateSpacesRepository(), DjangoNotificationRecorder()
             ).execute(
                 invitation_id=invitation_id,
                 user_id=request.user.id,

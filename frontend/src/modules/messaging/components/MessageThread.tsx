@@ -7,8 +7,18 @@ import { NewMessageData, MessageDeletedData } from '../../notifications';
 import { Composer } from './Composer';
 import { MessageActions } from './MessageActions';
 import { MediaUploadButton, SelectedFile } from './MediaUploadButton';
+import { GifPickerButton } from './GifPickerButton';
+import { UserProfileModal } from '@shared/components/UserProfileModal';
 
 const PAGE_SIZE = 20;
+
+/** True when a message's whole text content is nothing but a GIF URL (from
+ * the GIF picker, which sends the URL itself as the message content rather
+ * than a real file upload) -- rendered inline as an image instead of plain
+ * text. */
+function isGifUrl(content: string): boolean {
+  return /^https:\/\/\S+\.(gif|webp)(\?\S*)?$/i.test(content.trim());
+}
 
 interface MessageThreadProps {
   /** Exactly one of topicId/groupId/directChatId should be set -- whichever
@@ -24,6 +34,19 @@ interface MessageThreadProps {
    * sender-OR-permission rule. Editing is always sender-only regardless.
    * Not applicable to groups/DMs, which have no such permission concept. */
   hasDeletePermission?: boolean;
+  /** True if the current user holds SEND_MEDIA in this channel -- controls
+   * whether the attach button even renders. Defaults to true for groups/DMs,
+   * which have no such permission concept and always allow attachments.
+   * Without this, a member lacking SEND_MEDIA could pick a file, hit send,
+   * and get a silently text-only message with no error explaining why the
+   * attachment never made it (the backend rejects attach_media, but by then
+   * the message itself was already sent). */
+  hasSendMediaPermission?: boolean;
+  /** True if the current user holds SEND_MESSAGES in this channel -- hides
+   * the whole composer bar (not just attach/GIF) when false, rather than
+   * letting them type into a box that will just 403 on send. Defaults to
+   * true for groups/DMs, which have no such permission concept. */
+  hasSendMessagesPermission?: boolean;
   /** sender_id -> display name overrides (e.g. a channel nickname). The
    * backend never sends a real username on a message, only sender_id --
    * msg.sender_username is a client-side "User #<id>" placeholder computed
@@ -45,6 +68,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   directChatId,
   currentUserId,
   hasDeletePermission = false,
+  hasSendMediaPermission = true,
+  hasSendMessagesPermission = true,
   senderNameOverrides,
 }) => {
   const target: MessageTarget = {
@@ -60,6 +85,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<number | null>(null);
 
   // The backend orders messages oldest-first and paginates from the start,
   // so "give me the latest page" means first learning the total count, then
@@ -269,15 +295,31 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             className="flex flex-col bg-[var(--ws-bg-bubble)] text-[var(--ws-text-on-bubble)] p-3 rounded-lg"
           >
             <div className="flex items-center space-x-2">
-              <span className="font-semibold">
+              <button
+                type="button"
+                className="font-semibold hover:underline"
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}
+                onClick={() => setViewingUserId(msg.sender_id)}
+              >
                 {senderNameOverrides?.[msg.sender_id] ?? msg.sender_username}
+              </button>
+              <span
+                className="text-xs text-[var(--ws-text-secondary-on-bubble)]"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  padding: '1px 8px',
+                  borderRadius: 9999,
+                }}
+              >
+                {msg.sent_at}
+                {msg.is_edited && <span className="italic"> (edited)</span>}
               </span>
-              <span className="text-xs text-[var(--ws-text-secondary-on-bubble)]">{msg.sent_at}</span>
-              {msg.is_edited && (
-                <span className="text-xs text-[var(--ws-text-secondary-on-bubble)] italic">(edited)</span>
-              )}
             </div>
-            <p className="mt-1">{msg.content}</p>
+            {isGifUrl(msg.content) ? (
+              <img src={msg.content} alt="GIF" className="mt-1 max-w-xs max-h-64 rounded" />
+            ) : (
+              <p className="mt-1">{msg.content}</p>
+            )}
             {msg.media && msg.media.length > 0 && (
               <ul className="mt-1 space-y-1">
                 {msg.media.map((item, index) => {
@@ -323,9 +365,14 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         ))}
       </div>
 
-      {hasTarget && currentUserId !== undefined && (
+      {hasTarget && currentUserId !== undefined && hasSendMessagesPermission && (
         <div className="flex items-end gap-2 border-t p-2 border-[var(--ws-border)] bg-[var(--ws-bg)]">
-          <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
+          {hasSendMediaPermission && (
+            <>
+              <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
+              <GifPickerButton onSelectGif={(url) => void handleSendMessage(url)} />
+            </>
+          )}
           <div className="flex-1">
             <Composer
               onSendMessage={handleSendMessage}
@@ -334,6 +381,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             />
           </div>
         </div>
+      )}
+
+      {viewingUserId !== null && (
+        <UserProfileModal userId={viewingUserId} onClose={() => setViewingUserId(null)} />
       )}
     </div>
   );

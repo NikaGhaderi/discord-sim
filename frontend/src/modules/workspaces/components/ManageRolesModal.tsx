@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { profileApi, PublicProfile } from '../../profile';
 import { workspacesApi } from '../index';
-import { PERMISSION_LABELS, ChannelMember, Role } from '../types';
+import { PERMISSION_LABELS, ChannelMember, Role, RoleAssignment } from '../types';
 import { RoleFormModal } from './RoleFormModal';
 
 interface ManageRolesModalProps {
@@ -16,27 +17,92 @@ const isOwnerRole = (role: Role) => role.name.trim().toLowerCase() === OWNER_ROL
 export const ManageRolesModal: React.FC<ManageRolesModalProps> = ({ channelId, onClose }) => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [members, setMembers] = useState<ChannelMember[]>([]);
+  const [profilesById, setProfilesById] = useState<Record<number, PublicProfile>>({});
+  const [assignments, setAssignments] = useState<RoleAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [roleFormTarget, setRoleFormTarget] = useState<'new' | Role | null>(null);
   const [assignUserId, setAssignUserId] = useState<number | ''>('');
   const [assignRoleId, setAssignRoleId] = useState<number | ''>('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const loadAssignments = () =>
+    workspacesApi
+      .listRoleAssignments(channelId)
+      .then(setAssignments)
+      .catch(() => {
+        // Non-fatal -- roles/members still render even if this list fails
+        // (e.g. a transient error), rather than taking down the whole modal.
+      });
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([workspacesApi.listRoles(channelId), workspacesApi.listMembers(channelId)]).then(
-      ([roleList, memberList]) => {
+
+    // roles/members are the core of this modal -- a failure here is fatal
+    // and shown as an error. The assignments list and avatar lookups are
+    // each fetched (and caught) separately so a failure in either doesn't
+    // leave the whole modal stuck on "Loading roles..." forever.
+    Promise.all([workspacesApi.listRoles(channelId), workspacesApi.listMembers(channelId)])
+      .then(([roleList, memberList]) => {
         if (cancelled) return;
         setRoles(roleList);
         setMembers(memberList);
         setIsLoading(false);
-      }
-    );
+
+        workspacesApi
+          .listRoleAssignments(channelId)
+          .then((assignmentList) => {
+            if (!cancelled) setAssignments(assignmentList);
+          })
+          .catch(() => {
+            // Non-fatal, see loadAssignments above.
+          });
+
+        profileApi
+          .listPublicProfilesByIds(memberList.map((m) => m.user_id))
+          .then((profiles) => {
+            if (!cancelled) {
+              setProfilesById(Object.fromEntries(profiles.map((p) => [p.user_id, p])));
+            }
+          })
+          .catch(() => {
+            // Non-fatal -- rows fall back to "User #<id>" without a profile.
+          });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Failed to load roles.');
+          setIsLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
   }, [channelId]);
+
+  const handleRemoveAssignment = async (assignment: RoleAssignment) => {
+    const key = `${assignment.user_id}:${assignment.role_id}`;
+    setError(null);
+    setRemovingKey(key);
+    try {
+      await workspacesApi.removeRoleAssignment(
+        channelId,
+        assignment.user_id,
+        assignment.role_id
+      );
+      setAssignments((prev) =>
+        prev.filter(
+          (a) => !(a.user_id === assignment.user_id && a.role_id === assignment.role_id)
+        )
+      );
+    } catch {
+      setError('Failed to remove that role from the member.');
+    } finally {
+      setRemovingKey(null);
+    }
+  };
 
   const handleDeleteRole = async (role: Role) => {
     if (isOwnerRole(role)) return;
@@ -45,6 +111,7 @@ export const ManageRolesModal: React.FC<ManageRolesModalProps> = ({ channelId, o
     try {
       await workspacesApi.deleteRole(channelId, role.role_id);
       setRoles((prev) => prev.filter((r) => r.role_id !== role.role_id));
+      setAssignments((prev) => prev.filter((a) => a.role_id !== role.role_id));
     } catch {
       setError(`Failed to delete role "${role.name}".`);
     }
@@ -58,6 +125,7 @@ export const ManageRolesModal: React.FC<ManageRolesModalProps> = ({ channelId, o
       await workspacesApi.assignRole(channelId, assignUserId, assignRoleId);
       setAssignUserId('');
       setAssignRoleId('');
+      void loadAssignments();
     } catch {
       setError('Failed to assign role.');
     } finally {
@@ -66,7 +134,7 @@ export const ManageRolesModal: React.FC<ManageRolesModalProps> = ({ channelId, o
   };
 
   return (
-    <Modal title="Manage Roles" onClose={onClose}>
+    <Modal title="Manage Roles" onClose={onClose} className="modal-card--wide">
       {error && <p className="error-text">{error}</p>}
       {isLoading && <p className="list-row-subtitle">Loading roles...</p>}
 
@@ -142,6 +210,37 @@ export const ManageRolesModal: React.FC<ManageRolesModalProps> = ({ channelId, o
               Assign
             </button>
           </div>
+
+          <div className="sidebar-section-title" style={{ marginLeft: 0, marginTop: 20 }}>
+            Roles Assigned to Members
+          </div>
+          {assignments.length === 0 && (
+            <p className="list-row-subtitle">No roles assigned yet.</p>
+          )}
+          {assignments.map((assignment) => {
+            const role = roles.find((r) => r.role_id === assignment.role_id);
+            const member = profilesById[assignment.user_id];
+            const label = member?.username ?? `User #${assignment.user_id}`;
+            const key = `${assignment.user_id}:${assignment.role_id}`;
+            const isOwnerAssignment = role ? isOwnerRole(role) : false;
+            return (
+              <div key={key} className="list-row">
+                <div>
+                  <div className="list-row-title">{label}</div>
+                  <div className="list-row-subtitle">{role?.name ?? 'Unknown role'}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={isOwnerAssignment || removingKey === key}
+                  title={isOwnerAssignment ? 'The Owner role cannot be removed' : undefined}
+                  onClick={() => void handleRemoveAssignment(assignment)}
+                >
+                  {removingKey === key ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+            );
+          })}
         </>
       )}
 

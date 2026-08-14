@@ -16,6 +16,11 @@ interface ProfileViewProps {
    * calls this with the selected file. */
   onAvatarUpload?: (file: File) => void;
   isUploadingAvatar?: boolean;
+  /** True when rendered inside another component that already provides its
+   * own modal-card chrome (e.g. UserProfileModal, which wraps this in a
+   * <Modal>) -- skips ProfileView's own .modal-card wrapper so the two
+   * fixed-width cards don't nest and force a horizontal scrollbar. */
+  embedded?: boolean;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -24,6 +29,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onEditClick,
   onAvatarUpload,
   isUploadingAvatar = false,
+  embedded = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,7 +42,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const initial = profile.display_name.trim().charAt(0).toUpperCase() || '?';
 
   return (
-    <div className="modal-card" style={{ margin: '2rem auto' }}>
+    <div className={embedded ? undefined : 'modal-card'} style={embedded ? undefined : { margin: '2rem auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
         {profile.avatar_url ? (
           <a

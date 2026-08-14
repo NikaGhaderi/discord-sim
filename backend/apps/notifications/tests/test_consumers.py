@@ -94,6 +94,42 @@ def test_subscribed_client_receives_a_group_broadcast():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_client_auto_joins_its_own_personal_group_without_subscribing():
+    user = User.objects.create_user(
+        username="ws-personal", email="ws-personal@example.com"
+    )
+    token = _access_token_for(user)
+
+    async def scenario():
+        communicator = WebsocketCommunicator(application, f"/ws/stream/?token={token}")
+        connected, _ = await communicator.connect()
+        assert connected is True
+        # Deliberately never sends a subscribe message -- the personal
+        # group is joined automatically on connect (see NotificationBell's
+        # bell-badge live update).
+
+        layer = get_channel_layer()
+        await layer.group_send(
+            f"user_{user.id}",
+            {
+                "type": "broadcast.event",
+                "event_type": "NEW_NOTIFICATION",
+                "payload": {"notification_id": 1, "event_type": "NEW_MESSAGE"},
+            },
+        )
+
+        response = await communicator.receive_json_from(timeout=10)
+        assert response == {
+            "event_type": "NEW_NOTIFICATION",
+            "data": {"notification_id": 1, "event_type": "NEW_MESSAGE"},
+        }
+
+        await communicator.disconnect()
+
+    async_to_sync(scenario)()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_client_does_not_receive_broadcasts_for_groups_it_never_subscribed_to():
     user = User.objects.create_user(
         username="ws-unsubscribed", email="ws-unsubscribed@example.com"

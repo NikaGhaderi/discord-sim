@@ -4,7 +4,14 @@ import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { GroupInvitation } from '../types';
 
-export const InvitationList: React.FC = () => {
+interface InvitationListProps {
+  /** Fires right after an invitation is accepted, so the parent can refresh
+   * the group list instantly instead of the user having to reload the page
+   * to see the group they just joined. */
+  onAccepted?: () => void;
+}
+
+export const InvitationList: React.FC<InvitationListProps> = ({ onAccepted }) => {
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
   const [inviterProfilesById, setInviterProfilesById] = useState<
     Record<number, PublicProfile>
@@ -56,6 +63,7 @@ export const InvitationList: React.FC = () => {
     try {
       await privateSpacesApi.respondToInvitation(invitationId, status);
       setInvitations((prev) => prev.filter((inv) => inv.invitation_id !== invitationId));
+      if (status === 'ACCEPTED') onAccepted?.();
     } finally {
       setRespondingId(null);
     }

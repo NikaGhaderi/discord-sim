@@ -29,6 +29,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState<string | null>(null);
+  const [didCopyInviteLink, setDidCopyInviteLink] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +87,12 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
     }
   };
 
+  const handleCopyInviteLink = async () => {
+    await navigator.clipboard.writeText(group.invite_token);
+    setDidCopyInviteLink(true);
+    setTimeout(() => setDidCopyInviteLink(false), 2000);
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     const username = inviteUsername.trim();
@@ -131,8 +138,8 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
     <div className="group-settings-panel">
       {error && <p role="alert">{error}</p>}
 
-      <form onSubmit={handleSave}>
-        <label htmlFor="group-name-input">Group Name:</label>
+      <form onSubmit={handleSave} className="field">
+        <label htmlFor="group-name-input">Group Name</label>
         <input
           id="group-name-input"
           type="text"
@@ -140,10 +147,20 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           onChange={(e) => setName(e.target.value)}
           required
         />
-        <button type="submit" disabled={isSaving}>
-          Save Changes
+        <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save Name'}
         </button>
       </form>
+
+      <div className="field" style={{ marginTop: '20px' }}>
+        <label htmlFor="group-invite-link">Invite Link</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input id="group-invite-link" type="text" readOnly value={group.invite_token} />
+          <button type="button" className="btn" onClick={() => void handleCopyInviteLink()}>
+            {didCopyInviteLink ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </div>
 
       <div className="group-members" style={{ marginTop: '20px' }}>
         <h4>Members</h4>
@@ -156,7 +173,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
               const memberLabel =
                 memberProfile?.username ?? `User #${member.user_id}`;
               return (
-                <li key={member.user_id}>
+                <li key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Avatar avatarUrl={memberProfile?.avatar_url} label={memberLabel} size={20} />
                   {memberLabel}
                   {member.is_admin && ' (admin)'}
@@ -167,8 +184,8 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         )}
       </div>
 
-      <form onSubmit={(e) => void handleInvite(e)} style={{ marginTop: '20px' }}>
-        <label htmlFor="group-invite-username">Invite a member (username):</label>
+      <form onSubmit={(e) => void handleInvite(e)} className="field" style={{ marginTop: '20px' }}>
+        <label htmlFor="group-invite-username">Invite a member (username)</label>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             id="group-invite-username"
@@ -178,7 +195,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
             onChange={(e) => setInviteUsername(e.target.value)}
             required
           />
-          <button type="submit" disabled={isInviting}>
+          <button type="submit" className="btn btn-primary" disabled={isInviting}>
             {isInviting ? 'Sending...' : 'Send Invite'}
           </button>
         </div>
@@ -204,7 +221,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         <button
           type="button"
           onClick={() => void handleDeleteOrLeave('delete')}
-          className="btn-danger"
+          className="btn btn-danger"
           disabled={isRemoving}
         >
           Delete Group

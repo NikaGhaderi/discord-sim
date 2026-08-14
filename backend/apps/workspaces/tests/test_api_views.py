@@ -425,7 +425,7 @@ class TestMyPermissionsEndpoint:
             code.value for code in PermissionCode
         }
 
-    def test_plain_member_gets_no_permissions_by_default(self, users):
+    def test_plain_member_gets_send_messages_by_default(self, users):
         body = create_channel_via_api(users[0])
         member = users[1]
         authenticated_client(member).post(
@@ -437,7 +437,7 @@ class TestMyPermissionsEndpoint:
         )
 
         assert response.status_code == 200
-        assert response.json()["permissions"] == []
+        assert response.json()["permissions"] == ["SEND_MESSAGES"]
 
     def test_member_sees_permissions_granted_by_an_assigned_role(self, users):
         from apps.permissions.domain.permissions import PermissionCode
@@ -470,7 +470,10 @@ class TestMyPermissionsEndpoint:
         )
 
         assert response.status_code == 200
-        assert response.json()["permissions"] == [PermissionCode.DELETE_MESSAGES.value]
+        assert set(response.json()["permissions"]) == {
+            PermissionCode.DELETE_MESSAGES.value,
+            PermissionCode.SEND_MESSAGES.value,
+        }
 
     def test_non_member_gets_no_permissions_rather_than_an_error(self, users):
         body = create_channel_via_api(users[0])
@@ -777,6 +780,97 @@ class TestRoles:
         )
 
         assert response.status_code == 404
+
+    def test_owner_can_list_role_assignments_and_remove_one(self, users):
+        owner, target = users[0], users[1]
+        body = create_channel_via_api(owner)
+        authenticated_client(target).post(
+            f"/api/channels/{body['channel_id']}/join/", {}, format="json"
+        )
+        role = (
+            authenticated_client(owner)
+            .post(
+                f"/api/channels/{body['channel_id']}/roles/",
+                {"name": "Moderator", "permissions": []},
+                format="json",
+            )
+            .json()
+        )
+        authenticated_client(owner).post(
+            f"/api/channels/{body['channel_id']}/members/{target.id}/roles/",
+            {"role_id": role["role_id"]},
+            format="json",
+        )
+
+        listed = authenticated_client(owner).get(
+            f"/api/channels/{body['channel_id']}/role-assignments/"
+        )
+        assert listed.status_code == 200
+        assert {
+            (a["user_id"], a["role_id"]) for a in listed.json()
+        } >= {(target.id, role["role_id"])}
+
+        removed = authenticated_client(owner).delete(
+            f"/api/channels/{body['channel_id']}/members/{target.id}/roles/",
+            {"role_id": role["role_id"]},
+            format="json",
+        )
+        assert removed.status_code == 204
+
+        listed_after = authenticated_client(owner).get(
+            f"/api/channels/{body['channel_id']}/role-assignments/"
+        )
+        assert (target.id, role["role_id"]) not in {
+            (a["user_id"], a["role_id"]) for a in listed_after.json()
+        }
+
+    def test_removing_a_role_assignment_requires_manage_roles_permission(self, users):
+        owner, target, outsider = users[0], users[1], users[2]
+        body = create_channel_via_api(owner)
+        authenticated_client(target).post(
+            f"/api/channels/{body['channel_id']}/join/", {}, format="json"
+        )
+        ChannelMember.objects.create(channel_id=body["channel_id"], user=outsider)
+        role = (
+            authenticated_client(owner)
+            .post(
+                f"/api/channels/{body['channel_id']}/roles/",
+                {"name": "Moderator", "permissions": []},
+                format="json",
+            )
+            .json()
+        )
+        authenticated_client(owner).post(
+            f"/api/channels/{body['channel_id']}/members/{target.id}/roles/",
+            {"role_id": role["role_id"]},
+            format="json",
+        )
+
+        response = authenticated_client(outsider).delete(
+            f"/api/channels/{body['channel_id']}/members/{target.id}/roles/",
+            {"role_id": role["role_id"]},
+            format="json",
+        )
+
+        assert response.status_code == 403
+
+    def test_cannot_remove_the_owner_role_assignment_via_the_api(self, users):
+        owner = users[0]
+        body = create_channel_via_api(owner)
+        owner_role = (
+            authenticated_client(owner)
+            .get(f"/api/channels/{body['channel_id']}/roles/")
+            .json()
+        )
+        owner_role_id = next(r["role_id"] for r in owner_role if r["name"] == "Owner")
+
+        response = authenticated_client(owner).delete(
+            f"/api/channels/{body['channel_id']}/members/{owner.id}/roles/",
+            {"role_id": owner_role_id},
+            format="json",
+        )
+
+        assert response.status_code == 400
 
 
 @pytest.mark.django_db

@@ -22,7 +22,7 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({ onClose }) => {
   };
 
   return (
-    <Modal title="Theme" onClose={onClose}>
+    <Modal title="Theme" onClose={onClose} className="modal-card--wide">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto' }}>
         {PALETTES.map((palette) => (
           <button
@@ -34,11 +34,13 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({ onClose }) => {
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              justifyContent: 'flex-start',
+              justifyContent: 'space-between',
+              whiteSpace: 'nowrap',
               borderColor: selected === palette.name ? 'var(--ws-primary)' : undefined,
             }}
           >
-            <span style={{ display: 'flex', gap: 3, width: 112, flexShrink: 0 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{palette.name}</span>
+            <span style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
               {palette.colors.map((color, index) => (
                 <span
                   key={index}
@@ -53,7 +55,6 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({ onClose }) => {
                 />
               ))}
             </span>
-            <span>{palette.name}</span>
           </button>
         ))}
       </div>

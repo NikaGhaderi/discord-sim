@@ -2,6 +2,9 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NotificationFeed } from '../components/NotificationFeed';
 import { notificationsApi, socketClient } from '../index';
+import { profileApi } from '../../profile';
+import { workspacesApi } from '../../workspaces';
+import { privateSpacesApi } from '../../private_spaces';
 
 vi.mock('../index', () => ({
   notificationsApi: {
@@ -13,27 +16,49 @@ vi.mock('../index', () => ({
   },
 }));
 
+vi.mock('../../profile', () => ({
+  profileApi: {
+    listPublicProfilesByIds: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+vi.mock('../../workspaces', () => ({
+  workspacesApi: {
+    listChannels: vi.fn().mockResolvedValue([]),
+    listTopics: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+vi.mock('../../private_spaces', () => ({
+  privateSpacesApi: {
+    getGroup: vi.fn(),
+  },
+}));
+
 const notification = {
   notification_id: 1,
   event_type: 'NEW_MESSAGE',
-  payload: { content: 'hello there' },
+  payload: { content: 'hello there', sender_id: 7 },
   is_read: false,
   created_at: '2026-01-01T00:00:00Z',
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([]);
+  vi.mocked(workspacesApi.listChannels).mockResolvedValue([]);
+  vi.mocked(workspacesApi.listTopics).mockResolvedValue([]);
 });
 
 describe('NotificationFeed', () => {
-  it('shows a loading state, then the list', async () => {
+  it('shows a loading state, then the list with a formatted event label', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([notification]);
 
     render(<NotificationFeed />);
 
     expect(screen.getByText('Loading notifications...')).toBeInTheDocument();
     expect(await screen.findByText('hello there')).toBeInTheDocument();
-    expect(screen.getByText(/NEW_MESSAGE/)).toBeInTheDocument();
+    expect(screen.getByText(/New message/)).toBeInTheDocument();
   });
 
   it('shows an empty state with no notifications', async () => {
@@ -44,14 +69,43 @@ describe('NotificationFeed', () => {
     expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
   });
 
-  it('falls back to a JSON dump when the payload has no content field', async () => {
+  it('formats MESSAGE_DELETED and skips the raw JSON payload dump', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([
-      { ...notification, payload: { base_message_id: 42 } },
+      { ...notification, event_type: 'MESSAGE_DELETED', payload: { base_message_id: 42 } },
     ]);
 
     render(<NotificationFeed />);
 
-    expect(await screen.findByText('{"base_message_id":42}')).toBeInTheDocument();
+    expect(await screen.findByText(/Message deleted/)).toBeInTheDocument();
+    expect(screen.queryByText('{"base_message_id":42}')).not.toBeInTheDocument();
+  });
+
+  it('resolves the sender username into the notification context', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([notification]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 7, username: 'alice', display_name: 'Alice', avatar_url: null, bio: '' },
+    ]);
+
+    render(<NotificationFeed />);
+
+    expect(await screen.findByText(/from alice/)).toBeInTheDocument();
+  });
+
+  it('resolves the group name into the notification context', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([
+      { ...notification, payload: { content: 'hey team', sender_id: 7, group_id: 3 } },
+    ]);
+    vi.mocked(privateSpacesApi.getGroup).mockResolvedValueOnce({
+      group_id: 3,
+      name: 'Sprint Planning',
+      creator_id: 1,
+      created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'tok-sprint',
+    });
+
+    render(<NotificationFeed />);
+
+    expect(await screen.findByText(/in Sprint Planning/)).toBeInTheDocument();
   });
 
   it('subscribes to live NEW_NOTIFICATION events and prepends them', async () => {
@@ -66,13 +120,17 @@ describe('NotificationFeed', () => {
     await screen.findByText('No notifications yet.');
 
     act(() => {
-      pushLiveNotification({ ...notification, notification_id: 2, payload: { content: 'live one' } });
+      pushLiveNotification({
+        ...notification,
+        notification_id: 2,
+        payload: { content: 'live one', sender_id: 7 },
+      });
     });
 
     expect(await screen.findByText('live one')).toBeInTheDocument();
   });
 
-  it('marks a notification read optimistically, hiding the button', async () => {
+  it('removes the notification from the list once marked as read', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([notification]);
     vi.mocked(notificationsApi.markNotificationAsRead).mockResolvedValueOnce({
       ...notification,
@@ -84,11 +142,11 @@ describe('NotificationFeed', () => {
 
     fireEvent.click(screen.getByText('Mark as read'));
 
-    await waitFor(() => expect(screen.queryByText('Mark as read')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('hello there')).not.toBeInTheDocument());
     expect(notificationsApi.markNotificationAsRead).toHaveBeenCalledWith(1, true);
   });
 
-  it('rolls back the optimistic read state if the request fails', async () => {
+  it('keeps the notification removed locally even if persisting the read state fails', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([notification]);
     vi.mocked(notificationsApi.markNotificationAsRead).mockRejectedValueOnce(new Error('nope'));
 
@@ -97,6 +155,6 @@ describe('NotificationFeed', () => {
 
     fireEvent.click(screen.getByText('Mark as read'));
 
-    await waitFor(() => expect(screen.getByText('Mark as read')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('hello there')).not.toBeInTheDocument());
   });
 });

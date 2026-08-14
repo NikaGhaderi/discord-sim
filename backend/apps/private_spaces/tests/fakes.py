@@ -25,9 +25,11 @@ class InMemoryPrivateSpacesRepository(AbstractPrivateSpacesRepository):
     def seed_user(self, user_id: int) -> None:
         self._existing_user_ids.add(user_id)
 
-    def seed_group(self, group_id: int, name: str, creator_id: int) -> None:
+    def seed_group(
+        self, group_id: int, name: str, creator_id: int, invite_token: str = ""
+    ) -> None:
         self._groups[group_id] = GroupEntity(
-            id=group_id, name=name, creator_id=creator_id
+            id=group_id, name=name, creator_id=creator_id, invite_token=invite_token
         )
         self._memberships.setdefault(group_id, set())
 
@@ -80,7 +82,12 @@ class InMemoryPrivateSpacesRepository(AbstractPrivateSpacesRepository):
         ]
 
     def create_group_with_owner(self, name: str, creator_id: int) -> GroupEntity:
-        group = GroupEntity(id=self._next_group_id, name=name, creator_id=creator_id)
+        group = GroupEntity(
+            id=self._next_group_id,
+            name=name,
+            creator_id=creator_id,
+            invite_token=f"group-token-{self._next_group_id}",
+        )
         self._groups[group.id] = group
         self._memberships[group.id] = {creator_id}
         self._next_group_id += 1
@@ -90,6 +97,16 @@ class InMemoryPrivateSpacesRepository(AbstractPrivateSpacesRepository):
         if user_id not in self._memberships.get(group_id, set()):
             return None
         return self._groups.get(group_id)
+
+    def get_group_by_invite_token(self, invite_token: str):
+        for group in self._groups.values():
+            if group.invite_token == invite_token:
+                return group
+        return None
+
+    def add_group_member(self, group_id: int, user_id: int) -> GroupMemberEntity:
+        self._memberships.setdefault(group_id, set()).add(user_id)
+        return GroupMemberEntity(user_id=user_id, is_admin=False)
 
     def update_group(self, group_id: int, name: str) -> GroupEntity:
         group = self._groups[group_id]

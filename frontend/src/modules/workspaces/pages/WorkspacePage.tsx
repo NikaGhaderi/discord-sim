@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { workspacesApi } from '../index';
-import { Channel, ChannelMember } from '../types';
+import { Channel, ChannelMember, ChannelPermission } from '../types';
 import { ChannelSidebar } from '../components/ChannelSidebar';
 import { ChannelSettingsModal } from '../components/ChannelSettingsModal';
+import { MemberListModal } from '../components/MemberListModal';
 import { TopicTabs } from '../components/TopicTabs';
 import { profileApi } from '../../profile';
 import { messagingApi } from '../../messaging';
@@ -18,9 +19,11 @@ export const WorkspacePage: React.FC = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMemberListOpen, setIsMemberListOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<OpenPanel>('none');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [hasDeletePermission, setHasDeletePermission] = useState(false);
+  const [myChannelPermissions, setMyChannelPermissions] = useState<ChannelPermission[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [memberNicknames, setMemberNicknames] = useState<Record<number, string>>({});
 
@@ -34,11 +37,15 @@ export const WorkspacePage: React.FC = () => {
   useEffect(() => {
     if (selectedChannelId === null) {
       setHasDeletePermission(false);
+      setMyChannelPermissions([]);
       return;
     }
     let cancelled = false;
     workspacesApi.getMyPermissions(selectedChannelId).then((permissions) => {
-      if (!cancelled) setHasDeletePermission(permissions.includes('DELETE_MESSAGES'));
+      if (!cancelled) {
+        setHasDeletePermission(permissions.includes('DELETE_MESSAGES'));
+        setMyChannelPermissions(permissions);
+      }
     });
     return () => {
       cancelled = true;
@@ -120,7 +127,16 @@ export const WorkspacePage: React.FC = () => {
         {selectedChannel ? (
           <>
             <header className="main-header">
-              <strong># {selectedChannel.name}</strong>
+              <span
+                onClick={() => setIsMemberListOpen(true)}
+                style={{ cursor: 'pointer' }}
+                title="View channel members"
+                aria-label={`View members of ${selectedChannel.name}`}
+                role="button"
+                tabIndex={0}
+              >
+                <strong># {selectedChannel.name}</strong>
+              </span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className="btn" onClick={() => setOpenPanel('search')}>
                   Search
@@ -144,6 +160,8 @@ export const WorkspacePage: React.FC = () => {
                 topicId={activeTopicId}
                 currentUserId={currentUserId ?? undefined}
                 hasDeletePermission={hasDeletePermission}
+                hasSendMediaPermission={myChannelPermissions.includes('SEND_MEDIA')}
+                hasSendMessagesPermission={myChannelPermissions.includes('SEND_MESSAGES')}
                 senderNameOverrides={memberNicknames}
               />
             </div>
@@ -157,6 +175,7 @@ export const WorkspacePage: React.FC = () => {
         <ChannelSettingsModal
           channel={selectedChannel}
           currentUserId={currentUserId ?? undefined}
+          myPermissions={myChannelPermissions}
           onClose={() => setIsSettingsOpen(false)}
           onUpdated={(channelId, name) => {
             setChannels((prev) =>
@@ -171,6 +190,15 @@ export const WorkspacePage: React.FC = () => {
             removeChannelFromList(channelId);
             setIsSettingsOpen(false);
           }}
+        />
+      )}
+
+      {isMemberListOpen && selectedChannel && (
+        <MemberListModal
+          channelId={selectedChannel.channel_id}
+          currentUserId={currentUserId ?? undefined}
+          canKick={myChannelPermissions.includes('KICK_MEMBERS')}
+          onClose={() => setIsMemberListOpen(false)}
         />
       )}
 

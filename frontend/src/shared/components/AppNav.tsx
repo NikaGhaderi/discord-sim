@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../modules/identity/context';
 import { ThemePicker } from './ThemePicker';
 import { NotificationBell } from './NotificationBell';
@@ -19,7 +19,17 @@ const linkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => 
  */
 export const AppNav: React.FC = () => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    // isAuthenticated flipping to false doesn't change the current route by
+    // itself (no route guards exist) -- without this, logging out from
+    // /workspaces or /private-spaces left the same page mounted instead of
+    // landing back on the login form.
+    navigate('/', { replace: true });
+  };
 
   return (
     <nav
@@ -47,7 +57,7 @@ export const AppNav: React.FC = () => {
         <button type="button" className="btn" onClick={() => setIsThemePickerOpen(true)}>
           Theme
         </button>
-        <button type="button" className="btn btn-danger" onClick={() => void logout()}>
+        <button type="button" className="btn btn-danger" onClick={() => void handleLogout()}>
           Logout
         </button>
       </div>

@@ -5,11 +5,13 @@ import { CreateChannelModal } from '../components/CreateChannelModal';
 import { JoinChannelModal } from '../components/JoinChannelModal';
 import { ChannelSettingsModal } from '../components/ChannelSettingsModal';
 import { ManageRolesModal } from '../components/ManageRolesModal';
+import { MemberListModal } from '../components/MemberListModal';
 import { RoleFormModal } from '../components/RoleFormModal';
 import { TopicManagerModal } from '../components/TopicManagerModal';
 import { WorkspacePage } from '../pages/WorkspacePage';
 import { workspacesApi } from '../index';
 import { messagingApi } from '../../messaging';
+import { profileApi } from '../../profile';
 import { Channel, ChannelMember, Role, Topic, CHANNEL_PERMISSIONS } from '../types';
 
 vi.mock('../index', () => ({
@@ -31,6 +33,8 @@ vi.mock('../index', () => ({
     updateRole: vi.fn(),
     deleteRole: vi.fn(),
     assignRole: vi.fn(),
+    listRoleAssignments: vi.fn().mockResolvedValue([]),
+    removeRoleAssignment: vi.fn(),
     listTopics: vi.fn().mockResolvedValue([]),
     getTopic: vi.fn(),
     createTopic: vi.fn(),
@@ -65,7 +69,7 @@ vi.mock('../../profile', () => ({
     }),
     updateProfile: vi.fn(),
     getPublicProfile: vi.fn(),
-    listPublicProfilesByIds: vi.fn(),
+    listPublicProfilesByIds: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -253,6 +257,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={onUpdated}
         onDeleted={vi.fn()}
@@ -270,6 +275,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -291,6 +297,7 @@ describe('ChannelSettingsModal', () => {
       <ChannelSettingsModal
         channel={channel}
         currentUserId={42}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -317,6 +324,7 @@ describe('ChannelSettingsModal', () => {
       <ChannelSettingsModal
         channel={channel}
         currentUserId={42}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -333,6 +341,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={onDeleted}
@@ -352,6 +361,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={onDeleted}
@@ -370,6 +380,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -389,6 +400,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -412,6 +424,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_ROLES', 'MANAGE_TOPICS']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -426,6 +439,27 @@ describe('ChannelSettingsModal', () => {
 });
 
 describe('ManageRolesModal', () => {
+  it('still shows roles/members even when listRoleAssignments fails, instead of loading forever', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockRejectedValueOnce(new Error('nope'));
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Moderator', { selector: '.list-row-title' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading roles...')).not.toBeInTheDocument();
+  });
+
+  it('shows an error instead of loading forever when roles/members fail to load', async () => {
+    vi.mocked(workspacesApi.listRoles).mockRejectedValueOnce(new Error('nope'));
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([]);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Failed to load roles.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading roles...')).not.toBeInTheDocument();
+  });
+
   it('loads and lists roles and members', async () => {
     vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
     vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
@@ -488,16 +522,128 @@ describe('ManageRolesModal', () => {
 
     await waitFor(() => expect(workspacesApi.assignRole).toHaveBeenCalledWith(1, 42, 2));
   });
+
+  it('lists who holds which role and lets an admin remove one', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockResolvedValueOnce([
+      { userrole_id: 1, user_id: 42, role_id: 2, assigned_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+    vi.mocked(workspacesApi.removeRoleAssignment).mockResolvedValueOnce(undefined);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('sprint_master')).toBeInTheDocument();
+    const row = screen.getByText('sprint_master').closest('.list-row') as HTMLElement;
+    expect(within(row).getByText('Moderator')).toBeInTheDocument();
+
+    fireEvent.click(within(row).getByText('Remove'));
+
+    await waitFor(() =>
+      expect(workspacesApi.removeRoleAssignment).toHaveBeenCalledWith(1, 42, 2)
+    );
+    await waitFor(() => expect(screen.queryByText('sprint_master')).not.toBeInTheDocument());
+  });
+
+  it('disables removing the Owner role assignment', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockResolvedValueOnce([
+      { userrole_id: 1, user_id: 9, role_id: 1, assigned_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 9, username: 'owner_user', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    const row = (await screen.findByText('owner_user')).closest('.list-row') as HTMLElement;
+    expect(within(row).getByText('Remove')).toBeDisabled();
+  });
+});
+
+describe('MemberListModal', () => {
+  it('lists members and filters by search', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      member,
+      { channel_id: 1, user_id: 43, nickname_in_channel: 'Other', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+      { user_id: 43, username: 'random_dev', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<MemberListModal channelId={1} canKick={false} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('sprint_master')).toBeInTheDocument();
+    expect(screen.getByText('random_dev')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search members...'), {
+      target: { value: 'sprint' },
+    });
+
+    expect(screen.getByText('sprint_master')).toBeInTheDocument();
+    expect(screen.queryByText('random_dev')).not.toBeInTheDocument();
+  });
+
+  it('hides the Kick button without KICK_MEMBERS, shows it with', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValue([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    const { unmount } = render(
+      <MemberListModal channelId={1} canKick={false} onClose={vi.fn()} />
+    );
+    await screen.findByText('sprint_master');
+    expect(screen.queryByText('Kick')).not.toBeInTheDocument();
+    unmount();
+
+    render(<MemberListModal channelId={1} canKick onClose={vi.fn()} />);
+    await screen.findByText('sprint_master');
+    expect(screen.getByText('Kick')).toBeInTheDocument();
+  });
+
+  it('kicks a member and removes them from the list', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+    vi.mocked(workspacesApi.kickMember).mockResolvedValueOnce(undefined);
+
+    render(<MemberListModal channelId={1} canKick onClose={vi.fn()} />);
+    await screen.findByText('sprint_master');
+
+    fireEvent.click(screen.getByText('Kick'));
+
+    await waitFor(() => expect(workspacesApi.kickMember).toHaveBeenCalledWith(1, 42));
+    await waitFor(() => expect(screen.queryByText('sprint_master')).not.toBeInTheDocument());
+  });
+
+  it('never shows a Kick button for the current user themselves', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<MemberListModal channelId={1} currentUserId={42} canKick onClose={vi.fn()} />);
+
+    await screen.findByText('sprint_master');
+    expect(screen.queryByText('Kick')).not.toBeInTheDocument();
+  });
 });
 
 describe('RoleFormModal', () => {
-  it('lists exactly the 6 SCRUM-18 permission codes, no more, no fewer', () => {
+  it('lists exactly the permission catalog codes, no more, no fewer', () => {
     render(
       <RoleFormModal channelId={1} existingRole={null} onClose={vi.fn()} onSaved={vi.fn()} />
     );
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(CHANNEL_PERMISSIONS.length);
-    expect(checkboxes).toHaveLength(6);
+    expect(checkboxes).toHaveLength(7);
   });
 
   it('creates a new role with the selected permissions', async () => {

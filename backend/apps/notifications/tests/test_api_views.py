@@ -3,7 +3,7 @@ from rest_framework.test import APIClient
 
 from apps.authentication.models import User
 from apps.notifications.models import Notification
-from apps.workspaces.models import Channel, ChannelMember, Topic
+from apps.workspaces.models import Channel, ChannelMember, ChannelRole, Topic, UserChannelRole
 
 
 @pytest.fixture
@@ -109,6 +109,13 @@ def test_sending_a_message_creates_a_retrievable_notification_for_the_other_memb
     topic = Topic.objects.create(title="Topic", channel=channel)
     ChannelMember.objects.create(channel=channel, user=sender)
     ChannelMember.objects.create(channel=channel, user=member)
+    # Mirrors CreateChannelUseCase's real default: an "@everyone" role
+    # granting SEND_MESSAGES, assigned to every member.
+    everyone_role = ChannelRole.objects.create(
+        channel=channel, name="@everyone", permissions=["SEND_MESSAGES"]
+    )
+    for user in (sender, member):
+        UserChannelRole.objects.create(channel=channel, user=user, role=everyone_role)
 
     send_response = client_for(sender).post(
         "/api/messages/",
