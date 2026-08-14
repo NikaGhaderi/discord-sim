@@ -24,9 +24,7 @@ def test_record_persists_a_notification_per_recipient():
 def test_record_also_pushes_a_live_new_notification_event_per_recipient():
     owner = User.objects.create_user(username="owner2", email="owner2@example.com")
 
-    with patch(
-        "apps.notifications.recorder.ChannelsRealtimeNotifier"
-    ) as MockNotifier:
+    with patch("apps.notifications.recorder.ChannelsRealtimeNotifier") as MockNotifier:
         DjangoNotificationRecorder().record(
             [owner.id], "NEW_MESSAGE", {"base_message_id": 1}
         )

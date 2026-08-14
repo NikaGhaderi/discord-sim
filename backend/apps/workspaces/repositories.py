@@ -310,7 +310,9 @@ class DjangoChannelRepository(AbstractChannelRepository):
         assignments = UserChannelRole.objects.filter(channel_id=channel_id)
         return [_to_user_role_entity(a) for a in assignments]
 
-    def remove_role_assignment(self, channel_id: int, user_id: int, role_id: int) -> bool:
+    def remove_role_assignment(
+        self, channel_id: int, user_id: int, role_id: int
+    ) -> bool:
         deleted_count, _ = UserChannelRole.objects.filter(
             channel_id=channel_id, user_id=user_id, role_id=role_id
         ).delete()

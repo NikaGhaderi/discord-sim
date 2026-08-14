@@ -93,4 +93,6 @@ class AbstractNotificationRecorder(Protocol):
     duplicated here (rather than imported) so private_spaces doesn't take a
     dependency on the messaging app just for this one interface."""
 
-    def record(self, recipient_ids: list[int], event_type: str, payload: dict) -> None: ...
+    def record(
+        self, recipient_ids: list[int], event_type: str, payload: dict
+    ) -> None: ...

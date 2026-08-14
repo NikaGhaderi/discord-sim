@@ -250,9 +250,7 @@ class InMemoryChannelRepository(AbstractChannelRepository):
         return user_role
 
     def list_role_assignments(self, channel_id: int) -> list[UserChannelRoleEntity]:
-        return [
-            ur for ur in self._user_roles.values() if ur.channel_id == channel_id
-        ]
+        return [ur for ur in self._user_roles.values() if ur.channel_id == channel_id]
 
     def remove_role_assignment(
         self, channel_id: int, user_id: int, role_id: int

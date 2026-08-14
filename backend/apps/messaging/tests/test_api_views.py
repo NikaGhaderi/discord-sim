@@ -43,9 +43,7 @@ def spaces(users):
         channel=channel, name="@everyone", permissions=["SEND_MESSAGES"]
     )
     for member in (sender, participant, moderator):
-        UserChannelRole.objects.create(
-            channel=channel, user=member, role=everyone_role
-        )
+        UserChannelRole.objects.create(channel=channel, user=member, role=everyone_role)
     group = Group.objects.create(name="Group", creator=sender)
     GroupMember.objects.create(group=group, user=sender, is_admin=True)
     GroupMember.objects.create(group=group, user=participant)

@@ -431,4 +431,6 @@ class ChannelRoleAssignmentListView(APIView):
     )
     def get(self, request, channel_id):
         assignments = DjangoChannelRepository().list_role_assignments(channel_id)
-        return Response(UserChannelRoleSerializer(assignments, many=True).data, status=200)
+        return Response(
+            UserChannelRoleSerializer(assignments, many=True).data, status=200
+        )

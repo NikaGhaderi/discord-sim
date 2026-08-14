@@ -705,7 +705,9 @@ class TestRemoveRoleAssignmentUseCase:
         )
         AssignRoleUseCase(repo).execute(channel.id, 1, 2, role.id)
 
-        RemoveRoleAssignmentUseCase(repo).execute(channel.id, user_id=2, role_id=role.id)
+        RemoveRoleAssignmentUseCase(repo).execute(
+            channel.id, user_id=2, role_id=role.id
+        )
 
         assert PermissionCode.KICK_MEMBERS.value not in repo.get_user_permissions(
             channel.id, 2

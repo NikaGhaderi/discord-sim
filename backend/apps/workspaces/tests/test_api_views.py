@@ -806,9 +806,9 @@ class TestRoles:
             f"/api/channels/{body['channel_id']}/role-assignments/"
         )
         assert listed.status_code == 200
-        assert {
-            (a["user_id"], a["role_id"]) for a in listed.json()
-        } >= {(target.id, role["role_id"])}
+        assert {(a["user_id"], a["role_id"]) for a in listed.json()} >= {
+            (target.id, role["role_id"])
+        }
 
         removed = authenticated_client(owner).delete(
             f"/api/channels/{body['channel_id']}/members/{target.id}/roles/",

@@ -3,7 +3,13 @@ from rest_framework.test import APIClient
 
 from apps.authentication.models import User
 from apps.notifications.models import Notification
-from apps.workspaces.models import Channel, ChannelMember, ChannelRole, Topic, UserChannelRole
+from apps.workspaces.models import (
+    Channel,
+    ChannelMember,
+    ChannelRole,
+    Topic,
+    UserChannelRole,
+)
 
 
 @pytest.fixture

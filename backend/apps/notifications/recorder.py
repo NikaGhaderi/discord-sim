@@ -23,10 +23,10 @@ class DjangoNotificationRecorder(AbstractNotificationRecorder):
                     "event_type": notification.event_type,
                     "payload": notification.payload,
                     "is_read": notification.is_read,
-                    "created_at": notification.created_at.isoformat().replace(
-                        "+00:00", "Z"
-                    )
-                    if notification.created_at
-                    else None,
+                    "created_at": (
+                        notification.created_at.isoformat().replace("+00:00", "Z")
+                        if notification.created_at
+                        else None
+                    ),
                 },
             )

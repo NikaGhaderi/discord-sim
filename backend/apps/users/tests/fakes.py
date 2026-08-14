@@ -35,4 +35,6 @@ class InMemoryProfileRepository(AbstractProfileRepository):
         return updated_profile
 
     def update_avatar(self, user_id: int, uploaded_file) -> UserProfileEntity:
-        return self.update_profile(user_id, avatar_url=f"/media/avatars/{uploaded_file.name}")
+        return self.update_profile(
+            user_id, avatar_url=f"/media/avatars/{uploaded_file.name}"
+        )

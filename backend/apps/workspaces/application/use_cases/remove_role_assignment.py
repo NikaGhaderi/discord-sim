@@ -23,7 +23,9 @@ class RemoveRoleAssignmentUseCase:
         if role.channel_id != channel_id:
             raise ChannelRoleNotFoundError("Role not found in this channel.")
         if role.name == OWNER_ROLE_NAME:
-            raise OwnerRoleImmutableError("The Owner role assignment cannot be removed.")
+            raise OwnerRoleImmutableError(
+                "The Owner role assignment cannot be removed."
+            )
 
         removed = self._repository.remove_role_assignment(channel_id, user_id, role_id)
         if not removed:
