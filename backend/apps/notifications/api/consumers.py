@@ -8,6 +8,13 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             return
         self.groups_joined = []
         await self.accept()
+        # Every connected user auto-joins their own personal group so bell
+        # notifications (NEW_NOTIFICATION) reach them without an explicit
+        # subscribe -- unlike topic/group/direct_chat rooms below, which the
+        # client only joins for whatever it's actively viewing.
+        user_group = f"user_{self.scope['user'].id}"
+        await self.channel_layer.group_add(user_group, self.channel_name)
+        self.groups_joined.append(user_group)
         # client sends {"action": "subscribe", "group": "topic_5"} per room it's viewing
 
     async def receive_json(self, content):

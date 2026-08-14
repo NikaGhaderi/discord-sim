@@ -102,7 +102,13 @@ export const listMembers = async (
 export const getMyPermissions = async (
   _channelId: number
 ): Promise<ChannelPermission[]> => {
-  return Promise.resolve(['DELETE_MESSAGES', 'MANAGE_TOPICS', 'KICK_MEMBERS', 'SEND_MEDIA']);
+  return Promise.resolve([
+    'DELETE_MESSAGES',
+    'MANAGE_TOPICS',
+    'KICK_MEMBERS',
+    'SEND_MEDIA',
+    'SEND_MESSAGES',
+  ]);
 };
 
 export const updateMemberNickname = async (
@@ -172,6 +178,22 @@ export const assignRole = async (
     role_id: roleId,
     assigned_at: now(),
   });
+};
+
+export const listRoleAssignments = async (
+  _channelId: number
+): Promise<RoleAssignment[]> => {
+  return Promise.resolve([
+    { userrole_id: 1, user_id: MOCK_MEMBER.user_id, role_id: MOCK_ROLE.role_id, assigned_at: now() },
+  ]);
+};
+
+export const removeRoleAssignment = async (
+  _channelId: number,
+  _userId: number,
+  _roleId: number
+): Promise<void> => {
+  return Promise.resolve();
 };
 
 export const listTopics = async (_channelId: number): Promise<Topic[]> => {

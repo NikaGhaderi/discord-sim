@@ -5,11 +5,13 @@ import { CreateChannelModal } from '../components/CreateChannelModal';
 import { JoinChannelModal } from '../components/JoinChannelModal';
 import { ChannelSettingsModal } from '../components/ChannelSettingsModal';
 import { ManageRolesModal } from '../components/ManageRolesModal';
+import { MemberListModal } from '../components/MemberListModal';
 import { RoleFormModal } from '../components/RoleFormModal';
 import { TopicManagerModal } from '../components/TopicManagerModal';
 import { WorkspacePage } from '../pages/WorkspacePage';
 import { workspacesApi } from '../index';
 import { messagingApi } from '../../messaging';
+import { profileApi } from '../../profile';
 import { Channel, ChannelMember, Role, Topic, CHANNEL_PERMISSIONS } from '../types';
 
 vi.mock('../index', () => ({
@@ -22,7 +24,7 @@ vi.mock('../index', () => ({
     joinChannel: vi.fn(),
     joinChannelByInviteToken: vi.fn(),
     leaveChannel: vi.fn(),
-    listMembers: vi.fn(),
+    listMembers: vi.fn().mockResolvedValue([]),
     getMyPermissions: vi.fn().mockResolvedValue([]),
     updateMemberNickname: vi.fn(),
     kickMember: vi.fn(),
@@ -31,7 +33,9 @@ vi.mock('../index', () => ({
     updateRole: vi.fn(),
     deleteRole: vi.fn(),
     assignRole: vi.fn(),
-    listTopics: vi.fn(),
+    listRoleAssignments: vi.fn().mockResolvedValue([]),
+    removeRoleAssignment: vi.fn(),
+    listTopics: vi.fn().mockResolvedValue([]),
     getTopic: vi.fn(),
     createTopic: vi.fn(),
     deleteTopic: vi.fn(),
@@ -65,7 +69,7 @@ vi.mock('../../profile', () => ({
     }),
     updateProfile: vi.fn(),
     getPublicProfile: vi.fn(),
-    listPublicProfilesByIds: vi.fn(),
+    listPublicProfilesByIds: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -173,22 +177,6 @@ describe('ChannelSidebar', () => {
     expect(screen.getByText('Join a Channel')).toBeInTheDocument();
   });
 
-  it('opens the notification feed from the sidebar nav', async () => {
-    render(
-      <ChannelSidebar
-        channels={[]}
-        selectedChannelId={null}
-        onSelectChannel={vi.fn()}
-        onChannelCreated={vi.fn()}
-        onChannelJoined={vi.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByText('Notifications'));
-
-    expect(screen.getByText('Notifications', { selector: 'h2' })).toBeInTheDocument();
-    expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
-  });
 });
 
 describe('CreateChannelModal', () => {
@@ -269,6 +257,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={onUpdated}
         onDeleted={vi.fn()}
@@ -282,12 +271,77 @@ describe('ChannelSettingsModal', () => {
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(1, 'renamed'));
   });
 
+  it('does not render the nickname field when currentUserId is unknown', () => {
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        myPermissions={[]}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByLabelText(/my nickname/i)).not.toBeInTheDocument();
+  });
+
+  it('saves the current user\'s own nickname for the channel', async () => {
+    vi.mocked(workspacesApi.updateMemberNickname).mockResolvedValueOnce({
+      channel_id: 1,
+      user_id: 42,
+      nickname_in_channel: 'Sprint Master',
+      joined_at: '2026-01-01T00:00:00Z',
+    });
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        currentUserId={42}
+        myPermissions={[]}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/my nickname/i), {
+      target: { value: 'Sprint Master' },
+    });
+    fireEvent.click(screen.getByText('Save Nickname'));
+
+    await waitFor(() => {
+      expect(workspacesApi.updateMemberNickname).toHaveBeenCalledWith(1, 42, 'Sprint Master');
+    });
+    expect(await screen.findByText('Saved!')).toBeInTheDocument();
+  });
+
+  it('pre-fills the nickname field with the current value, if one is already set', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      { channel_id: 1, user_id: 42, nickname_in_channel: 'Existing Nick', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    render(
+      <ChannelSettingsModal
+        channel={channel}
+        currentUserId={42}
+        myPermissions={[]}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onLeft={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByDisplayValue('Existing Nick')).toBeInTheDocument();
+  });
+
   it('asks for confirmation before deleting, and does nothing if declined', async () => {
     vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
     const onDeleted = vi.fn();
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={onDeleted}
@@ -307,6 +361,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_CHANNEL']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={onDeleted}
@@ -325,6 +380,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -344,6 +400,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={[]}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -367,6 +424,7 @@ describe('ChannelSettingsModal', () => {
     render(
       <ChannelSettingsModal
         channel={channel}
+        myPermissions={['MANAGE_ROLES', 'MANAGE_TOPICS']}
         onClose={vi.fn()}
         onUpdated={vi.fn()}
         onDeleted={vi.fn()}
@@ -381,6 +439,27 @@ describe('ChannelSettingsModal', () => {
 });
 
 describe('ManageRolesModal', () => {
+  it('still shows roles/members even when listRoleAssignments fails, instead of loading forever', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockRejectedValueOnce(new Error('nope'));
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Moderator', { selector: '.list-row-title' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading roles...')).not.toBeInTheDocument();
+  });
+
+  it('shows an error instead of loading forever when roles/members fail to load', async () => {
+    vi.mocked(workspacesApi.listRoles).mockRejectedValueOnce(new Error('nope'));
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([]);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Failed to load roles.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading roles...')).not.toBeInTheDocument();
+  });
+
   it('loads and lists roles and members', async () => {
     vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
     vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
@@ -443,16 +522,128 @@ describe('ManageRolesModal', () => {
 
     await waitFor(() => expect(workspacesApi.assignRole).toHaveBeenCalledWith(1, 42, 2));
   });
+
+  it('lists who holds which role and lets an admin remove one', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole, modRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockResolvedValueOnce([
+      { userrole_id: 1, user_id: 42, role_id: 2, assigned_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+    vi.mocked(workspacesApi.removeRoleAssignment).mockResolvedValueOnce(undefined);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('sprint_master')).toBeInTheDocument();
+    const row = screen.getByText('sprint_master').closest('.list-row') as HTMLElement;
+    expect(within(row).getByText('Moderator')).toBeInTheDocument();
+
+    fireEvent.click(within(row).getByText('Remove'));
+
+    await waitFor(() =>
+      expect(workspacesApi.removeRoleAssignment).toHaveBeenCalledWith(1, 42, 2)
+    );
+    await waitFor(() => expect(screen.queryByText('sprint_master')).not.toBeInTheDocument());
+  });
+
+  it('disables removing the Owner role assignment', async () => {
+    vi.mocked(workspacesApi.listRoles).mockResolvedValueOnce([ownerRole]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([]);
+    vi.mocked(workspacesApi.listRoleAssignments).mockResolvedValueOnce([
+      { userrole_id: 1, user_id: 9, role_id: 1, assigned_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 9, username: 'owner_user', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<ManageRolesModal channelId={1} onClose={vi.fn()} />);
+
+    const row = (await screen.findByText('owner_user')).closest('.list-row') as HTMLElement;
+    expect(within(row).getByText('Remove')).toBeDisabled();
+  });
+});
+
+describe('MemberListModal', () => {
+  it('lists members and filters by search', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      member,
+      { channel_id: 1, user_id: 43, nickname_in_channel: 'Other', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+      { user_id: 43, username: 'random_dev', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<MemberListModal channelId={1} canKick={false} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('sprint_master')).toBeInTheDocument();
+    expect(screen.getByText('random_dev')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search members...'), {
+      target: { value: 'sprint' },
+    });
+
+    expect(screen.getByText('sprint_master')).toBeInTheDocument();
+    expect(screen.queryByText('random_dev')).not.toBeInTheDocument();
+  });
+
+  it('hides the Kick button without KICK_MEMBERS, shows it with', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValue([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValue([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    const { unmount } = render(
+      <MemberListModal channelId={1} canKick={false} onClose={vi.fn()} />
+    );
+    await screen.findByText('sprint_master');
+    expect(screen.queryByText('Kick')).not.toBeInTheDocument();
+    unmount();
+
+    render(<MemberListModal channelId={1} canKick onClose={vi.fn()} />);
+    await screen.findByText('sprint_master');
+    expect(screen.getByText('Kick')).toBeInTheDocument();
+  });
+
+  it('kicks a member and removes them from the list', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+    vi.mocked(workspacesApi.kickMember).mockResolvedValueOnce(undefined);
+
+    render(<MemberListModal channelId={1} canKick onClose={vi.fn()} />);
+    await screen.findByText('sprint_master');
+
+    fireEvent.click(screen.getByText('Kick'));
+
+    await waitFor(() => expect(workspacesApi.kickMember).toHaveBeenCalledWith(1, 42));
+    await waitFor(() => expect(screen.queryByText('sprint_master')).not.toBeInTheDocument());
+  });
+
+  it('never shows a Kick button for the current user themselves', async () => {
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([member]);
+    vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+      { user_id: 42, username: 'sprint_master', display_name: '', avatar_url: null, bio: '' },
+    ]);
+
+    render(<MemberListModal channelId={1} currentUserId={42} canKick onClose={vi.fn()} />);
+
+    await screen.findByText('sprint_master');
+    expect(screen.queryByText('Kick')).not.toBeInTheDocument();
+  });
 });
 
 describe('RoleFormModal', () => {
-  it('lists exactly the 6 SCRUM-18 permission codes, no more, no fewer', () => {
+  it('lists exactly the permission catalog codes, no more, no fewer', () => {
     render(
       <RoleFormModal channelId={1} existingRole={null} onClose={vi.fn()} onSaved={vi.fn()} />
     );
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(CHANNEL_PERMISSIONS.length);
-    expect(checkboxes).toHaveLength(6);
+    expect(checkboxes).toHaveLength(7);
   });
 
   it('creates a new role with the selected permissions', async () => {
@@ -615,6 +806,136 @@ describe('WorkspacePage', () => {
       { topic_id: channel.default_topic_id },
       20,
       0
+    );
+  });
+
+  it('shows a member\'s channel nickname as their message sender name', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listMembers).mockResolvedValueOnce([
+      { channel_id: 1, user_id: 9, nickname_in_channel: 'The Boss', joined_at: '2026-01-01T00:00:00Z' },
+    ]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          base_message_id: 1,
+          sender_id: 9,
+          sender_username: 'User #9',
+          content: 'hello from the boss',
+          sent_at: '2026-01-01T00:00:00Z',
+          is_edited: false,
+          media: [],
+        },
+      ],
+    });
+
+    render(<WorkspacePage />);
+
+    expect(await screen.findByText('The Boss')).toBeInTheDocument();
+    expect(screen.queryByText('User #9')).not.toBeInTheDocument();
+  });
+
+  it('hides the topic tab bar when the channel has only one topic', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValueOnce([topic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    await waitFor(() => expect(workspacesApi.listTopics).toHaveBeenCalledWith(1));
+    // "# general" legitimately appears twice already (sidebar item + main
+    // header) even with no topic tab bar -- a third instance would mean the
+    // (single-topic) tab bar rendered anyway.
+    expect(screen.queryAllByText('# general')).toHaveLength(2);
+  });
+
+  it('shows a topic tab bar and switches the active thread when a channel has multiple topics', async () => {
+    const secondTopic: Topic = {
+      topic_id: 6,
+      channel_id: 1,
+      title: 'random',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValueOnce([topic, secondTopic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    const generalTab = await screen.findByRole('button', { name: '# general' });
+    const randomTab = screen.getByRole('button', { name: '# random' });
+    expect(generalTab).toBeInTheDocument();
+    expect(randomTab).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: topic.topic_id },
+        20,
+        0
+      )
+    );
+
+    fireEvent.click(randomTab);
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: secondTopic.topic_id },
+        20,
+        0
+      )
+    );
+  });
+
+  it('resets the active topic back to the new channel\'s default when switching channels', async () => {
+    const secondChannel: Channel = {
+      channel_id: 2,
+      name: 'random-chat',
+      creator_id: 9,
+      default_topic_id: 8,
+      created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'def456',
+    };
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel, secondChannel]);
+    vi.mocked(workspacesApi.listTopics).mockResolvedValue([topic]);
+    vi.mocked(messagingApi.listMessages).mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    });
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: channel.default_topic_id },
+        20,
+        0
+      )
+    );
+
+    fireEvent.click(screen.getByText('# random-chat'));
+
+    await waitFor(() =>
+      expect(messagingApi.listMessages).toHaveBeenCalledWith(
+        { topic_id: secondChannel.default_topic_id },
+        20,
+        0
+      )
     );
   });
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { privateSpacesApi } from '../index';
 import { Group } from '../types';
+import { JoinGroupModal } from './JoinGroupModal';
 
 interface GroupListProps {
   onSelectGroup?: (group: Group) => void;
@@ -10,11 +11,16 @@ interface GroupListProps {
    * drops the now-gone group without waiting for a full refetch.
    */
   removedGroupId?: number | null;
+  /** Bumped by the parent whenever a group might have been joined
+   * elsewhere (e.g. accepting an invitation) so this list refetches
+   * instead of waiting for a page reload. */
+  reloadToken?: number;
 }
 
 export const GroupList: React.FC<GroupListProps> = ({
   onSelectGroup,
   removedGroupId,
+  reloadToken,
 }) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<number, number>>(
@@ -24,6 +30,9 @@ export const GroupList: React.FC<GroupListProps> = ({
   const [error, setError] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   const loadMemberCount = async (groupId: number) => {
     try {
@@ -63,7 +72,7 @@ export const GroupList: React.FC<GroupListProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadToken]);
 
   useEffect(() => {
     if (removedGroupId == null) return;
@@ -74,31 +83,77 @@ export const GroupList: React.FC<GroupListProps> = ({
     e.preventDefault();
     if (!groupName.trim()) return;
 
-    const newGroup = await privateSpacesApi.createGroup(groupName.trim());
-    setGroups((prev) => [...prev, newGroup]);
-    void loadMemberCount(newGroup.group_id);
-    setGroupName('');
-    setIsCreating(false);
+    setCreateError(null);
+    setIsSubmittingCreate(true);
+    try {
+      const newGroup = await privateSpacesApi.createGroup(groupName.trim());
+      setGroups((prev) => [...prev, newGroup]);
+      void loadMemberCount(newGroup.group_id);
+      setGroupName('');
+      setIsCreating(false);
+      // Without this, a successful create looked like nothing happened --
+      // the new group was appended at the bottom of a scrollable list with
+      // no visual confirmation. Selecting it immediately opens its chat,
+      // which is unambiguous proof it worked.
+      onSelectGroup?.(newGroup);
+    } catch {
+      setCreateError('Failed to create group. Please try again.');
+    } finally {
+      setIsSubmittingCreate(false);
+    }
   };
 
   return (
     <div className="group-list-container">
       <h3>Groups</h3>
       {!isCreating ? (
-        <button onClick={() => setIsCreating(true)} className="btn-primary">
-          Create Group
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => setIsCreating(true)}
+            className="btn btn-primary btn-block"
+            style={{ padding: '6px 10px', fontSize: 13 }}
+          >
+            Create Group
+          </button>
+          <button
+            onClick={() => setIsJoining(true)}
+            className="btn btn-block"
+            style={{ padding: '6px 10px', fontSize: 13 }}
+          >
+            Join Group
+          </button>
+        </div>
       ) : (
-        <form onSubmit={(e) => void handleCreateGroup(e)} className="create-group-form">
+        <form
+          onSubmit={(e) => void handleCreateGroup(e)}
+          className="create-group-form"
+          style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+        >
           <input
             type="text"
             placeholder="Group Name"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             required
+            style={{ width: '100%', boxSizing: 'border-box' }}
           />
-          <button type="submit">Create</button>
-          <button type="button" onClick={() => setIsCreating(false)}>Cancel</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmittingCreate}>
+              {isSubmittingCreate ? 'Creating...' : 'Create'}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setIsCreating(false);
+                setCreateError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          {createError && <p role="alert">{createError}</p>}
         </form>
       )}
 
@@ -106,7 +161,7 @@ export const GroupList: React.FC<GroupListProps> = ({
       {error && <p role="alert">Couldn&apos;t load groups.</p>}
 
       {!isLoading && !error && (
-        <ul className="group-list">
+        <ul className="group-list" style={{ marginTop: 10 }}>
           {groups.map((group) => (
             <li
               key={group.group_id}
@@ -124,6 +179,18 @@ export const GroupList: React.FC<GroupListProps> = ({
             </li>
           ))}
         </ul>
+      )}
+
+      {isJoining && (
+        <JoinGroupModal
+          onClose={() => setIsJoining(false)}
+          onJoined={(group) => {
+            setGroups((prev) =>
+              prev.some((g) => g.group_id === group.group_id) ? prev : [...prev, group]
+            );
+            void loadMemberCount(group.group_id);
+          }}
+        />
       )}
     </div>
   );

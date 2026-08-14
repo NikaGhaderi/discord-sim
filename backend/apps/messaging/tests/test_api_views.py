@@ -36,6 +36,14 @@ def spaces(users):
     ChannelMember.objects.create(channel=channel, user=sender)
     ChannelMember.objects.create(channel=channel, user=participant)
     ChannelMember.objects.create(channel=channel, user=moderator)
+    # Mirrors CreateChannelUseCase's real default: an "@everyone" role
+    # granting SEND_MESSAGES, assigned to every member (production does this
+    # via JoinChannelUseCase) -- without it nobody could send to the topic.
+    everyone_role = ChannelRole.objects.create(
+        channel=channel, name="@everyone", permissions=["SEND_MESSAGES"]
+    )
+    for member in (sender, participant, moderator):
+        UserChannelRole.objects.create(channel=channel, user=member, role=everyone_role)
     group = Group.objects.create(name="Group", creator=sender)
     GroupMember.objects.create(group=group, user=sender, is_admin=True)
     GroupMember.objects.create(group=group, user=participant)
@@ -85,6 +93,24 @@ def test_send_text_matches_contract_and_checks_membership(spaces):
     }
     assert created.json()["is_edited"] is False
     assert rejected.status_code == 403
+
+
+@pytest.mark.django_db
+def test_send_allows_blank_content_for_a_media_only_message(spaces):
+    topic = spaces["topic"]
+    payload = {
+        "topic_id": topic.id,
+        "group_id": None,
+        "direct_chat_id": None,
+        "content": "",
+    }
+
+    response = client_for(spaces["sender"]).post(
+        "/api/messages/", payload, format="json"
+    )
+
+    assert response.status_code == 201
+    assert response.json()["content"] == ""
 
 
 @pytest.mark.django_db
@@ -203,6 +229,31 @@ def test_search_matches_word_stems_not_just_substrings(spaces):
     assert stem_match.json()["results"][0]["content"] == "running the migration"
     assert plural_match.json()["count"] == 1
     assert plural_match.json()["results"][0]["content"] == "sprint planning"
+
+
+@pytest.mark.django_db
+def test_search_matches_a_common_stopword_as_a_literal_substring(spaces):
+    # Postgres's default "english" text-search config treats words like
+    # "will" as stopwords and drops them from indexing/querying entirely --
+    # SearchVector/SearchQuery alone would find nothing here even though
+    # "will" is literally in the message body. The substring fallback in
+    # search_messages must still catch it.
+    group = spaces["group"]
+    sender = spaces["sender"]
+    Message.objects.create(
+        sender=sender, group=group, body="I will not freak out under any circumstances."
+    )
+
+    response = client_for(sender).get(
+        f"/api/messages/search/?q=will&group_id={group.id}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert (
+        response.json()["results"][0]["content"]
+        == "I will not freak out under any circumstances."
+    )
 
 
 @pytest.mark.django_db

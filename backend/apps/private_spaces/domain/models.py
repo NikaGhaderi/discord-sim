@@ -20,6 +20,7 @@ class GroupEntity:
     creator_id: int
     id: int | None = None
     created_at: datetime | None = None
+    invite_token: str = ""
 
 
 @dataclass
@@ -30,6 +31,10 @@ class GroupInvitationEntity:
     status: str
     id: int | None = None
     created_at: datetime | None = None
+    # Only populated by list_pending_invitations_for_user, which the invitee
+    # (not yet a group member) uses to see what they're being invited to --
+    # GetGroupUseCase requires membership, so it can't be used here instead.
+    group_name: str | None = None
 
 
 @dataclass

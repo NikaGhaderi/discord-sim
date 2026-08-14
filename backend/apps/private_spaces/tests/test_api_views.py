@@ -93,7 +93,9 @@ class TestGroups:
             "name",
             "creator_id",
             "created_at",
+            "invite_token",
         }
+        assert response.json()["invite_token"]
         assert response.json()["name"] == "Weekend CTF Team"
         assert response.json()["creator_id"] == creator.id
         assert GroupMember.objects.get(
@@ -120,6 +122,25 @@ class TestGroups:
         assert left.status_code == 204
         assert deleted.status_code == 204
         assert not Group.objects.filter(pk=group.id).exists()
+
+    def test_join_by_invite_token(self, users):
+        creator, joiner = users[:2]
+        group = Group.objects.create(
+            name="Original", creator=creator, invite_token="tok-xyz"
+        )
+        GroupMember.objects.create(group=group, user=creator, is_admin=True)
+
+        joined = authenticated_client(joiner).post(
+            f"/api/groups/invite/{group.invite_token}/join/", {}, format="json"
+        )
+        unknown_token = authenticated_client(joiner).post(
+            "/api/groups/invite/bogus-token/join/", {}, format="json"
+        )
+
+        assert joined.status_code == 200
+        assert joined.json()["group_id"] == group.id
+        assert GroupMember.objects.filter(group=group, user=joiner).exists()
+        assert unknown_token.status_code == 404
 
     def test_get_detail_requires_membership(self, users):
         member, outsider = users[:2]
@@ -197,6 +218,10 @@ class TestGroupInvitations:
         assert body == {
             "invitation_id": invitation_id,
             "group_id": group.id,
+            # Only populated on the my-invitations list, where the invitee
+            # (not yet a member) needs it to know what group they're
+            # looking at -- null here since this is the create response.
+            "group_name": None,
             "inviter_id": inviter.id,
             "invitee_id": invitee.id,
             "status": "PENDING",
@@ -249,6 +274,19 @@ class TestInvitationList:
         assert response.json()["count"] == 1
         assert response.json()["results"][0]["invitation_id"] == mine.id
         assert response.json()["results"][0]["created_at"]
+
+    def test_includes_the_group_name_even_though_the_invitee_is_not_yet_a_member(
+        self, users
+    ):
+        inviter, invitee = users[:2]
+        group = Group.objects.create(name="Sprint Planning", creator=inviter)
+        GroupMember.objects.create(group=group, user=inviter, is_admin=True)
+        GroupInvitation.objects.create(group=group, inviter=inviter, invitee=invitee)
+
+        response = authenticated_client(invitee).get("/api/invitations/")
+
+        assert response.status_code == 200
+        assert response.json()["results"][0]["group_name"] == "Sprint Planning"
 
     def test_excludes_already_responded_invitations(self, users):
         inviter, invitee = users[:2]

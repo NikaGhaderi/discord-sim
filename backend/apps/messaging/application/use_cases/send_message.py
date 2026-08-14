@@ -5,6 +5,8 @@ from apps.messaging.application.interfaces import (
 )
 from apps.messaging.domain.exceptions import MessageTargetForbiddenError
 from apps.messaging.domain.models import MessageEntity, validate_exactly_one_target
+from apps.permissions.domain.checker import has_permission
+from apps.permissions.domain.permissions import PermissionCode
 
 
 def realtime_group_name(
@@ -27,6 +29,9 @@ def message_payload(message: MessageEntity) -> dict:
         "content": message.body,
         "sent_at": message.created_at.isoformat(),
         "is_edited": message.is_edited,
+        "topic_id": message.topic_id,
+        "group_id": message.group_id,
+        "direct_chat_id": message.direct_chat_id,
         "media": [
             {"file_url": media.file_url, "file_type": media.file_type}
             for media in message.media
@@ -64,6 +69,14 @@ class SendMessageUseCase:
             raise MessageTargetForbiddenError(
                 "You are not a member of this message target."
             )
+        # Only channel topics have a permission concept -- groups/DMs stay
+        # membership-only, same as before.
+        if topic_id is not None:
+            granted = self._repository.get_permissions_for_topic(topic_id, sender_id)
+            if not has_permission(granted, PermissionCode.SEND_MESSAGES.value):
+                raise MessageTargetForbiddenError(
+                    "You do not have permission to send messages here."
+                )
         message = self._repository.create_message(
             sender_id,
             content,

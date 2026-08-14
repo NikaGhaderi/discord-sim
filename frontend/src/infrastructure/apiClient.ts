@@ -25,7 +25,20 @@ import {
 // to Django (internal port 8000), so the browser-reachable address is
 // `http://localhost` (port 80), not 8000 directly. If unset, an empty string
 // means relative paths (frontend served behind the same Nginx).
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? "";
+export const baseURL = import.meta.env.VITE_API_BASE_URL ?? "";
+
+/**
+ * Resolves a backend-relative URL (e.g. a media file's `/media/...` path)
+ * against the API's origin rather than the current page's. In production
+ * the frontend and backend share an origin behind Nginx, so a root-relative
+ * URL like `/media/x.png` resolves correctly on its own -- but in local dev
+ * the Vite dev server runs on its own port, so an unresolved root-relative
+ * URL would 404/blank-page against the wrong origin.
+ */
+export const resolveMediaUrl = (url: string): string => {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${baseURL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,

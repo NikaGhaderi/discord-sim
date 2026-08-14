@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef, useLayoutEffect, UIEvent } from 'react';
+import { resolveMediaUrl } from '@infrastructure/apiClient';
 import { Message } from '../types';
 import { messagingApi, MessageTarget } from '../index';
 import { useLiveMessages } from '../useLiveMessages';
@@ -6,19 +7,52 @@ import { NewMessageData, MessageDeletedData } from '../../notifications';
 import { Composer } from './Composer';
 import { MessageActions } from './MessageActions';
 import { MediaUploadButton, SelectedFile } from './MediaUploadButton';
+import { GifPickerButton } from './GifPickerButton';
+import { UserProfileModal } from '@shared/components/UserProfileModal';
 
 const PAGE_SIZE = 20;
 
+/** True when a message's whole text content is nothing but a GIF URL (from
+ * the GIF picker, which sends the URL itself as the message content rather
+ * than a real file upload) -- rendered inline as an image instead of plain
+ * text. */
+function isGifUrl(content: string): boolean {
+  return /^https:\/\/\S+\.(gif|webp)(\?\S*)?$/i.test(content.trim());
+}
+
 interface MessageThreadProps {
-  /** Optional -- when omitted, this thread receives no live updates and
-   * can't send/schedule messages (same read-only behavior as before
-   * SCRUM-55/the messaging UI integration). */
+  /** Exactly one of topicId/groupId/directChatId should be set -- whichever
+   * kind of room this thread is showing. When none are set, this thread
+   * receives no live updates and can't send/schedule messages (same
+   * read-only behavior as before SCRUM-55/the messaging UI integration). */
   topicId?: number;
+  groupId?: number;
+  directChatId?: number;
   currentUserId?: number;
   /** True if the current user holds DELETE_MESSAGES in this channel --
    * lets them delete others' messages, mirroring the backend's
-   * sender-OR-permission rule. Editing is always sender-only regardless. */
+   * sender-OR-permission rule. Editing is always sender-only regardless.
+   * Not applicable to groups/DMs, which have no such permission concept. */
   hasDeletePermission?: boolean;
+  /** True if the current user holds SEND_MEDIA in this channel -- controls
+   * whether the attach button even renders. Defaults to true for groups/DMs,
+   * which have no such permission concept and always allow attachments.
+   * Without this, a member lacking SEND_MEDIA could pick a file, hit send,
+   * and get a silently text-only message with no error explaining why the
+   * attachment never made it (the backend rejects attach_media, but by then
+   * the message itself was already sent). */
+  hasSendMediaPermission?: boolean;
+  /** True if the current user holds SEND_MESSAGES in this channel -- hides
+   * the whole composer bar (not just attach/GIF) when false, rather than
+   * letting them type into a box that will just 403 on send. Defaults to
+   * true for groups/DMs, which have no such permission concept. */
+  hasSendMessagesPermission?: boolean;
+  /** sender_id -> display name overrides (e.g. a channel nickname). The
+   * backend never sends a real username on a message, only sender_id --
+   * msg.sender_username is a client-side "User #<id>" placeholder computed
+   * in api.ts, and this is the mechanism for replacing it with something
+   * more meaningful when the caller has that information available. */
+  senderNameOverrides?: Record<number, string>;
 }
 
 function addMessageIfNew(messages: Message[], incoming: Message): Message[] {
@@ -30,10 +64,20 @@ function addMessageIfNew(messages: Message[], incoming: Message): Message[] {
 
 export const MessageThread: React.FC<MessageThreadProps> = ({
   topicId,
+  groupId,
+  directChatId,
   currentUserId,
   hasDeletePermission = false,
+  hasSendMediaPermission = true,
+  hasSendMessagesPermission = true,
+  senderNameOverrides,
 }) => {
-  const target: MessageTarget = { topic_id: topicId };
+  const target: MessageTarget = {
+    topic_id: topicId,
+    group_id: groupId,
+    direct_chat_id: directChatId,
+  };
+  const hasTarget = topicId !== undefined || groupId !== undefined || directChatId !== undefined;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [offset, setOffset] = useState<number>(0);
@@ -41,13 +85,14 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<number | null>(null);
 
   // The backend orders messages oldest-first and paginates from the start,
   // so "give me the latest page" means first learning the total count, then
   // fetching the last PAGE_SIZE of it -- there's no "give me the tail"
   // shortcut on this endpoint.
   useEffect(() => {
-    if (topicId === undefined) {
+    if (!hasTarget) {
       setMessages([]);
       setLoading(false);
       return;
@@ -85,7 +130,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicId]);
+  }, [topicId, groupId, directChatId]);
 
   const handleNewMessage = useCallback((data: NewMessageData) => {
     setMessages((prev) =>
@@ -107,6 +152,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   useLiveMessages({
     topicId,
+    groupId,
+    directChatId,
     onNewMessage: handleNewMessage,
     onMessageDeleted: handleMessageDeleted,
   });
@@ -125,7 +172,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }, [messages]);
 
   const loadMoreMessages = () => {
-    if (loading || !hasMore || topicId === undefined) return;
+    if (loading || !hasMore || !hasTarget) return;
 
     setLoading(true);
     if (containerRef.current) {
@@ -151,7 +198,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const handleSendMessage = async (content: string) => {
-    if (topicId === undefined) return;
+    if (!hasTarget) return;
     setError(null);
     try {
       const sent = await messagingApi.sendMessage({ ...target, content });
@@ -180,7 +227,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const handleScheduleMessage = async (content: string, scheduledAt: string) => {
-    if (topicId === undefined) return;
+    if (!hasTarget) return;
     setError(null);
     try {
       await messagingApi.createScheduledMessage({
@@ -218,7 +265,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   return (
     <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
       {error && (
-        <div className="text-center py-1 text-xs text-red-400" role="alert">
+        <div className="text-center py-1 text-xs text-[var(--ws-danger)]" role="alert">
           {error}
         </div>
       )}
@@ -227,45 +274,80 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         ref={containerRef}
         onScroll={handleScroll}
         data-testid="message-thread-scroll"
-        className="flex-1 overflow-y-auto p-4 space-y-4"
-        style={{ maxHeight: 'calc(100vh - 120px)' }}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--ws-bg-chat)]"
+        style={{ minHeight: 0 }}
       >
         {loading && (
-          <div className="text-center py-2 text-sm text-gray-400">
+          <div className="text-center py-2 text-sm text-[var(--ws-text-on-chat)]">
             Loading messages...
           </div>
         )}
 
         {!loading && !hasMore && messages.length > 0 && (
-          <div className="text-center py-2 text-xs text-gray-500">
+          <div className="text-center py-2 text-xs text-[var(--ws-text-on-chat)]">
             Beginning of message history
           </div>
         )}
 
         {messages.map((msg) => (
-          <div key={msg.base_message_id} className="flex flex-col bg-gray-800 p-3 rounded-lg">
+          <div
+            key={msg.base_message_id}
+            className="flex flex-col bg-[var(--ws-bg-bubble)] text-[var(--ws-text-on-bubble)] p-3 rounded-lg"
+          >
             <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white">{msg.sender_username}</span>
-              <span className="text-xs text-gray-400">{msg.sent_at}</span>
-              {msg.is_edited && (
-                <span className="text-xs text-gray-500 italic">(edited)</span>
-              )}
+              <button
+                type="button"
+                className="font-semibold hover:underline"
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}
+                onClick={() => setViewingUserId(msg.sender_id)}
+              >
+                {senderNameOverrides?.[msg.sender_id] ?? msg.sender_username}
+              </button>
+              <span
+                className="text-xs text-[var(--ws-text-secondary-on-bubble)]"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  padding: '1px 8px',
+                  borderRadius: 9999,
+                }}
+              >
+                {msg.sent_at}
+                {msg.is_edited && <span className="italic"> (edited)</span>}
+              </span>
             </div>
-            <p className="text-gray-200 mt-1">{msg.content}</p>
+            {isGifUrl(msg.content) ? (
+              <img src={msg.content} alt="GIF" className="mt-1 max-w-xs max-h-64 rounded" />
+            ) : (
+              <p className="mt-1">{msg.content}</p>
+            )}
             {msg.media && msg.media.length > 0 && (
               <ul className="mt-1 space-y-1">
-                {msg.media.map((item, index) => (
-                  <li key={index}>
-                    <a
-                      href={item.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-indigo-400 hover:underline"
-                    >
-                      {item.file_url.split('/').pop()}
-                    </a>
-                  </li>
-                ))}
+                {msg.media.map((item, index) => {
+                  const resolvedUrl = resolveMediaUrl(item.file_url);
+                  const isImage = item.file_type.startsWith('image/');
+                  return (
+                    <li key={index}>
+                      {isImage ? (
+                        <a href={resolvedUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={resolvedUrl}
+                            alt={item.file_url.split('/').pop()}
+                            className="mt-1 max-w-xs max-h-64 rounded"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          href={resolvedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-[var(--ws-text-secondary-on-bubble)] hover:underline"
+                        >
+                          {item.file_url.split('/').pop()}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {currentUserId !== undefined && (
@@ -283,13 +365,26 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         ))}
       </div>
 
-      {topicId !== undefined && currentUserId !== undefined && (
-        <div className="flex items-end gap-2 border-t border-gray-200 p-2">
-          <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
+      {hasTarget && currentUserId !== undefined && hasSendMessagesPermission && (
+        <div className="flex items-end gap-2 border-t p-2 border-[var(--ws-border)] bg-[var(--ws-bg)]">
+          {hasSendMediaPermission && (
+            <>
+              <MediaUploadButton selectedFile={selectedFile} onFileSelect={setSelectedFile} />
+              <GifPickerButton onSelectGif={(url) => void handleSendMessage(url)} />
+            </>
+          )}
           <div className="flex-1">
-            <Composer onSendMessage={handleSendMessage} onScheduleMessage={handleScheduleMessage} />
+            <Composer
+              onSendMessage={handleSendMessage}
+              onScheduleMessage={handleScheduleMessage}
+              hasAttachment={selectedFile !== null}
+            />
           </div>
         </div>
+      )}
+
+      {viewingUserId !== null && (
+        <UserProfileModal userId={viewingUserId} onClose={() => setViewingUserId(null)} />
       )}
     </div>
   );

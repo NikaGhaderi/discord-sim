@@ -42,6 +42,11 @@ urlpatterns = [
         name="channel-member-roles",
     ),
     path(
+        "api/channels/<int:channel_id>/role-assignments/",
+        views.ChannelRoleAssignmentListView.as_view(),
+        name="channel-role-assignment-list",
+    ),
+    path(
         "api/channels/<int:channel_id>/my-permissions/",
         views.ChannelMyPermissionsView.as_view(),
         name="channel-my-permissions",

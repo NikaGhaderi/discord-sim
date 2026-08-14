@@ -29,6 +29,26 @@ describe('SCRUM-43 Messaging Components', () => {
 
       expect(handleSend).not.toHaveBeenCalled();
     });
+
+    it('blocks sending empty text when there is no attachment', () => {
+      const handleSend = vi.fn();
+      render(<Composer onSendMessage={handleSend} />);
+
+      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+      expect(handleSend).not.toHaveBeenCalled();
+    });
+
+    it('allows sending empty text when hasAttachment is true (media-only message)', () => {
+      const handleSend = vi.fn();
+      render(<Composer onSendMessage={handleSend} hasAttachment />);
+
+      expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+      expect(handleSend).toHaveBeenCalledWith('');
+    });
   });
 
   describe('MessageActions Permissions', () => {

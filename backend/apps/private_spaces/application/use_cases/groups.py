@@ -1,9 +1,31 @@
-from apps.private_spaces.application.interfaces import AbstractPrivateSpacesRepository
+from apps.private_spaces.application.interfaces import (
+    AbstractNotificationRecorder,
+    AbstractPrivateSpacesRepository,
+)
 from apps.private_spaces.domain.exceptions import (
     GroupMembershipNotFoundError,
     GroupNotFoundError,
 )
 from apps.private_spaces.domain.models import GroupEntity, GroupMemberEntity
+
+
+class JoinGroupByInviteTokenUseCase:
+    """Lets a user join a group directly via its invite link, the same way
+    channels work -- bypasses the invite-by-username flow entirely (and
+    with it, the invitee's `allow_group_invitations` opt-out), matching how
+    a channel invite link already lets anyone in regardless of that
+    equivalent-purpose flag not existing for channels.
+    """
+
+    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+        self._repository = repository
+
+    def execute(self, invite_token: str, user_id: int) -> GroupEntity:
+        group = self._repository.get_group_by_invite_token(invite_token)
+        if group is None:
+            raise GroupNotFoundError("Group not found.")
+        self._repository.add_group_member(group.id, user_id)
+        return group
 
 
 class ListGroupsUseCase:
@@ -81,10 +103,25 @@ class ListGroupMembersUseCase:
 
 
 class LeaveGroupUseCase:
-    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+    def __init__(
+        self,
+        repository: AbstractPrivateSpacesRepository,
+        notification_recorder: AbstractNotificationRecorder | None = None,
+    ) -> None:
         self._repository = repository
+        self._notification_recorder = notification_recorder
 
     def execute(self, group_id: int, user_id: int) -> None:
         removed = self._repository.remove_group_member(group_id, user_id)
         if not removed:
             raise GroupMembershipNotFoundError("Group membership not found.")
+        if self._notification_recorder is not None:
+            remaining_ids = [
+                m.user_id for m in self._repository.list_group_members(group_id)
+            ]
+            if remaining_ids:
+                self._notification_recorder.record(
+                    remaining_ids,
+                    "MEMBER_LEFT",
+                    {"group_id": group_id, "user_id": user_id},
+                )

@@ -62,6 +62,45 @@ describe('MessageThread', () => {
     expect(socketClient.subscribe).not.toHaveBeenCalled();
   });
 
+  it('fetches messages for a group target when groupId is passed', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
+      page([makeMessage({ base_message_id: 1, content: 'group message' })])
+    );
+
+    render(<MessageThread groupId={3} currentUserId={1} />);
+
+    expect(await screen.findByText('group message')).toBeInTheDocument();
+    expect(messagingApi.listMessages).toHaveBeenCalledWith({ group_id: 3 }, 20, 0);
+    expect(socketClient.subscribe).toHaveBeenCalledWith('group_3');
+  });
+
+  it('fetches messages for a direct-chat target when directChatId is passed', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
+      page([makeMessage({ base_message_id: 1, content: 'dm message' })])
+    );
+
+    render(<MessageThread directChatId={9} currentUserId={1} />);
+
+    expect(await screen.findByText('dm message')).toBeInTheDocument();
+    expect(messagingApi.listMessages).toHaveBeenCalledWith({ direct_chat_id: 9 }, 20, 0);
+    expect(socketClient.subscribe).toHaveBeenCalledWith('direct_chat_9');
+  });
+
+  it('shows a senderNameOverrides entry (e.g. a channel nickname) instead of sender_username', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
+      page([
+        makeMessage({ base_message_id: 1, sender_id: 5, sender_username: 'User #5', content: 'hi' }),
+        makeMessage({ base_message_id: 2, sender_id: 6, sender_username: 'User #6', content: 'hey' }),
+      ])
+    );
+
+    render(<MessageThread topicId={7} senderNameOverrides={{ 5: 'Sprint Master' }} />);
+
+    expect(await screen.findByText('Sprint Master')).toBeInTheDocument();
+    expect(screen.getByText('User #6')).toBeInTheDocument();
+    expect(screen.queryByText('User #5')).not.toBeInTheDocument();
+  });
+
   it('fetches once when the total count fits in a single page', async () => {
     vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
       page([makeMessage({ base_message_id: 1, content: 'only message' })])
@@ -311,6 +350,100 @@ describe('MessageThread', () => {
     await waitFor(() =>
       expect(messagingApi.attachMedia).toHaveBeenCalledWith(6, file)
     );
-    expect(await screen.findByText('a.png')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'a.png' })).toHaveAttribute(
+      'src',
+      'http://localhost/media/a.png'
+    );
+  });
+
+  it('hides the attach control when the caller has no SEND_MEDIA permission', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} hasSendMediaPermission={false} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('media-file-input')).not.toBeInTheDocument();
+    // Text sending must still work without the permission.
+    expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
+  });
+
+  it('hides the whole composer bar when the caller has no SEND_MESSAGES permission', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} hasSendMessagesPermission={false} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.queryByPlaceholderText('Type a message...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('media-file-input')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Add GIF')).not.toBeInTheDocument();
+  });
+
+  it('renders a message whose content is a GIF URL as an inline image', async () => {
+    const gifMessage = makeMessage({
+      base_message_id: 9,
+      content: 'https://media.giphy.com/abc/original.gif',
+    });
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([gifMessage]));
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+
+    const img = await screen.findByAltText('GIF');
+    expect(img).toHaveAttribute('src', 'https://media.giphy.com/abc/original.gif');
+    expect(screen.queryByText('https://media.giphy.com/abc/original.gif')).not.toBeInTheDocument();
+  });
+
+  it('shows the GIF picker button alongside attach when SEND_MEDIA is allowed', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('Add GIF')).toBeInTheDocument();
+  });
+
+  it('sends a media-only message with no text at all', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(page([]));
+    const sent = makeMessage({ base_message_id: 6, content: '' });
+    vi.mocked(messagingApi.sendMessage).mockResolvedValueOnce(sent);
+    vi.mocked(messagingApi.attachMedia).mockResolvedValueOnce({
+      media_id: 1,
+      base_message_id: 6,
+      file_url: '/media/a.png',
+      file_type: 'image/png',
+      file_size: 10,
+      thumbnail_url: null,
+    });
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+    await waitFor(() => expect(messagingApi.listMessages).toHaveBeenCalled());
+
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    fireEvent.change(screen.getByTestId('media-file-input'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(messagingApi.sendMessage).toHaveBeenCalledWith({ topic_id: 7, content: '' });
+    });
+    await waitFor(() => expect(messagingApi.attachMedia).toHaveBeenCalledWith(6, file));
+  });
+
+  it('renders a non-image attachment as a plain link, not inline', async () => {
+    vi.mocked(messagingApi.listMessages).mockResolvedValueOnce(
+      page([
+        makeMessage({
+          base_message_id: 9,
+          content: 'a doc',
+          media: [{ file_url: '/media/notes.txt', file_type: 'text/plain' }],
+        }),
+      ])
+    );
+
+    render(<MessageThread topicId={7} currentUserId={1} />);
+
+    expect(await screen.findByRole('link', { name: 'notes.txt' })).toHaveAttribute(
+      'href',
+      'http://localhost/media/notes.txt'
+    );
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 });

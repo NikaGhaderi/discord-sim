@@ -18,6 +18,7 @@ export interface PrivateSpacesApi {
   listGroups(): Promise<Group[]>;
   createGroup(name: string): Promise<Group>;
   getGroup(groupId: number): Promise<Group>;
+  joinGroupByInviteToken(inviteToken: string): Promise<Group>;
   listGroupMembers(groupId: number): Promise<GroupMember[]>;
   updateGroup(groupId: number, name: string): Promise<Group>;
   deleteOrLeaveGroup(
@@ -65,6 +66,11 @@ export const createGroup = async (name: string): Promise<Group> => {
 
 export const getGroup = async (groupId: number): Promise<Group> => {
   const response = await apiClient.get<Group>(`/api/groups/${groupId}/`);
+  return response.data;
+};
+
+export const joinGroupByInviteToken = async (inviteToken: string): Promise<Group> => {
+  const response = await apiClient.post<Group>(`/api/groups/invite/${inviteToken}/join/`, {});
   return response.data;
 };
 

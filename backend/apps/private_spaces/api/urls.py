@@ -15,6 +15,11 @@ urlpatterns = [
         name="group-detail",
     ),
     path(
+        "groups/invite/<str:invite_token>/join/",
+        views.GroupJoinByInviteTokenView.as_view(),
+        name="group-invite-join",
+    ),
+    path(
         "groups/<int:group_id>/members/",
         views.GroupMemberListView.as_view(),
         name="group-member-list",

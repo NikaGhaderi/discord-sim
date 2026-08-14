@@ -31,7 +31,7 @@ export const ScheduledMessagesPanel: React.FC<ScheduledMessagesPanelProps> = ({ 
   };
 
   if (loading) {
-    return <div className="p-3 text-xs text-gray-500">Loading scheduled messages...</div>;
+    return <div className="p-3 text-xs text-[var(--ws-text-secondary)]">Loading scheduled messages...</div>;
   }
 
   return (

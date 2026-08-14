@@ -1,4 +1,7 @@
-from apps.private_spaces.application.interfaces import AbstractPrivateSpacesRepository
+from apps.private_spaces.application.interfaces import (
+    AbstractNotificationRecorder,
+    AbstractPrivateSpacesRepository,
+)
 from apps.private_spaces.domain.exceptions import (
     AlreadyGroupMemberError,
     GroupNotFoundError,
@@ -40,15 +43,27 @@ class SendGroupInvitationUseCase:
 
 
 class RespondToInvitationUseCase:
-    def __init__(self, repository: AbstractPrivateSpacesRepository) -> None:
+    def __init__(
+        self,
+        repository: AbstractPrivateSpacesRepository,
+        notification_recorder: AbstractNotificationRecorder | None = None,
+    ) -> None:
         self._repository = repository
+        self._notification_recorder = notification_recorder
 
     def execute(
         self, invitation_id: int, user_id: int, status: str
     ) -> GroupInvitationEntity:
-        return self._repository.respond_to_invitation_as_invitee(
+        invitation = self._repository.respond_to_invitation_as_invitee(
             invitation_id, user_id, status
         )
+        if status == "ACCEPTED" and self._notification_recorder is not None:
+            self._notification_recorder.record(
+                [invitation.inviter_id],
+                "INVITATION_ACCEPTED",
+                {"group_id": invitation.group_id, "invitee_id": invitation.invitee_id},
+            )
+        return invitation
 
 
 class ListMyInvitationsUseCase:

@@ -39,6 +39,10 @@ class UserIdsQuerySerializer(serializers.Serializer):
             ) from exc
 
 
+class AvatarUploadSerializer(serializers.Serializer):
+    avatar = serializers.ImageField(allow_empty_file=False)
+
+
 class UpdateProfileSerializer(serializers.Serializer):
     display_name = serializers.CharField(
         required=False,

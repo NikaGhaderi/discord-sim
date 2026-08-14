@@ -25,6 +25,11 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
   >({});
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [membersError, setMembersError] = useState(false);
+  const [inviteUsername, setInviteUsername] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSent, setInviteSent] = useState<string | null>(null);
+  const [didCopyInviteLink, setDidCopyInviteLink] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +87,33 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
     }
   };
 
+  const handleCopyInviteLink = async () => {
+    await navigator.clipboard.writeText(group.invite_token);
+    setDidCopyInviteLink(true);
+    setTimeout(() => setDidCopyInviteLink(false), 2000);
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const username = inviteUsername.trim();
+    if (!username) return;
+    setInviteError(null);
+    setInviteSent(null);
+    setIsInviting(true);
+    try {
+      // No endpoint invites by username directly -- resolve to a user_id
+      // first, same pattern DirectMessageList uses to start a DM.
+      const profile = await profileApi.getPublicProfile(username);
+      await privateSpacesApi.sendGroupInvitation(group.group_id, profile.user_id);
+      setInviteSent(`Invitation sent to ${username}.`);
+      setInviteUsername('');
+    } catch {
+      setInviteError(`Couldn't invite "${username}". Check the username and try again.`);
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   const handleDeleteOrLeave = async (mode: 'delete' | 'leave') => {
     const confirmed =
       mode === 'delete'
@@ -104,12 +136,10 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
 
   return (
     <div className="group-settings-panel">
-      <h3>Group Settings: {group.name}</h3>
-
       {error && <p role="alert">{error}</p>}
 
-      <form onSubmit={handleSave}>
-        <label htmlFor="group-name-input">Group Name:</label>
+      <form onSubmit={handleSave} className="field">
+        <label htmlFor="group-name-input">Group Name</label>
         <input
           id="group-name-input"
           type="text"
@@ -117,10 +147,20 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           onChange={(e) => setName(e.target.value)}
           required
         />
-        <button type="submit" disabled={isSaving}>
-          Save Changes
+        <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save Name'}
         </button>
       </form>
+
+      <div className="field" style={{ marginTop: '20px' }}>
+        <label htmlFor="group-invite-link">Invite Link</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input id="group-invite-link" type="text" readOnly value={group.invite_token} />
+          <button type="button" className="btn" onClick={() => void handleCopyInviteLink()}>
+            {didCopyInviteLink ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </div>
 
       <div className="group-members" style={{ marginTop: '20px' }}>
         <h4>Members</h4>
@@ -133,7 +173,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
               const memberLabel =
                 memberProfile?.username ?? `User #${member.user_id}`;
               return (
-                <li key={member.user_id}>
+                <li key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Avatar avatarUrl={memberProfile?.avatar_url} label={memberLabel} size={20} />
                   {memberLabel}
                   {member.is_admin && ' (admin)'}
@@ -143,6 +183,25 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
           </ul>
         )}
       </div>
+
+      <form onSubmit={(e) => void handleInvite(e)} className="field" style={{ marginTop: '20px' }}>
+        <label htmlFor="group-invite-username">Invite a member (username)</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            id="group-invite-username"
+            type="text"
+            placeholder="username"
+            value={inviteUsername}
+            onChange={(e) => setInviteUsername(e.target.value)}
+            required
+          />
+          <button type="submit" className="btn btn-primary" disabled={isInviting}>
+            {isInviting ? 'Sending...' : 'Send Invite'}
+          </button>
+        </div>
+        {inviteError && <p role="alert">{inviteError}</p>}
+        {inviteSent && <p>{inviteSent}</p>}
+      </form>
 
       {/*
         Both actions are offered to every member, not just admins: the
@@ -162,7 +221,7 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         <button
           type="button"
           onClick={() => void handleDeleteOrLeave('delete')}
-          className="btn-danger"
+          className="btn btn-danger"
           disabled={isRemoving}
         >
           Delete Group

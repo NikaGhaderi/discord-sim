@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Modal } from '@shared/components/Modal';
-import { NotificationFeed } from '../../notifications/components/NotificationFeed';
 import { Channel, ChannelMember } from '../types';
 import { CreateChannelModal } from './CreateChannelModal';
 import { JoinChannelModal } from './JoinChannelModal';
@@ -13,7 +11,7 @@ interface ChannelSidebarProps {
   onChannelJoined: (membership: ChannelMember) => void;
 }
 
-type OpenModal = 'none' | 'create' | 'join' | 'notifications';
+type OpenModal = 'none' | 'create' | 'join';
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   channels,
@@ -27,16 +25,18 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   return (
     <aside className="sidebar">
-      <nav>
-        <div className="channel-item">Home</div>
-        <div className="channel-item">Friends</div>
-        <div className="channel-item">Direct Messages</div>
-        <div className="channel-item" onClick={() => setOpenModal('notifications')}>
-          Notifications
-        </div>
-      </nav>
-
-      <div className="sidebar-section-title">
+      {/*
+        "Home"/"Friends"/"Direct Messages" used to live here as
+        non-functional placeholders (no onClick at all, and "Friends" has
+        no backing feature anywhere in the backend). Real cross-page
+        navigation, and the notifications bell (which used to live here as
+        a channels-only entry, invisible from private-spaces), now both
+        live in the persistent <AppNav>.
+      */}
+      <div
+        className="sidebar-section-title"
+        style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '4px 10px', borderRadius: 9999 }}
+      >
         <span>CHANNELS</span>
         <div style={{ position: 'relative' }}>
           <button
@@ -107,11 +107,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       )}
       {openModal === 'join' && (
         <JoinChannelModal onClose={() => setOpenModal('none')} onJoined={onChannelJoined} />
-      )}
-      {openModal === 'notifications' && (
-        <Modal title="Notifications" onClose={() => setOpenModal('none')}>
-          <NotificationFeed />
-        </Modal>
       )}
     </aside>
   );

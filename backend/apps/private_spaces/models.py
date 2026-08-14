@@ -38,6 +38,7 @@ class DirectChat(models.Model):
 
 class Group(models.Model):
     name = models.CharField(max_length=100)
+    invite_token = models.TextField(blank=True, default="")
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

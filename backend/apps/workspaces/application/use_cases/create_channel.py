@@ -14,7 +14,9 @@ class CreateChannelUseCase:
         channel = self._repository.set_default_topic(channel.id, topic.id)
 
         self._repository.add_member(channel.id, creator_id)
-        self._repository.create_role(channel.id, EVERYONE_ROLE_NAME, [])
+        self._repository.create_role(
+            channel.id, EVERYONE_ROLE_NAME, [PermissionCode.SEND_MESSAGES.value]
+        )
         owner_role = self._repository.create_role(
             channel.id, OWNER_ROLE_NAME, [code.value for code in PermissionCode]
         )

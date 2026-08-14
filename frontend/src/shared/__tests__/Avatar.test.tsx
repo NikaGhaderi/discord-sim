@@ -10,22 +10,20 @@ describe('Avatar', () => {
     expect(img).toHaveAttribute('src', 'https://storage/avatars/nika.jpg');
   });
 
-  it('falls back to the shared placeholder when avatarUrl is null', () => {
+  it('falls back to a generated initial when avatarUrl is null', () => {
     render(<Avatar avatarUrl={null} label="no_avatar" />);
 
-    expect(screen.getByRole('img', { name: 'no_avatar' })).toHaveAttribute(
-      'src',
-      'https://via.placeholder.com/150'
-    );
+    const fallback = screen.getByRole('img', { name: 'no_avatar' });
+    expect(fallback.tagName).toBe('SPAN');
+    expect(fallback).toHaveTextContent('N');
   });
 
-  it('falls back to the shared placeholder when avatarUrl is an empty string', () => {
+  it('falls back to a generated initial when avatarUrl is an empty string', () => {
     render(<Avatar avatarUrl="" label="empty_avatar" />);
 
-    expect(screen.getByRole('img', { name: 'empty_avatar' })).toHaveAttribute(
-      'src',
-      'https://via.placeholder.com/150'
-    );
+    const fallback = screen.getByRole('img', { name: 'empty_avatar' });
+    expect(fallback.tagName).toBe('SPAN');
+    expect(fallback).toHaveTextContent('E');
   });
 
   it('defaults to a 28px size, overridable via the size prop', () => {

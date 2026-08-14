@@ -24,6 +24,9 @@ from apps.workspaces.application.use_cases.list_channels import ListChannelsUseC
 from apps.workspaces.application.use_cases.list_members import ListMembersUseCase
 from apps.workspaces.application.use_cases.list_roles import ListRolesUseCase
 from apps.workspaces.application.use_cases.list_topics import ListTopicsUseCase
+from apps.workspaces.application.use_cases.remove_role_assignment import (
+    RemoveRoleAssignmentUseCase,
+)
 from apps.workspaces.application.use_cases.update_channel import UpdateChannelUseCase
 from apps.workspaces.application.use_cases.update_member_nickname import (
     UpdateMemberNicknameUseCase,
@@ -397,3 +400,37 @@ class ChannelMemberRoleView(APIView):
             return Response({"detail": str(exc)}, status=403)
 
         return Response(UserChannelRoleSerializer(user_role).data, status=201)
+
+    @require_permission(
+        code=PermissionCode.MANAGE_ROLES,
+        get_granted_permissions=get_granted_permissions,
+    )
+    def delete(self, request, channel_id, user_id):
+        role_id = request.data.get("role_id")
+        if role_id is None:
+            return Response({"detail": "role_id is required."}, status=400)
+        try:
+            RemoveRoleAssignmentUseCase(DjangoChannelRepository()).execute(
+                channel_id, user_id=user_id, role_id=int(role_id)
+            )
+        except ChannelMemberNotFoundError:
+            return _member_not_found_response()
+        except ChannelRoleNotFoundError:
+            return _role_not_found_response()
+        except OwnerRoleImmutableError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(status=204)
+
+
+class ChannelRoleAssignmentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @require_permission(
+        code=PermissionCode.MANAGE_ROLES,
+        get_granted_permissions=get_granted_permissions,
+    )
+    def get(self, request, channel_id):
+        assignments = DjangoChannelRepository().list_role_assignments(channel_id)
+        return Response(
+            UserChannelRoleSerializer(assignments, many=True).data, status=200
+        )

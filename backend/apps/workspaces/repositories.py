@@ -306,6 +306,18 @@ class DjangoChannelRepository(AbstractChannelRepository):
             )
         return _to_user_role_entity(user_role)
 
+    def list_role_assignments(self, channel_id: int) -> list[UserChannelRoleEntity]:
+        assignments = UserChannelRole.objects.filter(channel_id=channel_id)
+        return [_to_user_role_entity(a) for a in assignments]
+
+    def remove_role_assignment(
+        self, channel_id: int, user_id: int, role_id: int
+    ) -> bool:
+        deleted_count, _ = UserChannelRole.objects.filter(
+            channel_id=channel_id, user_id=user_id, role_id=role_id
+        ).delete()
+        return deleted_count > 0
+
     def get_user_permissions(self, channel_id: int, user_id: int) -> list[str]:
         roles = ChannelRole.objects.filter(
             assignments__channel_id=channel_id, assignments__user_id=user_id

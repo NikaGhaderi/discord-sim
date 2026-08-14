@@ -60,19 +60,19 @@ export const MediaUploadButton: React.FC<MediaUploadButtonProps> = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="p-2 text-gray-500 hover:text-indigo-600 border border-gray-300 rounded-md text-sm font-medium disabled:opacity-50"
+          className="p-2 border rounded-md text-sm font-medium disabled:opacity-50 text-[var(--ws-text-secondary)] border-[var(--ws-border)] hover:text-[var(--ws-primary)]"
           aria-label="Attach File"
         >
           📎 Attach
         </button>
       ) : (
-        <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md border border-gray-300 text-xs text-gray-700">
+        <div className="flex items-center gap-2 p-1.5 rounded-md border text-xs bg-[var(--ws-bg-hover)] border-[var(--ws-border)] text-[var(--ws-text)]">
           <span className="font-medium truncate max-w-[150px]">{selectedFile.name}</span>
-          <span className="text-gray-500">({formatFileSize(selectedFile.size)})</span>
+          <span className="text-[var(--ws-text-secondary)]">({formatFileSize(selectedFile.size)})</span>
           <button
             type="button"
             onClick={handleClear}
-            className="text-red-500 hover:text-red-700 font-bold ml-1"
+            className="font-bold ml-1 text-[var(--ws-danger)] hover:opacity-75"
             aria-label="Remove Attachment"
           >
             ×

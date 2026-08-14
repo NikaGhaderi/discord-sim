@@ -20,6 +20,7 @@ export interface Group {
   name: string;
   creator_id: number;
   created_at: string;
+  invite_token: string;
 }
 
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
@@ -27,6 +28,11 @@ export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 export interface GroupInvitation {
   invitation_id: number;
   group_id: number;
+  /** Only populated on the my-invitations list -- the invitee isn't a group
+   * member yet, so GetGroupUseCase (which requires membership) can't be
+   * used to resolve the name any other way. Null on other responses that
+   * reuse this same shape (e.g. the create-invitation response). */
+  group_name: string | null;
   inviter_id: number;
   invitee_id: number;
   status: InvitationStatus;

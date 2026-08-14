@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { resolveMediaUrl } from '@infrastructure/apiClient';
 
 export interface ProfileData {
   display_name: string;
@@ -11,39 +12,116 @@ interface ProfileViewProps {
   profile: ProfileData;
   isOwnProfile: boolean;
   onEditClick?: () => void;
+  /** Only relevant when isOwnProfile -- shows a "Change Photo" control that
+   * calls this with the selected file. */
+  onAvatarUpload?: (file: File) => void;
+  isUploadingAvatar?: boolean;
+  /** True when rendered inside another component that already provides its
+   * own modal-card chrome (e.g. UserProfileModal, which wraps this in a
+   * <Modal>) -- skips ProfileView's own .modal-card wrapper so the two
+   * fixed-width cards don't nest and force a horizontal scrollbar. */
+  embedded?: boolean;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   profile,
   isOwnProfile,
   onEditClick,
+  onAvatarUpload,
+  isUploadingAvatar = false,
+  embedded = false,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onAvatarUpload?.(file);
+    e.target.value = '';
+  };
+
+  const initial = profile.display_name.trim().charAt(0).toUpperCase() || '?';
+
   return (
-    <div style={{ maxWidth: '400px', margin: '2rem auto', padding: '1rem', border: '1px solid #ccc', borderRadius: '8px' }}>
+    <div className={embedded ? undefined : 'modal-card'} style={embedded ? undefined : { margin: '2rem auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-        <img
-          src={profile.avatar_url || 'https://via.placeholder.com/150'}
-          alt={profile.display_name}
-          style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover' }}
-        />
-        <h2>{profile.display_name}</h2>
-        <p style={{ color: '#666' }}>{profile.bio || 'No bio provided.'}</p>
+        {profile.avatar_url ? (
+          <a
+            href={resolveMediaUrl(profile.avatar_url)}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: 'inline-block' }}
+          >
+            <img
+              src={resolveMediaUrl(profile.avatar_url)}
+              alt={profile.display_name}
+              style={{
+                display: 'block',
+                margin: '0 auto',
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+              }}
+            />
+          </a>
+        ) : (
+          // No external placeholder-image dependency (it can silently fail
+          // to load, leaving a blank gap) -- a generated initial always
+          // renders and already matches whatever palette is active.
+          <div
+            style={{
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '48px',
+              fontWeight: 700,
+              background: 'var(--ws-primary)',
+              color: 'var(--ws-text-on-bubble)',
+            }}
+          >
+            {initial}
+          </div>
+        )}
+        <h2 style={{ margin: '0.75rem 0 0.25rem' }}>{profile.display_name}</h2>
+        <p style={{ color: 'var(--ws-text-secondary)', margin: 0 }}>
+          {profile.bio || 'No bio provided.'}
+        </p>
+
+        {isOwnProfile && onAvatarUpload && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              data-testid="avatar-file-input"
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingAvatar}
+            >
+              {isUploadingAvatar ? 'Uploading...' : 'Change Photo'}
+            </button>
+          </div>
+        )}
       </div>
 
       {isOwnProfile && (
-        <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-          <span>
-            <strong>Allow Group Invitations: </strong>
-            {profile.allow_group_invitations ? 'Yes' : 'No'}
-          </span>
+        <div className="list-row" style={{ borderBottom: 'none' }}>
+          <span>Allow Group Invitations</span>
+          <strong>{profile.allow_group_invitations ? 'Yes' : 'No'}</strong>
         </div>
       )}
 
       {isOwnProfile && onEditClick && (
-        <button
-          onClick={onEditClick}
-          style={{ marginTop: '1.5rem', width: '100%', padding: '0.5rem 1rem', cursor: 'pointer' }}
-        >
+        <button onClick={onEditClick} className="btn btn-primary btn-block" style={{ marginTop: '1.5rem' }}>
           Edit Profile
         </button>
       )}

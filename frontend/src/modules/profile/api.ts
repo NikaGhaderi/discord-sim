@@ -31,6 +31,7 @@ export interface ProfileApi {
    * result, not errored.
    */
   listPublicProfilesByIds(userIds: number[]): Promise<PublicProfile[]>;
+  uploadAvatar(file: File): Promise<UserProfile>;
 }
 
 export const getMyProfile = async (): Promise<UserProfile> => {
@@ -62,6 +63,15 @@ export const listPublicProfilesByIds = async (
   }
   const response = await apiClient.get<PublicProfile[]>('/api/users/by-ids/', {
     params: { ids: userIds.join(',') },
+  });
+  return response.data;
+};
+
+export const uploadAvatar = async (file: File): Promise<UserProfile> => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const response = await apiClient.post<UserProfile>('/api/users/me/avatar/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;
 };

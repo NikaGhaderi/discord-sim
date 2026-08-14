@@ -46,6 +46,10 @@ export interface WorkspacesApi {
   updateRole(channelId: number, roleId: number, payload: UpdateRolePayload): Promise<Role>;
   deleteRole(channelId: number, roleId: number): Promise<void>;
   assignRole(channelId: number, userId: number, roleId: number): Promise<RoleAssignment>;
+  /** Every role currently assigned to every member of the channel -- powers
+   * the admin-facing "who has what role" table. Requires MANAGE_ROLES. */
+  listRoleAssignments(channelId: number): Promise<RoleAssignment[]>;
+  removeRoleAssignment(channelId: number, userId: number, roleId: number): Promise<void>;
 
   listTopics(channelId: number): Promise<Topic[]>;
   getTopic(channelId: number, topicId: number): Promise<Topic>;
@@ -67,6 +71,7 @@ const ENDPOINTS = {
   memberRoles: (channelId: number, userId: number) =>
     `/api/channels/${channelId}/members/${userId}/roles/`,
   roles: (channelId: number) => `/api/channels/${channelId}/roles/`,
+  roleAssignments: (channelId: number) => `/api/channels/${channelId}/role-assignments/`,
   role: (channelId: number, roleId: number) =>
     `/api/channels/${channelId}/roles/${roleId}/`,
   topics: (channelId: number) => `/api/channels/${channelId}/topics/`,
@@ -199,6 +204,25 @@ export const assignRole = async (
     { role_id: roleId }
   );
   return response.data;
+};
+
+export const listRoleAssignments = async (
+  channelId: number
+): Promise<RoleAssignment[]> => {
+  const response = await apiClient.get<RoleAssignment[]>(
+    ENDPOINTS.roleAssignments(channelId)
+  );
+  return response.data;
+};
+
+export const removeRoleAssignment = async (
+  channelId: number,
+  userId: number,
+  roleId: number
+): Promise<void> => {
+  await apiClient.delete(ENDPOINTS.memberRoles(channelId, userId), {
+    data: { role_id: roleId },
+  });
 };
 
 export const listTopics = async (channelId: number): Promise<Topic[]> => {

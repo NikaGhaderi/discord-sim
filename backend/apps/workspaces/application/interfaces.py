@@ -111,5 +111,13 @@ class AbstractChannelRepository(ABC):
     ) -> UserChannelRoleEntity: ...
 
     @abstractmethod
+    def list_role_assignments(self, channel_id: int) -> list[UserChannelRoleEntity]: ...
+
+    @abstractmethod
+    def remove_role_assignment(
+        self, channel_id: int, user_id: int, role_id: int
+    ) -> bool: ...
+
+    @abstractmethod
     def get_user_permissions(self, channel_id: int, user_id: int) -> list[str]:
         """Union of permissions from every role assigned to user_id in channel_id."""

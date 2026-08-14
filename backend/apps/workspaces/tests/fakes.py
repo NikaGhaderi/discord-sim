@@ -249,6 +249,22 @@ class InMemoryChannelRepository(AbstractChannelRepository):
         self._next_user_role_id += 1
         return user_role
 
+    def list_role_assignments(self, channel_id: int) -> list[UserChannelRoleEntity]:
+        return [ur for ur in self._user_roles.values() if ur.channel_id == channel_id]
+
+    def remove_role_assignment(
+        self, channel_id: int, user_id: int, role_id: int
+    ) -> bool:
+        for ur_id, ur in list(self._user_roles.items()):
+            if (
+                ur.channel_id == channel_id
+                and ur.user_id == user_id
+                and ur.role_id == role_id
+            ):
+                del self._user_roles[ur_id]
+                return True
+        return False
+
     def get_user_permissions(self, channel_id: int, user_id: int) -> list[str]:
         role_ids = {
             ur.role_id
