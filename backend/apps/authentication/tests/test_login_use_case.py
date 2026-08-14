@@ -3,7 +3,6 @@ import pytest
 from apps.authentication.application.use_cases.login import (
     AuthenticatedUser,
     LoginUseCase,
-    Requires2FA,
 )
 from apps.authentication.application.use_cases.register import RegisterUserUseCase
 from apps.authentication.domain.exceptions import InvalidCredentialsError
@@ -31,18 +30,18 @@ def test_login_with_correct_credentials_and_no_2fa_returns_authenticated_user():
     assert result.user.username == USERNAME
 
 
-def test_login_with_2fa_enabled_returns_requires_2fa_with_a_temp_token():
+def test_login_with_2fa_enabled_still_returns_authenticated_user_on_this_branch():
+    # production branch only: 2FA is force-disabled at login regardless of
+    # is_2fa_enabled, since this deployment has no working outbound email
+    # to actually deliver a code. See login.py for why -- do not merge this
+    # test change back to develop/main, which keep the real Requires2FA path.
     repo = InMemoryAuthRepository()
-    user = _register(repo, is_2fa_enabled=True)
+    _register(repo, is_2fa_enabled=True)
 
     result = LoginUseCase(repo).execute(USERNAME, PASSWORD)
 
-    assert isinstance(result, Requires2FA)
-    assert result.email == EMAIL
-    assert len(result.code) == 6
-    assert result.code.isdigit()
-    assert result.temp_token
-    assert repo.consume_two_factor_challenge(result.temp_token, result.code) == user.id
+    assert isinstance(result, AuthenticatedUser)
+    assert result.user.username == USERNAME
 
 
 def test_login_with_email_instead_of_username_succeeds():

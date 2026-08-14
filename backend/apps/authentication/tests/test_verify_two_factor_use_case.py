@@ -1,6 +1,6 @@
 import pytest
 
-from apps.authentication.application.use_cases.login import LoginUseCase, Requires2FA
+from apps.authentication.application.use_cases.login import Requires2FA
 from apps.authentication.application.use_cases.register import RegisterUserUseCase
 from apps.authentication.application.use_cases.verify_two_factor import (
     VerifyTwoFactorUseCase,
@@ -16,11 +16,14 @@ PASSWORD = "correct-horse-battery"
 
 
 def _login_and_request_2fa(repo) -> tuple[UserEntity, Requires2FA]:
+    # production branch only: LoginUseCase itself never takes the 2FA path
+    # here (see login.py), but VerifyTwoFactorUseCase is unchanged and still
+    # real/correct code -- exercise it directly against the repository
+    # instead of relying on LoginUseCase to produce the challenge.
     user = RegisterUserUseCase(repo).execute(USERNAME, EMAIL, PASSWORD)
     user.is_2fa_enabled = True
-    result = LoginUseCase(repo).execute(USERNAME, PASSWORD)
-    assert isinstance(result, Requires2FA)
-    return user, result
+    code, temp_token = repo.create_two_factor_challenge(user.id)
+    return user, Requires2FA(email=user.email, code=code, temp_token=temp_token)
 
 
 def test_verify_with_correct_code_returns_the_user():

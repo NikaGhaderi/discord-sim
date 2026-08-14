@@ -41,14 +41,10 @@ class LoginUseCase:
         if not user.is_active:
             raise InvalidCredentialsError("Invalid username or password.")
 
-        if user.is_2fa_enabled:
-            # get_by_username only ever returns persisted users, so id is set;
-            # asserted (not re-raised as InvalidCredentialsError) so a broken
-            # repository adapter surfaces as its own bug, not a bogus login failure.
-            assert user.id is not None, "repository returned a user with no id"
-            code, temp_token = self._repository.create_two_factor_challenge(user.id)
-            # code/temp_token handed to the caller so the api layer can email/
-            # return them; must never be logged or persisted in plaintext elsewhere.
-            return Requires2FA(email=user.email, code=code, temp_token=temp_token)
-
+        # production branch only: 2FA is disabled here regardless of
+        # user.is_2fa_enabled -- this deployment has no working outbound
+        # email (no domain to verify with a provider), so a 2FA code would
+        # never actually reach anyone and login would be permanently
+        # blocked. develop/main keep the real check; do not merge this
+        # change back there.
         return AuthenticatedUser(user=user)
