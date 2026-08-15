@@ -146,6 +146,18 @@ describe('NotificationFeed', () => {
     expect(notificationsApi.markNotificationAsRead).toHaveBeenCalledWith(1, true);
   });
 
+  it('does not show already-read notifications on initial load, even though the API returns them', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([
+      { ...notification, notification_id: 2, is_read: true, payload: { content: 'old, already read' } },
+      { ...notification, is_read: false },
+    ]);
+
+    render(<NotificationFeed />);
+
+    expect(await screen.findByText('hello there')).toBeInTheDocument();
+    expect(screen.queryByText('old, already read')).not.toBeInTheDocument();
+  });
+
   it('keeps the notification removed locally even if persisting the read state fails', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce([notification]);
     vi.mocked(notificationsApi.markNotificationAsRead).mockRejectedValueOnce(new Error('nope'));
