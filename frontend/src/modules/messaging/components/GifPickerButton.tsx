@@ -50,14 +50,19 @@ function toGifResults(data: unknown[]): GifResult[] {
       title: string;
       images: {
         fixed_height_small: { url: string };
-        original: { url: string };
+        fixed_height: { url: string };
       };
     };
     return {
       id: gif.id,
       title: gif.title,
       previewUrl: gif.images.fixed_height_small.url,
-      fullUrl: gif.images.original.url,
+      // images.original can be tens of MB (Giphy's raw upload, uncapped
+      // resolution/duration) -- loads fine on desktop wifi but times out or
+      // gets refused by mobile data-saver on cellular. fixed_height caps
+      // height at 200px, which keeps file size in the tens-to-low-hundreds
+      // of KB range while still being a full-quality GIF for chat display.
+      fullUrl: gif.images.fixed_height.url,
     };
   });
 }
