@@ -80,9 +80,9 @@ class TestSendGroupInvitationUseCase:
         )
         recorder.reset_mock()
 
-        _invitation, created = SendGroupInvitationUseCase(repo, profiles, recorder).execute(
-            group_id=1, inviter_id=10, invitee_id=20
-        )
+        _invitation, created = SendGroupInvitationUseCase(
+            repo, profiles, recorder
+        ).execute(group_id=1, inviter_id=10, invitee_id=20)
 
         assert created is False
         recorder.record.assert_not_called()
