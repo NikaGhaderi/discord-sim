@@ -9,6 +9,10 @@ interface ChannelSidebarProps {
   onSelectChannel: (channelId: number) => void;
   onChannelCreated: (channel: Channel) => void;
   onChannelJoined: (membership: ChannelMember) => void;
+  /** True to slide this in as an open drawer on mobile (see the
+   * `.sidebar.mobile-open` rule in workspaces.css) -- irrelevant above the
+   * mobile breakpoint, where the sidebar is always visible regardless. */
+  mobileOpen?: boolean;
 }
 
 type OpenModal = 'none' | 'create' | 'join';
@@ -19,12 +23,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onSelectChannel,
   onChannelCreated,
   onChannelJoined,
+  mobileOpen = false,
 }) => {
   const [openModal, setOpenModal] = useState<OpenModal>('none');
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       {/*
         "Home"/"Friends"/"Direct Messages" used to live here as
         non-functional placeholders (no onClick at all, and "Friends" has

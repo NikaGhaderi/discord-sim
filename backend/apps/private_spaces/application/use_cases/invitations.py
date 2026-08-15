@@ -17,9 +17,11 @@ class SendGroupInvitationUseCase:
         self,
         repository: AbstractPrivateSpacesRepository,
         profile_repository: AbstractProfileRepository,
+        notification_recorder: AbstractNotificationRecorder | None = None,
     ) -> None:
         self._repository = repository
         self._profile_repository = profile_repository
+        self._notification_recorder = notification_recorder
 
     def execute(
         self, group_id: int, inviter_id: int, invitee_id: int
@@ -37,9 +39,19 @@ class SendGroupInvitationUseCase:
         if self._repository.is_group_member(group_id, invitee_id):
             raise AlreadyGroupMemberError("This user is already a group member.")
 
-        return self._repository.create_or_get_invitation(
+        invitation, created = self._repository.create_or_get_invitation(
             group_id, inviter_id, invitee_id
         )
+        # Only on an actually-new invitation -- create_or_get_invitation
+        # returns the existing pending one (created=False) if the invitee
+        # already had one, and that shouldn't notify them a second time.
+        if created and self._notification_recorder is not None:
+            self._notification_recorder.record(
+                [invitee_id],
+                "GROUP_INVITATION_RECEIVED",
+                {"group_id": group_id, "inviter_id": inviter_id},
+            )
+        return invitation, created
 
 
 class RespondToInvitationUseCase:

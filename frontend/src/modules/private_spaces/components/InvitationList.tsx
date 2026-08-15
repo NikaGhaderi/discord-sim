@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@shared/components/Avatar';
 import { profileApi, PublicProfile } from '../../profile';
+import { socketClient } from '../../notifications';
 import { privateSpacesApi } from '../index';
 import { GroupInvitation } from '../types';
 
@@ -20,43 +21,53 @@ export const InvitationList: React.FC<InvitationListProps> = ({ onAccepted }) =>
   const [error, setError] = useState(false);
   const [respondingId, setRespondingId] = useState<number | null>(null);
 
+  const loadInvitations = useCallback(async (isCancelled: () => boolean) => {
+    setIsLoading(true);
+    setError(false);
+    try {
+      const page = await privateSpacesApi.listMyInvitations();
+      if (isCancelled()) return;
+      setInvitations(page.results);
+
+      const inviterIds = Array.from(
+        new Set(page.results.map((inv) => inv.inviter_id))
+      );
+      const profiles = await profileApi.listPublicProfilesByIds(inviterIds);
+      if (!isCancelled()) {
+        setInviterProfilesById(
+          Object.fromEntries(profiles.map((p) => [p.user_id, p]))
+        );
+      }
+    } catch {
+      if (!isCancelled()) {
+        setError(true);
+      }
+    } finally {
+      if (!isCancelled()) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-
-    const loadInvitations = async () => {
-      setIsLoading(true);
-      setError(false);
-      try {
-        const page = await privateSpacesApi.listMyInvitations();
-        if (cancelled) return;
-        setInvitations(page.results);
-
-        const inviterIds = Array.from(
-          new Set(page.results.map((inv) => inv.inviter_id))
-        );
-        const profiles = await profileApi.listPublicProfilesByIds(inviterIds);
-        if (!cancelled) {
-          setInviterProfilesById(
-            Object.fromEntries(profiles.map((p) => [p.user_id, p]))
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setError(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadInvitations();
-
+    void loadInvitations(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadInvitations]);
+
+  // A new invitation sent while this list is already open previously
+  // required a full page reload to show up -- the sender's own action
+  // never pushed anything to the invitee. Refetch live instead whenever a
+  // GROUP_INVITATION_RECEIVED notification arrives over the socket.
+  useEffect(() => {
+    return socketClient.onNewNotification((notification) => {
+      if (notification.event_type === 'GROUP_INVITATION_RECEIVED') {
+        void loadInvitations(() => false);
+      }
+    });
+  }, [loadInvitations]);
 
   const respond = async (invitationId: number, status: 'ACCEPTED' | 'DECLINED') => {
     setRespondingId(invitationId);
