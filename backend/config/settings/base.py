@@ -114,6 +114,36 @@ STORAGES = {
     },
 }
 
+# Local dev writes uploaded media (avatars, message attachments) to disk at
+# MEDIA_ROOT, served by nginx's own /media/ location (see nginx/nginx.conf)
+# via the shared media_volume. That setup doesn't exist on a plain
+# single-container deployment (e.g. Railway's backend service runs this
+# Dockerfile directly, no nginx in front) -- nothing would serve /media/ at
+# all, and the container's disk isn't persisted across redeploys anyway.
+# Setting AWS_STORAGE_BUCKET_NAME switches the default file storage to any
+# S3-compatible bucket (AWS S3, Cloudflare R2, Backblaze B2, ...), which
+# serves uploads directly from the bucket's own public URL -- no reliance
+# on this app process for serving, and durable across redeploys.
+USE_S3_MEDIA = bool(os.environ.get("AWS_STORAGE_BUCKET_NAME"))
+if USE_S3_MEDIA:
+    STORAGES["default"] = {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"}
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+    AWS_STORAGE_BUCKET_NAME = os.environ["AWS_STORAGE_BUCKET_NAME"]
+    AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "auto")
+    # Only needed for non-AWS S3-compatible providers (e.g. Cloudflare R2's
+    # https://<account_id>.r2.cloudflarestorage.com) -- leave unset for real AWS S3.
+    AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL") or None
+    # Optional public-facing domain if the bucket is fronted by a CDN/custom
+    # domain (e.g. R2's public bucket URL) -- otherwise falls back to the
+    # provider's own default public URL for the bucket.
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN") or None
+    # The bucket is expected to have a public-read policy for uploaded media
+    # (profile pictures, message attachments aren't sensitive), so URLs don't
+    # need per-request signature query strings -- shorter, cacheable links.
+    AWS_QUERYSTRING_AUTH = False
+    AWS_DEFAULT_ACL = None
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- DRF ---

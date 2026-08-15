@@ -48,6 +48,45 @@ class TestSendGroupInvitationUseCase:
         assert invitation.status == "PENDING"
         assert invitation.invitee_id == 20
 
+    def test_notifies_the_invitee_when_a_new_invitation_is_created(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        profiles = InMemoryProfileRepository(
+            [_profile(20, allow_group_invitations=True)]
+        )
+        recorder = Mock()
+
+        SendGroupInvitationUseCase(repo, profiles, recorder).execute(
+            group_id=1, inviter_id=10, invitee_id=20
+        )
+
+        recorder.record.assert_called_once_with(
+            [20], "GROUP_INVITATION_RECEIVED", {"group_id": 1, "inviter_id": 10}
+        )
+
+    def test_does_not_re_notify_for_an_already_pending_invitation(self):
+        repo = InMemoryPrivateSpacesRepository()
+        repo.seed_group(1, "Group", creator_id=10)
+        repo.seed_membership(1, 10)
+        repo.seed_user(20)
+        profiles = InMemoryProfileRepository(
+            [_profile(20, allow_group_invitations=True)]
+        )
+        recorder = Mock()
+        SendGroupInvitationUseCase(repo, profiles, recorder).execute(
+            group_id=1, inviter_id=10, invitee_id=20
+        )
+        recorder.reset_mock()
+
+        _invitation, created = SendGroupInvitationUseCase(
+            repo, profiles, recorder
+        ).execute(group_id=1, inviter_id=10, invitee_id=20)
+
+        assert created is False
+        recorder.record.assert_not_called()
+
     def test_rejects_when_invitee_disabled_invitations(self):
         repo = InMemoryPrivateSpacesRepository()
         repo.seed_group(1, "Group", creator_id=10)

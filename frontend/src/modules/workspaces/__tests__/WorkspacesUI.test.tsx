@@ -780,6 +780,35 @@ describe('WorkspacePage', () => {
     expect(screen.getByText('Channel Settings')).toBeInTheDocument();
   });
 
+  it('opens the mobile channel drawer via the hamburger button, and closes it by selecting a channel', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
+    expect(sidebar.className).not.toContain('mobile-open');
+
+    fireEvent.click(screen.getByRole('button', { name: /open channel list/i }));
+    expect(sidebar.className).toContain('mobile-open');
+
+    fireEvent.click(within(sidebar).getByText('# general'));
+    expect(sidebar.className).not.toContain('mobile-open');
+  });
+
+  it('closes the mobile channel drawer by clicking the backdrop', async () => {
+    vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
+
+    render(<WorkspacePage />);
+    await screen.findAllByText('# general');
+    fireEvent.click(screen.getByRole('button', { name: /open channel list/i }));
+
+    fireEvent.click(document.querySelector('.mobile-sidebar-backdrop') as HTMLElement);
+
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
+    expect(sidebar.className).not.toContain('mobile-open');
+  });
+
   it('renders the real message thread for the selected channel default topic', async () => {
     vi.mocked(workspacesApi.listChannels).mockResolvedValueOnce([channel]);
     vi.mocked(messagingApi.listMessages).mockResolvedValueOnce({

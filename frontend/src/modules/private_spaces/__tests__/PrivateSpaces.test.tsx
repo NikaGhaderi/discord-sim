@@ -386,6 +386,48 @@ describe('Private Spaces (SCRUM-35 network wiring)', () => {
       expect(onSelectDm).toHaveBeenCalledWith(dm);
     });
 
+    it('deletes a DM from the list without selecting it, and notifies the parent', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+      const dm = { direct_chat_id: 1, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' };
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([dm]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        { user_id: 777, username: 'ftm_roosta', display_name: 'Fatemeh Roosta', avatar_url: null, bio: '' },
+      ]);
+      vi.mocked(privateSpacesApi.deleteDirectChat).mockResolvedValueOnce(undefined);
+      const onSelectDm = vi.fn();
+      const onDeletedDm = vi.fn();
+
+      render(
+        <DirectMessageList currentUserId={currentUserId} onSelectDm={onSelectDm} onDeletedDm={onDeletedDm} />
+      );
+      await screen.findByText('ftm_roosta');
+
+      fireEvent.click(screen.getByRole('button', { name: /delete conversation/i }));
+
+      await waitFor(() => expect(privateSpacesApi.deleteDirectChat).toHaveBeenCalledWith(1));
+      expect(onDeletedDm).toHaveBeenCalledWith(1);
+      expect(onSelectDm).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByText('ftm_roosta')).not.toBeInTheDocument());
+    });
+
+    it('declining the confirm dialog does not delete the DM', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+      vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
+        { direct_chat_id: 1, user1_id: currentUserId, user2_id: 777, created_at: '2026-01-01T00:00:00Z' },
+      ]);
+      vi.mocked(profileApi.listPublicProfilesByIds).mockResolvedValueOnce([
+        { user_id: 777, username: 'ftm_roosta', display_name: 'Fatemeh Roosta', avatar_url: null, bio: '' },
+      ]);
+
+      render(<DirectMessageList currentUserId={currentUserId} />);
+      await screen.findByText('ftm_roosta');
+
+      fireEvent.click(screen.getByRole('button', { name: /delete conversation/i }));
+
+      expect(privateSpacesApi.deleteDirectChat).not.toHaveBeenCalled();
+      expect(screen.getByText('ftm_roosta')).toBeInTheDocument();
+    });
+
     it('falls back to a generated initial when the participant has no avatar_url', async () => {
       vi.mocked(privateSpacesApi.listDirectChats).mockResolvedValueOnce([
         { direct_chat_id: 1, user1_id: currentUserId, user2_id: 778, created_at: '2026-01-01T00:00:00Z' },

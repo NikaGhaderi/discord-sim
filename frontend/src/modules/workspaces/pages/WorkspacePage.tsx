@@ -20,6 +20,7 @@ export const WorkspacePage: React.FC = () => {
   const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMemberListOpen, setIsMemberListOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<OpenPanel>('none');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [hasDeletePermission, setHasDeletePermission] = useState(false);
@@ -109,10 +110,20 @@ export const WorkspacePage: React.FC = () => {
 
   return (
     <div className="workspace-layout" dir="ltr" lang="en">
+      {isMobileSidebarOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
       <ChannelSidebar
         channels={channels}
         selectedChannelId={selectedChannelId}
-        onSelectChannel={setSelectedChannelId}
+        mobileOpen={isMobileSidebarOpen}
+        onSelectChannel={(channelId) => {
+          setSelectedChannelId(channelId);
+          setIsMobileSidebarOpen(false);
+        }}
         onChannelCreated={(channel) => {
           setChannels((prev) => [...prev, channel]);
           setSelectedChannelId(channel.channel_id);
@@ -127,6 +138,14 @@ export const WorkspacePage: React.FC = () => {
         {selectedChannel ? (
           <>
             <header className="main-header">
+              <button
+                type="button"
+                className="btn mobile-menu-btn"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open channel list"
+              >
+                ☰
+              </button>
               <span
                 onClick={() => setIsMemberListOpen(true)}
                 style={{ cursor: 'pointer' }}
@@ -167,7 +186,19 @@ export const WorkspacePage: React.FC = () => {
             </div>
           </>
         ) : (
-          <p className="empty-state">Select or create a channel to get started.</p>
+          <>
+            <header className="main-header">
+              <button
+                type="button"
+                className="btn mobile-menu-btn"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open channel list"
+              >
+                ☰
+              </button>
+            </header>
+            <p className="empty-state">Select or create a channel to get started.</p>
+          </>
         )}
       </main>
 
