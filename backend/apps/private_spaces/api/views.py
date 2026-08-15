@@ -226,7 +226,9 @@ class GroupInvitationCreateView(APIView):
 
         try:
             invitation, created = SendGroupInvitationUseCase(
-                DjangoPrivateSpacesRepository(), DjangoProfileRepository()
+                DjangoPrivateSpacesRepository(),
+                DjangoProfileRepository(),
+                DjangoNotificationRecorder(),
             ).execute(
                 group_id=group_id,
                 inviter_id=request.user.id,

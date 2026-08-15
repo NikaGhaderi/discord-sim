@@ -36,6 +36,8 @@ export const AppNav: React.FC = () => {
       style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        rowGap: 6,
         gap: 4,
         padding: '10px 20px',
         borderBottom: '1px solid var(--ws-border)',

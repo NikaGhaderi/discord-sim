@@ -192,6 +192,10 @@ body {
   padding: 12px;
 }
 
+.private-spaces-sidebar {
+  width: 300px;
+}
+
 .sidebar-section-title {
   display: flex;
   align-items: center;
@@ -238,6 +242,58 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+}
+
+/* --- Mobile layout ------------------------------------------------------
+   Below this width, the fixed 240px sidebar would eat most of the screen,
+   so it becomes a slide-in drawer (hidden by default, toggled by a
+   hamburger button each page renders in its own header) instead of sitting
+   permanently alongside the main panel. Both WorkspacePage and
+   PrivateSpacesPage share the .sidebar/.workspace-layout/.main-panel
+   classes, so this single block covers both. */
+.mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .workspace-layout {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: min(80vw, 300px);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 45;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .main-header {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 .main-header {

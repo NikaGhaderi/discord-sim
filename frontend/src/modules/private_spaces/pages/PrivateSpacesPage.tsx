@@ -6,6 +6,7 @@ import { GroupList } from '../components/GroupList';
 import { GroupSettingsPanel } from '../components/GroupSettingsPanel';
 import { InvitationList } from '../components/InvitationList';
 import { MessageThread } from '../../messaging/components/MessageThread';
+import { ScheduledMessagesPanel } from '../../messaging/components/ScheduledMessagesPanel';
 import { Modal } from '@shared/components/Modal';
 import { UserProfileModal } from '@shared/components/UserProfileModal';
 import { DirectChat, Group } from '../types';
@@ -24,7 +25,11 @@ export const PrivateSpacesPage: React.FC = () => {
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState(false);
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
+  const [isScheduledOpen, setIsScheduledOpen] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<number | null>(null);
+  const [removedDmId, setRemovedDmId] = useState<number | null>(null);
+  const [isDeletingDm, setIsDeletingDm] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   // sender_id -> real username, for whichever group/DM is currently open --
   // like channels, the backend never sends a username on a message, only
   // sender_id, so it has to be resolved client-side per thread.
@@ -104,6 +109,20 @@ export const PrivateSpacesPage: React.FC = () => {
       dm,
       otherUsername: otherProfile?.username ?? `User #${otherId}`,
     });
+    setIsMobileSidebarOpen(false);
+  };
+
+  const handleDeleteOpenDm = async () => {
+    if (selected?.kind !== 'dm') return;
+    if (!window.confirm('Delete this conversation? This cannot be undone.')) return;
+    setIsDeletingDm(true);
+    try {
+      await privateSpacesApi.deleteDirectChat(selected.dm.direct_chat_id);
+      setRemovedDmId(selected.dm.direct_chat_id);
+      setSelected(null);
+    } finally {
+      setIsDeletingDm(false);
+    }
   };
 
   if (isLoadingUser) {
@@ -116,14 +135,32 @@ export const PrivateSpacesPage: React.FC = () => {
 
   return (
     <div className="private-spaces-layout workspace-layout">
+      {isMobileSidebarOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
       <aside
-        className="private-spaces-sidebar sidebar"
-        style={{ width: '300px', overflowY: 'auto' }}
+        className={`private-spaces-sidebar sidebar${isMobileSidebarOpen ? ' mobile-open' : ''}`}
+        style={{ overflowY: 'auto' }}
       >
-        <DirectMessageList currentUserId={currentUserId} onSelectDm={(dm) => void handleSelectDm(dm)} />
+        <DirectMessageList
+          currentUserId={currentUserId}
+          onSelectDm={(dm) => void handleSelectDm(dm)}
+          removedDmId={removedDmId}
+          onDeletedDm={(dmId) => {
+            if (selected?.kind === 'dm' && selected.dm.direct_chat_id === dmId) {
+              setSelected(null);
+            }
+          }}
+        />
         <hr style={{ margin: '20px 0', borderColor: 'var(--ws-border)' }} />
         <GroupList
-          onSelectGroup={(group) => setSelected({ kind: 'group', group })}
+          onSelectGroup={(group) => {
+            setSelected({ kind: 'group', group });
+            setIsMobileSidebarOpen(false);
+          }}
           removedGroupId={removedGroupId}
           reloadToken={groupsReloadToken}
         />
@@ -135,6 +172,14 @@ export const PrivateSpacesPage: React.FC = () => {
         {selected ? (
           <>
             <header className="main-header">
+              <button
+                type="button"
+                className="btn mobile-menu-btn"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open direct messages and groups list"
+              >
+                ☰
+              </button>
               {selected.kind === 'dm' ? (
                 <button
                   type="button"
@@ -153,11 +198,26 @@ export const PrivateSpacesPage: React.FC = () => {
               ) : (
                 <strong>{selected.group.name}</strong>
               )}
-              {selected.kind === 'group' && (
-                <button type="button" className="btn" onClick={() => setIsGroupSettingsOpen(true)}>
-                  Settings
+              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                <button type="button" className="btn" onClick={() => setIsScheduledOpen(true)}>
+                  Scheduled
                 </button>
-              )}
+                {selected.kind === 'group' && (
+                  <button type="button" className="btn" onClick={() => setIsGroupSettingsOpen(true)}>
+                    Settings
+                  </button>
+                )}
+                {selected.kind === 'dm' && (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={isDeletingDm}
+                    onClick={() => void handleDeleteOpenDm()}
+                  >
+                    Delete Chat
+                  </button>
+                )}
+              </div>
             </header>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <MessageThread
@@ -169,7 +229,19 @@ export const PrivateSpacesPage: React.FC = () => {
             </div>
           </>
         ) : (
-          <p className="empty-state">Select a group or a direct message to start chatting.</p>
+          <>
+            <header className="main-header">
+              <button
+                type="button"
+                className="btn mobile-menu-btn"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open direct messages and groups list"
+              >
+                ☰
+              </button>
+            </header>
+            <p className="empty-state">Select a group or a direct message to start chatting.</p>
+          </>
         )}
       </main>
 
@@ -183,6 +255,18 @@ export const PrivateSpacesPage: React.FC = () => {
               setRemovedGroupId(groupId);
               setIsGroupSettingsOpen(false);
             }}
+          />
+        </Modal>
+      )}
+
+      {isScheduledOpen && selected && (
+        <Modal title="Scheduled Messages" onClose={() => setIsScheduledOpen(false)}>
+          <ScheduledMessagesPanel
+            target={
+              selected.kind === 'group'
+                ? { group_id: selected.group.group_id }
+                : { direct_chat_id: selected.dm.direct_chat_id }
+            }
           />
         </Modal>
       )}

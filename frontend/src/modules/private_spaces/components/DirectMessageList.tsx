@@ -7,6 +7,14 @@ import { DirectChat } from '../types';
 interface DirectMessageListProps {
   currentUserId: number;
   onSelectDm?: (dm: DirectChat) => void;
+  /** Fires after a DM is deleted from this list, so the parent can clear
+   * its selection if that was the currently-open chat. */
+  onDeletedDm?: (dmId: number) => void;
+  /** Set by the parent right after a delete succeeds elsewhere (e.g. a
+   * "Delete Chat" button in the open chat's own header) so this list --
+   * which owns its own fetched state -- drops the now-gone DM without a
+   * refetch. */
+  removedDmId?: number | null;
 }
 
 const otherParticipantId = (dm: DirectChat, currentUserId: number): number =>
@@ -15,6 +23,8 @@ const otherParticipantId = (dm: DirectChat, currentUserId: number): number =>
 export const DirectMessageList: React.FC<DirectMessageListProps> = ({
   currentUserId,
   onSelectDm,
+  onDeletedDm,
+  removedDmId,
 }) => {
   const [dms, setDms] = useState<DirectChat[]>([]);
   const [profilesById, setProfilesById] = useState<
@@ -25,6 +35,7 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
   const [newUsername, setNewUsername] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +77,24 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
       cancelled = true;
     };
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (removedDmId == null) return;
+    setDms((prev) => prev.filter((dm) => dm.direct_chat_id !== removedDmId));
+  }, [removedDmId]);
+
+  const handleDelete = async (e: React.MouseEvent, dmId: number) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this conversation? This cannot be undone.')) return;
+    setDeletingId(dmId);
+    try {
+      await privateSpacesApi.deleteDirectChat(dmId);
+      setDms((prev) => prev.filter((dm) => dm.direct_chat_id !== dmId));
+      onDeletedDm?.(dmId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleStartDm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,7 +178,18 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
                     regardless of whether the avatar is an <img> or the
                     text-initial fallback. */}
                 <Avatar avatarUrl={otherProfile?.avatar_url} label={label} />
-                <strong>{label}</strong>
+                <strong style={{ flex: 1 }}>{label}</strong>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ padding: '2px 8px', fontSize: 12 }}
+                  disabled={deletingId === dm.direct_chat_id}
+                  onClick={(e) => void handleDelete(e, dm.direct_chat_id)}
+                  aria-label={`Delete conversation with ${label}`}
+                  title="Delete conversation"
+                >
+                  ✕
+                </button>
               </li>
             );
           })}
