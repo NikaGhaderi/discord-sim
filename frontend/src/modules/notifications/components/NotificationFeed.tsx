@@ -44,7 +44,11 @@ export const NotificationFeed: React.FC = () => {
     let cancelled = false;
     notificationsApi.listNotifications().then((list) => {
       if (!cancelled) {
-        setNotifications(list);
+        // The API returns read notifications too (they're still real
+        // records), but this panel unmounts on close and remounts fresh on
+        // reopen -- without filtering here, anything marked read last time
+        // would come back from the server and reappear.
+        setNotifications(list.filter((n) => !n.is_read));
         setIsLoading(false);
       }
     });
