@@ -81,6 +81,11 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      # Matches what local dev gets from the (gitignored) .env.local --
+      # without this, resolveMediaUrl's baseURL defaults to "" in CI and
+      # tests asserting on a "http://localhost/..." prefix fail.
+      VITE_API_BASE_URL: http://localhost
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

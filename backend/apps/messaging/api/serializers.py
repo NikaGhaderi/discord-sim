@@ -1,0 +1,107 @@
+from rest_framework import serializers
+
+from apps.messaging.domain.exceptions import InvalidMessageTargetError
+from apps.messaging.domain.models import validate_exactly_one_target
+
+
+class MessageTargetSerializer(serializers.Serializer):
+    topic_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    group_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    direct_chat_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+
+    def validate(self, attrs):
+        try:
+            validate_exactly_one_target(
+                attrs.get("topic_id"),
+                attrs.get("group_id"),
+                attrs.get("direct_chat_id"),
+            )
+        except InvalidMessageTargetError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return attrs
+
+
+class SendMessageSerializer(MessageTargetSerializer):
+    # Blank is allowed so a message can carry only an attachment (media is
+    # attached in a second call, against this message's id, so the message
+    # itself must exist first regardless of whether it has any text).
+    content = serializers.CharField(allow_blank=True, trim_whitespace=False)
+
+
+class CreateScheduledMessageSerializer(SendMessageSerializer):
+    scheduled_time = serializers.DateTimeField()
+
+
+class ScheduledMessageQuerySerializer(serializers.Serializer):
+    topic_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    group_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    direct_chat_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+
+
+class ScheduledMessageSerializer(serializers.Serializer):
+    scheduled_id = serializers.IntegerField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    scheduled_time = serializers.DateTimeField(read_only=True)
+    topic_id = serializers.IntegerField(read_only=True, allow_null=True)
+    group_id = serializers.IntegerField(read_only=True, allow_null=True)
+    direct_chat_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+
+class MessageQuerySerializer(MessageTargetSerializer):
+    limit = serializers.IntegerField(
+        required=False, default=50, min_value=1, max_value=100
+    )
+    offset = serializers.IntegerField(required=False, default=0, min_value=0)
+
+
+class SearchMessageQuerySerializer(MessageQuerySerializer):
+    q = serializers.CharField(allow_blank=False, trim_whitespace=True)
+
+
+class UpdateMessageSerializer(serializers.Serializer):
+    content = serializers.CharField(allow_blank=False, trim_whitespace=False)
+
+
+class MediaUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(allow_empty_file=False)
+
+
+class MediaSerializer(serializers.Serializer):
+    media_id = serializers.IntegerField(read_only=True)
+    base_message_id = serializers.IntegerField(read_only=True)
+    file_url = serializers.CharField(read_only=True)
+    file_type = serializers.CharField(read_only=True)
+    file_size = serializers.IntegerField(read_only=True)
+    thumbnail_url = serializers.CharField(read_only=True, allow_null=True)
+
+
+class MediaSummarySerializer(serializers.Serializer):
+    file_url = serializers.CharField(read_only=True)
+    file_type = serializers.CharField(read_only=True)
+
+
+class MessageSerializer(serializers.Serializer):
+    base_message_id = serializers.IntegerField(source="id", read_only=True)
+    sender_id = serializers.IntegerField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    sent_at = serializers.DateTimeField(source="created_at", read_only=True)
+    is_edited = serializers.BooleanField(read_only=True)
+    media = MediaSummarySerializer(many=True, read_only=True)
+
+
+class SentMessageSerializer(serializers.Serializer):
+    base_message_id = serializers.IntegerField(source="id", read_only=True)
+    sender_id = serializers.IntegerField(read_only=True)
+    content = serializers.CharField(source="body", read_only=True)
+    sent_at = serializers.DateTimeField(source="created_at", read_only=True)
+    is_edited = serializers.BooleanField(read_only=True)
+
+
+# Compatibility names for callers written before SCRUM-38 split read/write
+# serializer responsibilities.
+CreateMessageSerializer = SendMessageSerializer
+MessageHistorySerializer = MessageSerializer

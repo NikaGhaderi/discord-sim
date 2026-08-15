@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/*
+ * The app fills the browser window exactly -- the outer page never
+ * scrolls; only specific inner regions (a message list, a modal body) do.
+ * This requires the full ancestor chain down to #root to have a real
+ * height (percentages don't work without one), which is why each level
+ * gets height: 100% explicitly rather than relying on content sizing.
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}

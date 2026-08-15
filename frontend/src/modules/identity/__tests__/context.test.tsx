@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context';
+import { SESSION_EXPIRED_EVENT } from '@infrastructure/apiClient';
 import * as identityModule from '../index';
 
 vi.mock('../index', () => ({
@@ -97,6 +98,25 @@ describe('AuthProvider / useAuth', () => {
     );
 
     expect(screen.getByTestId('step')).toHaveTextContent('AUTHENTICATED');
+  });
+
+  test('drops back to LOGIN when apiClient reports the session has expired', async () => {
+    window.localStorage.setItem('access_token', 'existing-token');
+    window.localStorage.setItem('refresh_token', 'existing-refresh');
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('step')).toHaveTextContent('AUTHENTICATED');
+
+    await act(async () => {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    });
+
+    expect(screen.getByTestId('step')).toHaveTextContent('LOGIN');
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
   });
 
   test('login moves to the 2FA step when the backend requires it', async () => {

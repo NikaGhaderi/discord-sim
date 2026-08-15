@@ -3,6 +3,7 @@ import { ForgotPasswordForm } from '../components/ForgotPasswordForm';
 import { LoginForm } from '../components/LoginForm';
 import { RegisterForm } from '../components/RegisterForm';
 import { TwoFactorForm } from '../components/TwoFactorForm';
+import { VantaRingsBackground } from '@shared/components/VantaRingsBackground';
 import { useAuth } from '../context';
 
 type Mode = 'login' | 'register' | 'forgot-password';
@@ -19,7 +20,6 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
   const auth = useAuth();
   const [mode, setMode] = useState<Mode>('login');
-  const [force2FA, setForce2FA] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null);
 
@@ -76,56 +76,71 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
 
   const handleLogout = () => {
     setMode('login');
-    setForce2FA(false);
     setError(null);
     setForgotPasswordMessage(null);
     void auth.logout();
   };
 
-  // Determine which step to render, respecting the debug override
-  const activeStep = force2FA ? '2FA' : auth.authStep;
+  const activeStep = auth.authStep;
 
   return (
     <div style={{
+      position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
       minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
       fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
-      padding: '20px'
+      padding: '20px',
+      overflow: 'hidden',
     }}>
-      {/* Temporary Debug Checkbox */}
-      <div style={{
-        marginBottom: '20px',
-        padding: '10px 15px',
-        backgroundColor: '#fff3cd',
-        border: '1px solid #ffeeba',
-        borderRadius: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '14px',
-        color: '#856404'
-      }}>
-        <input
-          id="debug-force-2fa"
-          type="checkbox"
-          checked={force2FA}
-          onChange={(e) => setForce2FA(e.target.checked)}
-          style={{ cursor: 'pointer' }}
+      <VantaRingsBackground />
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          zIndex: 1,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <img
+          src="/branding/goat.png"
+          alt="Goat mascot"
+          style={{
+            height: '90px',
+            width: '90px',
+            objectFit: 'contain',
+            borderRadius: '50%',
+            display: 'block',
+            position: 'relative',
+            zIndex: 2,
+          }}
         />
-        <label htmlFor="debug-force-2fa" style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-          Debug: Force 2FA View
-        </label>
+        <img
+          src="/branding/discord-sim.jpg"
+          alt="Discord Sim"
+          style={{
+            height: '90px',
+            width: 'auto',
+            objectFit: 'contain',
+            display: 'block',
+            marginLeft: '-28px',
+            zIndex: 1,
+          }}
+        />
       </div>
 
       <div style={{
-        backgroundColor: '#fff',
+        position: 'relative',
+        zIndex: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.88)',
         padding: '40px',
         borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
         width: '100%',
         maxWidth: '400px'
       }}>
@@ -209,7 +224,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
             onSubmit={handleVerify2FA}
             isSubmitting={auth.isLoading}
             onBackToLogin={() => {
-              setForce2FA(false); // Turn off debug mode when going back
               setError(null);
               setMode('login');
             }}

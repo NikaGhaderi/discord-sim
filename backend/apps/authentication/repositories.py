@@ -16,7 +16,6 @@ def _to_entity(django_user) -> UserEntity:
         email=django_user.email,
         password_hash=django_user.password,
         is_2fa_enabled=django_user.is_2fa_enabled,
-        allow_group_invitations=django_user.allow_group_invitations,
         is_active=django_user.is_active,
         created_at=django_user.date_joined,
     )
@@ -53,7 +52,6 @@ class DjangoAuthRepository(AbstractAuthRepository):
                 email=user_entity.email,
                 password=user_entity.password_hash,
                 is_2fa_enabled=user_entity.is_2fa_enabled,
-                allow_group_invitations=user_entity.allow_group_invitations,
             )
         except IntegrityError as exc:
             raise DuplicateUserError(

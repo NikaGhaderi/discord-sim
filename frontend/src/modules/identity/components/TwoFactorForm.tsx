@@ -46,13 +46,13 @@ export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSubmit, onBackTo
 
   return (
     <form onSubmit={handleSubmit} className="identity-form" style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '350px', margin: '0 auto' }}>
-      <h2 style={{ textAlign: 'center' }}>Two-Factor Authentication</h2>
+      <h2 style={{ textAlign: 'center', color: '#666' }}>Two-Factor Authentication</h2>
       <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>
         Enter the 6-digit verification code sent to your device.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        <label htmlFor="2fa-code" style={{ fontSize: '14px', fontWeight: 'bold' }}>Verification Code</label>
+        <label htmlFor="2fa-code" style={{ fontSize: '14px', fontWeight: 'bold', color: '#666' }}>Verification Code</label>
         <input
           id="2fa-code"
           type="text"
