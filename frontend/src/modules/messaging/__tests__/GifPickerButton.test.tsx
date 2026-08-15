@@ -12,7 +12,7 @@ function mockGiphyResponse(gifs: Array<{ id: string; title: string }>) {
           title: g.title,
           images: {
             fixed_height_small: { url: `https://media.giphy.com/${g.id}/preview.gif` },
-            original: { url: `https://media.giphy.com/${g.id}/original.gif` },
+            fixed_height: { url: `https://media.giphy.com/${g.id}/fixed_height.gif` },
           },
         })),
       }),
@@ -57,7 +57,7 @@ describe('GifPickerButton', () => {
 
     fireEvent.click(screen.getByLabelText('Cool Gif'));
 
-    expect(onSelectGif).toHaveBeenCalledWith('https://media.giphy.com/abc/original.gif');
+    expect(onSelectGif).toHaveBeenCalledWith('https://media.giphy.com/abc/fixed_height.gif');
   });
 
   it('searches by query after debounce', async () => {
