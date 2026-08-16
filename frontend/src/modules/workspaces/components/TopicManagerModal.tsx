@@ -1,5 +1,7 @@
 import React, { useEffect, useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { workspacesApi } from '../index';
 import { Topic } from '../types';
 
@@ -60,36 +62,32 @@ export const TopicManagerModal: React.FC<TopicManagerModalProps> = ({ channelId,
 
   return (
     <Modal title="Manage Topics" onClose={onClose}>
-      {error && <p className="error-text">{error}</p>}
-      {isLoading && <p className="list-row-subtitle">Loading topics...</p>}
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      {isLoading && <p className="text-sm text-muted">Loading topics...</p>}
 
       {!isLoading &&
         topics.map((topic) => (
-          <div key={topic.topic_id} className="list-row">
+          <div key={topic.topic_id} className="list-row flex items-center justify-between py-2">
             <div className="list-row-title"># {topic.title}</div>
-            <button type="button" className="btn btn-danger" onClick={() => handleDelete(topic)}>
+            <Button variant="danger" size="sm" onClick={() => handleDelete(topic)}>
               Delete
-            </button>
+            </Button>
           </div>
         ))}
 
-      <form onSubmit={handleCreate} style={{ marginTop: 16 }}>
-        <div className="field">
-          <label htmlFor="topic-title">New Topic Title</label>
-          <input
-            id="topic-title"
-            type="text"
-            required
-            minLength={2}
-            maxLength={100}
-            placeholder="e.g. announcements"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-        <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
+      <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-3">
+        <Input
+          label="New Topic Title"
+          required
+          minLength={2}
+          maxLength={100}
+          placeholder="e.g. announcements"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Adding...' : 'Add Topic'}
-        </button>
+        </Button>
       </form>
     </Modal>
   );

@@ -42,8 +42,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
   return (
     <Modal title="Profile" onClose={onClose}>
-      {error && <p role="alert">Couldn&apos;t load this user&apos;s profile.</p>}
-      {!error && !profile && <p className="list-row-subtitle">Loading…</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          Couldn&apos;t load this user&apos;s profile.
+        </p>
+      )}
+      {!error && !profile && <p className="text-sm text-muted">Loading…</p>}
       {profile && (
         <ProfileView
           profile={{ ...profile, allow_group_invitations: false }}

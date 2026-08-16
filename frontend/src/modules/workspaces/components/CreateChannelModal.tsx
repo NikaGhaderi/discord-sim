@@ -1,5 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { workspacesApi } from '../index';
 import { Channel } from '../types';
 
@@ -30,35 +32,36 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({ onClose,
 
   return (
     <Modal title="Create Channel" onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <p className="error-text">{error}</p>}
-        <div className="field">
-          <label htmlFor="channel-name">Channel Name</label>
-          <input
-            id="channel-name"
-            type="text"
-            required
-            minLength={2}
-            maxLength={100}
-            placeholder="e.g. study-group"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input
+          label="Channel Name"
+          name="name"
+          required
+          minLength={2}
+          maxLength={100}
+          placeholder="e.g. study-group"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={error ?? undefined}
+        />
         {/* Privacy is shown per the wireframe but not part of the confirmed API contract yet. */}
-        <div className="field">
-          <label htmlFor="channel-privacy">Privacy</label>
-          <select id="channel-privacy" defaultValue="public" disabled>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          Privacy
+          <select
+            defaultValue="public"
+            disabled
+            className="min-h-11 rounded-xl border border-border bg-background px-3.5 text-foreground"
+          >
             <option value="public">Public</option>
           </select>
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
+        </label>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating...' : 'Create'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>
