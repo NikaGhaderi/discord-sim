@@ -17,6 +17,10 @@
   --ws-primary-hover: #27272a;
   --ws-danger: #dc2626;
   --ws-radius: 8px;
+  --ws-accent-secondary: #6366f1;
+  --ws-glow-primary: #a5b4fc;
+  --ws-glow-secondary: #f0abfc;
+  --ws-shadow-tint: #6366f1;
 }
 
 body {

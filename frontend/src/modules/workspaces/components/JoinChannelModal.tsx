@@ -1,5 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { workspacesApi } from '../index';
 import { ChannelMember } from '../types';
 
@@ -34,37 +36,30 @@ export const JoinChannelModal: React.FC<JoinChannelModalProps> = ({ onClose, onJ
 
   return (
     <Modal title="Join a Channel" onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <p className="error-text">{error}</p>}
-        <div className="field">
-          <label htmlFor="invite-token">Invite Link or Token</label>
-          <input
-            id="invite-token"
-            type="text"
-            required
-            placeholder="e.g. a1b2c3d4"
-            value={inviteToken}
-            onChange={(e) => setInviteToken(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="nickname">Nickname (optional)</label>
-          <input
-            id="nickname"
-            type="text"
-            maxLength={50}
-            placeholder="e.g. Sprint Master"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-          />
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input
+          label="Invite Link or Token"
+          name="inviteToken"
+          required
+          placeholder="e.g. a1b2c3d4"
+          value={inviteToken}
+          onChange={(e) => setInviteToken(e.target.value)}
+          error={error ?? undefined}
+        />
+        <Input
+          label="Nickname (optional)"
+          maxLength={50}
+          placeholder="e.g. Sprint Master"
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Joining...' : 'Join'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

@@ -17,11 +17,8 @@ export interface Palette {
 
 export const PALETTES: Palette[] = [
   { name: 'Graphite', colors: ['#C1C0C2', '#F5E9E7', '#837D68', '#8A9DB1', '#ECC5C6', '#ECCC5C'] },
-  { name: 'Frozen Mist', colors: ['#7C7D75', '#ADACA7', '#FCF8D8', '#D9DAFF', '#DD700B'] },
   { name: 'Amber Walnut Morning', colors: ['#EBEFEE', '#CCB499', '#C8906D', '#BB6C43', '#4A413C'] },
-  { name: 'Copper Aquamarine Dream', colors: ['#DCAA89', '#30525C', '#C35627', '#D6794D', '#4C848D', '#BFB9B5'] },
   { name: 'Rose Quartz Evening', colors: ['#64242F', '#B44446', '#FC8F8F', '#DFD9D8'] },
-  { name: 'Calcite', colors: ['#DDDCDB', '#FD7B41', '#EDBF9B', '#3C4044'] },
   { name: 'Sapphire Nightfall Whisper', colors: ['#0474C4', '#5379AE', '#2C444C', '#A8C4EC', '#06457F', '#262B40'] },
   { name: 'Lapis Velvet Evening', colors: ['#213885', '#ECDFD2', '#5F3475', '#081849', '#CCCACC', '#893172'] },
   { name: 'Opaline', colors: ['#F4F4F6', '#E7E7E7', '#D2D2D4', '#FF634A'] },
@@ -31,8 +28,9 @@ export const PALETTES: Palette[] = [
   { name: 'Vibrant but Calm', colors: ['#E43D12', '#D6536D', '#FFA2B6', '#EFB11D', '#EBE9E1'] },
   { name: 'Texturized and Dynamic', colors: ['#2F4454', '#2E151B', '#DA7B93', '#376E6F', '#1C3334'] },
   { name: 'Vivid and Sharp', colors: ['#D83F87', '#2A1B3D', '#44318D', '#E98074', '#A4B3B6'] },
-  { name: 'Corporate and Traditional', colors: ['#88BDBC', '#254E58', '#112D32', '#4F4A41', '#6E6658'] },
-  { name: 'Gorgeous Contrast', colors: ['#61892F', '#86C232', '#222629', '#474B4F', '#6B6E70'] },
-  { name: 'Rose Red and Blueberry', colors: ['#4285F4', '#5C2018', '#BC4639', '#D4A59A', '#F3E0DC'] },
   { name: 'Intrepid and Fearless', colors: ['#314455', '#644E5B', '#9E5A63', '#C96567', '#97AABD'] },
+  { name: 'Emerald Depths', colors: ['#091413', '#285A48', '#408A71', '#B0E4CC'] },
+  { name: 'Dusk Clay', colors: ['#0F3040', '#464858', '#A56F63', '#D99B7F'] },
+  { name: 'Olive Grove', colors: ['#9CB080', '#618764', '#2B5748', '#273338'] },
+  { name: 'Cocoa Noir', colors: ['#000000', '#1F150C', '#412D15', '#E1DCC9'] },
 ];

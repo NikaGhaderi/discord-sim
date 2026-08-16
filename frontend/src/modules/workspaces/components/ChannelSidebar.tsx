@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Channel, ChannelMember } from '../types';
 import { CreateChannelModal } from './CreateChannelModal';
 import { JoinChannelModal } from './JoinChannelModal';
+import { Button } from '@shared/components/ui/Button';
+import { cn } from '@shared/lib/cn';
 
 interface ChannelSidebarProps {
   channels: Channel[];
@@ -29,7 +32,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   return (
-    <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
+    <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''} flex h-full flex-col gap-3 bg-surface p-3`}>
       {/*
         "Home"/"Friends"/"Direct Messages" used to live here as
         non-functional placeholders (no onClick at all, and "Friends" has
@@ -38,64 +41,56 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         a channels-only entry, invisible from private-spaces), now both
         live in the persistent <AppNav>.
       */}
-      <div
-        className="sidebar-section-title"
-        style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '4px 10px', borderRadius: 9999 }}
-      >
-        <span>CHANNELS</span>
-        <div style={{ position: 'relative' }}>
+      <div className="flex items-center justify-between rounded-full bg-black/25 px-2.5 py-1">
+        <span className="text-xs font-semibold tracking-wide text-muted">CHANNELS</span>
+        <div className="relative">
           <button
             type="button"
-            className="sidebar-icon-btn"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted transition hover:bg-surface-raised hover:text-foreground"
             onClick={() => setShowAddMenu((v) => !v)}
             aria-label="Add channel"
           >
-            +
+            <Plus size={14} aria-hidden />
           </button>
           {showAddMenu && (
-            <div
-              className="modal-card"
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                width: 160,
-                padding: 8,
-                zIndex: 10,
-              }}
-            >
-              <button
-                type="button"
-                className="btn btn-block"
-                style={{ marginBottom: 6 }}
+            <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-card border border-border bg-surface-raised p-2 shadow-[0_24px_80px_rgb(0_0_0/18%)]">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mb-1.5 w-full justify-start"
                 onClick={() => {
                   setOpenModal('create');
                   setShowAddMenu(false);
                 }}
               >
                 Create Channel
-              </button>
-              <button
-                type="button"
-                className="btn btn-block"
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full justify-start"
                 onClick={() => {
                   setOpenModal('join');
                   setShowAddMenu(false);
                 }}
               >
                 Join Channel
-              </button>
+              </Button>
             </div>
           )}
         </div>
       </div>
 
-      <nav>
-        {channels.length === 0 && <p className="list-row-subtitle">No channels yet.</p>}
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+        {channels.length === 0 && <p className="px-2 text-sm text-muted">No channels yet.</p>}
         {channels.map((channel) => (
           <div
             key={channel.channel_id}
-            className={`channel-item${channel.channel_id === selectedChannelId ? ' active' : ''}`}
+            className={cn(
+              'cursor-pointer rounded-xl border-l-2 border-transparent px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-foreground',
+              channel.channel_id === selectedChannelId &&
+                'border-accent bg-surface-raised font-semibold text-foreground'
+            )}
             onClick={() => onSelectChannel(channel.channel_id)}
           >
             # {channel.name}
@@ -103,9 +98,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         ))}
       </nav>
 
-      <div style={{ marginTop: 'auto' }} className="list-row-subtitle">
-        User · Online
-      </div>
+      <div className="mt-auto text-xs text-muted">User · Online</div>
 
       {openModal === 'create' && (
         <CreateChannelModal onClose={() => setOpenModal('none')} onCreated={onChannelCreated} />

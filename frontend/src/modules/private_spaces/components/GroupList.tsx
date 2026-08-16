@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { privateSpacesApi } from '../index';
 import { Group } from '../types';
 import { JoinGroupModal } from './JoinGroupModal';
+import { Button } from '@shared/components/ui/Button';
+import { Input } from '@shared/components/ui/Input';
 
 interface GroupListProps {
   onSelectGroup?: (group: Group) => void;
@@ -105,72 +107,68 @@ export const GroupList: React.FC<GroupListProps> = ({
 
   return (
     <div className="group-list-container">
-      <h3>Groups</h3>
+      <h3 className="mb-5 text-sm font-semibold tracking-wide text-muted">Groups</h3>
       {!isCreating ? (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            onClick={() => setIsCreating(true)}
-            className="btn btn-primary btn-block"
-            style={{ padding: '6px 10px', fontSize: 13 }}
-          >
+        <div className="flex gap-1.5">
+          <Button variant="secondary" size="sm" className="flex-1" onClick={() => setIsCreating(true)}>
             Create Group
-          </button>
-          <button
-            onClick={() => setIsJoining(true)}
-            className="btn btn-block"
-            style={{ padding: '6px 10px', fontSize: 13 }}
-          >
+          </Button>
+          <Button variant="secondary" size="sm" className="flex-1" onClick={() => setIsJoining(true)}>
             Join Group
-          </button>
+          </Button>
         </div>
       ) : (
-        <form
-          onSubmit={(e) => void handleCreateGroup(e)}
-          className="create-group-form"
-          style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-        >
-          <input
-            type="text"
+        <form onSubmit={(e) => void handleCreateGroup(e)} className="flex flex-col gap-2">
+          <Input
+            label="Group Name"
             placeholder="Group Name"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             required
-            style={{ width: '100%', boxSizing: 'border-box' }}
           />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmittingCreate}>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" className="flex-1" disabled={isSubmittingCreate}>
               {isSubmittingCreate ? 'Creating...' : 'Create'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn"
-              style={{ flex: 1 }}
+              variant="secondary"
+              size="sm"
+              className="flex-1"
               onClick={() => {
                 setIsCreating(false);
                 setCreateError(null);
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
-          {createError && <p role="alert">{createError}</p>}
+          {createError && (
+            <p role="alert" className="text-sm text-danger">
+              {createError}
+            </p>
+          )}
         </form>
       )}
 
-      {isLoading && <p>Loading groups…</p>}
-      {error && <p role="alert">Couldn&apos;t load groups.</p>}
+      {isLoading && <p className="mt-2 text-sm text-muted">Loading groups…</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          Couldn&apos;t load groups.
+        </p>
+      )}
 
       {!isLoading && !error && (
-        <ul className="group-list" style={{ marginTop: 10 }}>
+        <ul className="mt-2.5 flex flex-col gap-0.5">
           {groups.map((group) => (
             <li
               key={group.group_id}
               onClick={() => onSelectGroup?.(group)}
-              className="group-item"
+              className="cursor-pointer rounded-xl px-2 py-1.5 text-sm text-muted transition hover:bg-surface-raised hover:text-foreground"
             >
-              <span>{group.name}</span>
+              <span className="text-foreground">{group.name}</span>
               {memberCounts[group.group_id] !== undefined && (
-                <span className="group-member-count">
+                <span className="text-muted">
                   {' '}
                   ({memberCounts[group.group_id]}{' '}
                   {memberCounts[group.group_id] === 1 ? 'member' : 'members'})

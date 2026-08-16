@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { workspacesApi } from '../index';
 import { Topic } from '../types';
+import { cn } from '@shared/lib/cn';
 
 interface TopicTabsProps {
   channelId: number;
@@ -32,31 +33,16 @@ export const TopicTabs: React.FC<TopicTabsProps> = ({
   if (topics.length <= 1) return null;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 4,
-        padding: '8px 20px 0',
-        borderBottom: '1px solid var(--ws-border)',
-      }}
-    >
+    <div className="flex gap-1 border-b border-border px-5 pt-2">
       {topics.map((topic) => (
         <button
           key={topic.topic_id}
           type="button"
           onClick={() => onSelectTopic(topic.topic_id)}
-          style={{
-            padding: '6px 12px',
-            border: 'none',
-            borderBottom:
-              topic.topic_id === selectedTopicId
-                ? '2px solid var(--ws-primary)'
-                : '2px solid transparent',
-            background: 'none',
-            cursor: 'pointer',
-            fontWeight: topic.topic_id === selectedTopicId ? 700 : 400,
-            color: topic.topic_id === selectedTopicId ? 'var(--ws-text)' : 'var(--ws-text-secondary)',
-          }}
+          className={cn(
+            'border-b-2 border-transparent px-3 py-1.5 text-sm text-muted transition hover:text-foreground',
+            topic.topic_id === selectedTopicId && 'border-accent font-bold text-foreground'
+          )}
         >
           # {topic.title}
         </button>

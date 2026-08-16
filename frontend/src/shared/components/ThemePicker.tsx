@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { PALETTES } from '../theme/palettes';
 import { applyPaletteByName, getStoredPaletteName } from '../theme/applyPalette';
+import { Button } from './ui/Button';
+import { cn } from '@shared/lib/cn';
 
 interface ThemePickerProps {
   onClose: () => void;
@@ -22,40 +24,29 @@ export const ThemePicker: React.FC<ThemePickerProps> = ({ onClose }) => {
   };
 
   return (
-    <Modal title="Theme" onClose={onClose} className="modal-card--wide">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto' }}>
+    <Modal title="Theme" onClose={onClose} className="w-[min(40rem,calc(100%-2rem))]">
+      <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
         {PALETTES.map((palette) => (
-          <button
+          <Button
             key={palette.name}
-            type="button"
+            variant="secondary"
             onClick={() => handleSelect(palette.name)}
-            className="btn"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              justifyContent: 'space-between',
-              whiteSpace: 'nowrap',
-              borderColor: selected === palette.name ? 'var(--ws-primary)' : undefined,
-            }}
+            className={cn(
+              'w-full justify-between gap-3 whitespace-nowrap text-left',
+              selected === palette.name && 'border-brand'
+            )}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{palette.name}</span>
-            <span style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+            <span className="overflow-hidden text-ellipsis">{palette.name}</span>
+            <span className="flex shrink-0 gap-1">
               {palette.colors.map((color, index) => (
                 <span
                   key={index}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: color,
-                    border: '1px solid rgba(0,0,0,0.15)',
-                    flexShrink: 0,
-                  }}
+                  className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/15"
+                  style={{ background: color }}
                 />
               ))}
             </span>
-          </button>
+          </Button>
         ))}
       </div>
     </Modal>
