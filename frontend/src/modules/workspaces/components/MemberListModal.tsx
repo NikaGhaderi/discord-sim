@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Avatar } from '@shared/components/Avatar';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { profileApi, PublicProfile } from '../../profile';
 import { workspacesApi } from '../index';
 import { ChannelMember } from '../types';
@@ -38,9 +40,7 @@ export const MemberListModal: React.FC<MemberListModalProps> = ({
         const data = await workspacesApi.listMembers(channelId);
         if (cancelled) return;
         setMembers(data);
-        const profiles = await profileApi.listPublicProfilesByIds(
-          data.map((m) => m.user_id)
-        );
+        const profiles = await profileApi.listPublicProfilesByIds(data.map((m) => m.user_id));
         if (!cancelled) {
           setProfilesById(Object.fromEntries(profiles.map((p) => [p.user_id, p])));
         }
@@ -81,42 +81,50 @@ export const MemberListModal: React.FC<MemberListModalProps> = ({
 
   return (
     <Modal title="Channel Members" onClose={onClose}>
-      <input
-        type="text"
+      <Input
+        label="Search members"
         placeholder="Search members..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 12 }}
+        className="mb-3"
       />
 
-      {kickError && <p role="alert">{kickError}</p>}
-      {isLoading && <p className="list-row-subtitle">Loading members...</p>}
-      {error && <p role="alert">Couldn&apos;t load members.</p>}
+      {kickError && (
+        <p role="alert" className="mb-2 text-sm text-danger">
+          {kickError}
+        </p>
+      )}
+      {isLoading && <p className="text-sm text-muted">Loading members...</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          Couldn&apos;t load members.
+        </p>
+      )}
 
       {!isLoading && !error && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '50vh', overflowY: 'auto' }}>
+        <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
           {visibleMembers.length === 0 && (
-            <p className="list-row-subtitle">No members match &quot;{query}&quot;.</p>
+            <p className="text-sm text-muted">No members match &quot;{query}&quot;.</p>
           )}
           {visibleMembers.map((member) => {
             const profile = profilesById[member.user_id];
             const label = profile?.username ?? member.nickname_in_channel ?? `User #${member.user_id}`;
             const isSelf = member.user_id === currentUserId;
             return (
-              <div key={member.user_id} className="list-row">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={member.user_id} className="list-row flex items-center justify-between py-2">
+                <div className="flex items-center gap-2">
                   <Avatar avatarUrl={profile?.avatar_url} label={label} size={24} />
                   <span>{label}</span>
                 </div>
                 {canKick && !isSelf && (
-                  <button
-                    type="button"
-                    className="btn btn-danger"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     disabled={kickingUserId === member.user_id}
                     onClick={() => void handleKick(member.user_id)}
                   >
                     {kickingUserId === member.user_id ? 'Removing...' : 'Kick'}
-                  </button>
+                  </Button>
                 )}
               </div>
             );

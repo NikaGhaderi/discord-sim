@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Menu } from 'lucide-react';
 import { profileApi } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { DirectMessageList } from '../components/DirectMessageList';
@@ -9,6 +10,8 @@ import { MessageThread } from '../../messaging/components/MessageThread';
 import { ScheduledMessagesPanel } from '../../messaging/components/ScheduledMessagesPanel';
 import { Modal } from '@shared/components/Modal';
 import { UserProfileModal } from '@shared/components/UserProfileModal';
+import { Button } from '@shared/components/ui/Button';
+import { LoadingState, ErrorState } from '@shared/components/ui/AsyncState';
 import { DirectChat, Group } from '../types';
 
 type SelectedSpace =
@@ -126,11 +129,11 @@ export const PrivateSpacesPage: React.FC = () => {
   };
 
   if (isLoadingUser) {
-    return <div style={{ padding: '20px' }}>Loading…</div>;
+    return <LoadingState label="Loading…" />;
   }
 
   if (userError || currentUserId === null) {
-    return <div style={{ padding: '20px' }}>Couldn&apos;t load your account.</div>;
+    return <ErrorState detail="Couldn't load your account." />;
   }
 
   return (
@@ -171,14 +174,14 @@ export const PrivateSpacesPage: React.FC = () => {
       <main className="private-spaces-main main-panel" style={{ minWidth: 0 }}>
         {selected ? (
           <>
-            <header className="main-header">
+            <header className="main-header flex items-center gap-3 border-b border-border bg-surface px-5 py-3">
               <button
                 type="button"
-                className="btn mobile-menu-btn"
+                className="mobile-menu-btn inline-flex min-h-9 min-w-9 items-center justify-center rounded-xl text-muted hover:bg-surface-raised hover:text-foreground"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 aria-label="Open direct messages and groups list"
               >
-                ☰
+                <Menu size={18} aria-hidden />
               </button>
               {selected.kind === 'dm' ? (
                 <button
@@ -190,7 +193,7 @@ export const PrivateSpacesPage: React.FC = () => {
                         : selected.dm.user1_id;
                     setViewingUserId(otherId);
                   }}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+                  className="cursor-pointer border-none bg-transparent p-0 font-inherit text-inherit"
                   title="View profile"
                 >
                   <strong>{selected.otherUsername}</strong>
@@ -198,24 +201,24 @@ export const PrivateSpacesPage: React.FC = () => {
               ) : (
                 <strong>{selected.group.name}</strong>
               )}
-              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-                <button type="button" className="btn" onClick={() => setIsScheduledOpen(true)}>
+              <div className="ml-auto flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setIsScheduledOpen(true)}>
                   Scheduled
-                </button>
+                </Button>
                 {selected.kind === 'group' && (
-                  <button type="button" className="btn" onClick={() => setIsGroupSettingsOpen(true)}>
+                  <Button variant="secondary" size="sm" onClick={() => setIsGroupSettingsOpen(true)}>
                     Settings
-                  </button>
+                  </Button>
                 )}
                 {selected.kind === 'dm' && (
-                  <button
-                    type="button"
-                    className="btn btn-danger"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     disabled={isDeletingDm}
                     onClick={() => void handleDeleteOpenDm()}
                   >
                     Delete Chat
-                  </button>
+                  </Button>
                 )}
               </div>
             </header>
@@ -230,17 +233,17 @@ export const PrivateSpacesPage: React.FC = () => {
           </>
         ) : (
           <>
-            <header className="main-header">
+            <header className="main-header flex items-center border-b border-border bg-surface px-5 py-3">
               <button
                 type="button"
-                className="btn mobile-menu-btn"
+                className="mobile-menu-btn inline-flex min-h-9 min-w-9 items-center justify-center rounded-xl text-muted hover:bg-surface-raised hover:text-foreground"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 aria-label="Open direct messages and groups list"
               >
-                ☰
+                <Menu size={18} aria-hidden />
               </button>
             </header>
-            <p className="empty-state">Select a group or a direct message to start chatting.</p>
+            <p className="empty-state text-muted">Select a group or a direct message to start chatting.</p>
           </>
         )}
       </main>

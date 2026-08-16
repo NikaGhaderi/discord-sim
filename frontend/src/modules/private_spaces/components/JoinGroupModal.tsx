@@ -1,5 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { privateSpacesApi } from '../index';
 import { Group } from '../types';
 
@@ -30,26 +32,23 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({ onClose, onJoine
 
   return (
     <Modal title="Join a Group" onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <p className="error-text">{error}</p>}
-        <div className="field">
-          <label htmlFor="group-invite-token">Invite Link or Token</label>
-          <input
-            id="group-invite-token"
-            type="text"
-            required
-            placeholder="e.g. a1b2c3d4"
-            value={inviteToken}
-            onChange={(e) => setInviteToken(e.target.value)}
-          />
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input
+          label="Invite Link or Token"
+          required
+          placeholder="e.g. a1b2c3d4"
+          value={inviteToken}
+          onChange={(e) => setInviteToken(e.target.value)}
+          error={error ?? undefined}
+          name="inviteToken"
+        />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Joining...' : 'Join'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

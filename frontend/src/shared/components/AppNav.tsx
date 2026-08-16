@@ -3,13 +3,14 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../modules/identity/context';
 import { ThemePicker } from './ThemePicker';
 import { NotificationBell } from './NotificationBell';
+import { Button } from './ui/Button';
+import { cn } from '@shared/lib/cn';
 
-const linkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
-  padding: '8px 12px',
-  textDecoration: 'none',
-  color: isActive ? 'var(--ws-primary)' : 'var(--ws-text)',
-  fontWeight: isActive ? 700 : 400,
-});
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    'rounded-xl px-3 py-2 text-sm font-medium transition hover:text-foreground',
+    isActive ? 'text-brand font-semibold' : 'text-muted'
+  );
 
 /**
  * The app's only persistent top-level navigation. Rendered once, above
@@ -32,36 +33,25 @@ export const AppNav: React.FC = () => {
   };
 
   return (
-    <nav
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        rowGap: 6,
-        gap: 4,
-        padding: '10px 20px',
-        borderBottom: '1px solid var(--ws-border)',
-        background: 'var(--ws-bg-nav)',
-      }}
-    >
-      <NavLink to="/workspaces" style={linkStyle}>
+    <nav className="flex flex-wrap items-center gap-1 border-b border-border bg-nav px-5 py-2.5">
+      <NavLink to="/workspaces" className={linkClass}>
         Workspaces
       </NavLink>
-      <NavLink to="/private-spaces" style={linkStyle}>
+      <NavLink to="/private-spaces" className={linkClass}>
         Direct Messages
       </NavLink>
-      <NavLink to="/profile" style={linkStyle}>
+      <NavLink to="/profile" className={linkClass}>
         Profile
       </NavLink>
 
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="ml-auto flex items-center gap-2">
         <NotificationBell />
-        <button type="button" className="btn" onClick={() => setIsThemePickerOpen(true)}>
+        <Button variant="secondary" size="sm" onClick={() => setIsThemePickerOpen(true)}>
           Theme
-        </button>
-        <button type="button" className="btn btn-danger" onClick={() => void handleLogout()}>
+        </Button>
+        <Button variant="danger" size="sm" onClick={() => void handleLogout()}>
           Logout
-        </button>
+        </Button>
       </div>
 
       {isThemePickerOpen && <ThemePicker onClose={() => setIsThemePickerOpen(false)} />}

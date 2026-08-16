@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { Input } from '@shared/components/ui/Input';
+import { Textarea } from '@shared/components/ui/Textarea';
+import { Button } from '@shared/components/ui/Button';
 import { ProfileData } from './ProfileView';
 
 interface ProfileEditFormProps {
@@ -29,34 +32,32 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '400px', margin: '2rem auto', padding: '1rem', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h2>Edit Profile</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto mt-8 max-w-[400px] rounded-card border border-border bg-surface/90 p-5 shadow-[0_24px_80px_rgb(0_0_0/18%)] backdrop-blur"
+    >
+      <h2 className="mb-4 text-xl font-semibold text-foreground">Edit Profile</h2>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Display Name</label>
-        <input
-          type="text"
+      <div className="mb-4 flex flex-col gap-4">
+        <Input
+          label="Display Name"
+          name="displayName"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           required
           minLength={2}
-          style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
         />
-      </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Bio</label>
-        <textarea
+        <Textarea
+          label="Bio"
+          name="bio"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           rows={4}
           maxLength={300}
-          style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
         />
-      </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
           <input
             type="checkbox"
             checked={allowGroupInvitations}
@@ -66,13 +67,13 @@ export const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
         </label>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-        <button type="submit" style={{ flex: 1, padding: '0.5rem', cursor: 'pointer' }}>
+      <div className="mt-6 flex gap-4">
+        <Button type="submit" className="flex-1">
           Save
-        </button>
-        <button type="button" onClick={onCancel} style={{ flex: 1, padding: '0.5rem', cursor: 'pointer' }}>
+        </Button>
+        <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
