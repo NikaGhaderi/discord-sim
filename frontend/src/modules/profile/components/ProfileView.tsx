@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import { resolveMediaUrl } from '@infrastructure/apiClient';
+import { Button } from '@shared/components/ui/Button';
+import { cn } from '@shared/lib/cn';
 
 export interface ProfileData {
   display_name: string;
@@ -42,88 +44,66 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const initial = profile.display_name.trim().charAt(0).toUpperCase() || '?';
 
   return (
-    <div className={embedded ? undefined : 'modal-card'} style={embedded ? undefined : { margin: '2rem auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+    <div
+      className={cn(
+        !embedded &&
+          'mx-auto my-8 max-w-[420px] rounded-card border border-border bg-surface/90 p-5 shadow-[0_24px_80px_rgb(0_0_0/18%)] backdrop-blur'
+      )}
+    >
+      <div className="mb-4 text-center">
         {profile.avatar_url ? (
-          <a
-            href={resolveMediaUrl(profile.avatar_url)}
-            target="_blank"
-            rel="noreferrer"
-            style={{ display: 'inline-block' }}
-          >
+          <a href={resolveMediaUrl(profile.avatar_url)} target="_blank" rel="noreferrer" className="inline-block">
             <img
               src={resolveMediaUrl(profile.avatar_url)}
               alt={profile.display_name}
-              style={{
-                display: 'block',
-                margin: '0 auto',
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-              }}
+              className="mx-auto block h-[120px] w-[120px] rounded-full object-cover"
             />
           </a>
         ) : (
           // No external placeholder-image dependency (it can silently fail
           // to load, leaving a blank gap) -- a generated initial always
           // renders and already matches whatever palette is active.
-          <div
-            style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              margin: '0 auto',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '48px',
-              fontWeight: 700,
-              background: 'var(--ws-primary)',
-              color: 'var(--ws-text-on-bubble)',
-            }}
-          >
+          <div className="mx-auto flex h-[120px] w-[120px] items-center justify-center rounded-full bg-brand text-5xl font-bold text-background">
             {initial}
           </div>
         )}
-        <h2 style={{ margin: '0.75rem 0 0.25rem' }}>{profile.display_name}</h2>
-        <p style={{ color: 'var(--ws-text-secondary)', margin: 0 }}>
-          {profile.bio || 'No bio provided.'}
-        </p>
+        <h2 className="mb-1 mt-3 text-xl font-semibold text-foreground">{profile.display_name}</h2>
+        <p className="m-0 text-sm text-muted">{profile.bio || 'No bio provided.'}</p>
 
         {isOwnProfile && onAvatarUpload && (
-          <div style={{ marginTop: '0.75rem' }}>
+          <div className="mt-3">
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              style={{ display: 'none' }}
+              className="hidden"
               data-testid="avatar-file-input"
             />
-            <button
+            <Button
               type="button"
-              className="btn"
+              variant="secondary"
+              size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingAvatar}
             >
               {isUploadingAvatar ? 'Uploading...' : 'Change Photo'}
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {isOwnProfile && (
-        <div className="list-row" style={{ borderBottom: 'none' }}>
+        <div className="flex items-center justify-between py-2 text-sm text-foreground">
           <span>Allow Group Invitations</span>
           <strong>{profile.allow_group_invitations ? 'Yes' : 'No'}</strong>
         </div>
       )}
 
       {isOwnProfile && onEditClick && (
-        <button onClick={onEditClick} className="btn btn-primary btn-block" style={{ marginTop: '1.5rem' }}>
+        <Button onClick={onEditClick} className="mt-6 w-full">
           Edit Profile
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { Avatar } from '@shared/components/Avatar';
+import { Button } from '@shared/components/ui/Button';
+import { Input } from '@shared/components/ui/Input';
 import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { DirectChat } from '../types';
@@ -124,42 +127,45 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
 
   return (
     <div className="dm-list-container">
-      <h3>Direct Messages</h3>
+      <h3 className="mb-5 text-sm font-semibold tracking-wide text-muted">Direct Messages</h3>
       {!isCreating ? (
-        <button
-          onClick={() => setIsCreating(true)}
-          className="btn btn-primary btn-block"
-          style={{ padding: '6px 10px', fontSize: 13 }}
-        >
+        <Button variant="secondary" size="sm" className="mb-5 w-full" onClick={() => setIsCreating(true)}>
           Start New DM
-        </button>
+        </Button>
       ) : (
-        <form
-          onSubmit={(e) => void handleStartDm(e)}
-          className="start-dm-form"
-          style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-        >
-          <input
-            type="text"
+        <form onSubmit={(e) => void handleStartDm(e)} className="mb-5 flex flex-col gap-2">
+          <Input
+            label="Username"
             placeholder="Enter username..."
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             required
-            style={{ width: '100%', boxSizing: 'border-box' }}
           />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Start</button>
-            <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setIsCreating(false)}>Cancel</button>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" className="flex-1">
+              Start
+            </Button>
+            <Button type="button" variant="secondary" size="sm" className="flex-1" onClick={() => setIsCreating(false)}>
+              Cancel
+            </Button>
           </div>
         </form>
       )}
 
-      {startError && <p role="alert">{startError}</p>}
-      {isLoading && <p>Loading direct messages…</p>}
-      {error && <p role="alert">Couldn&apos;t load direct messages.</p>}
+      {startError && (
+        <p role="alert" className="mb-2 text-sm text-danger">
+          {startError}
+        </p>
+      )}
+      {isLoading && <p className="text-sm text-muted">Loading direct messages…</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          Couldn&apos;t load direct messages.
+        </p>
+      )}
 
       {!isLoading && !error && (
-        <ul className="dm-list" style={{ marginTop: 10 }}>
+        <ul className="mt-2.5 flex flex-col gap-0.5">
           {dms.map((dm) => {
             const otherId = otherParticipantId(dm, currentUserId);
             const otherProfile = profilesById[otherId];
@@ -168,8 +174,7 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
               <li
                 key={dm.direct_chat_id}
                 onClick={() => onSelectDm?.(dm)}
-                className="dm-item"
-                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-muted transition hover:bg-surface-raised hover:text-foreground"
               >
                 {/* Falls back to the raw id (and a placeholder avatar) only
                     if the bulk lookup didn't resolve it, e.g. the other
@@ -178,18 +183,18 @@ export const DirectMessageList: React.FC<DirectMessageListProps> = ({
                     regardless of whether the avatar is an <img> or the
                     text-initial fallback. */}
                 <Avatar avatarUrl={otherProfile?.avatar_url} label={label} />
-                <strong style={{ flex: 1 }}>{label}</strong>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  style={{ padding: '2px 8px', fontSize: 12 }}
+                <strong className="flex-1 text-foreground">{label}</strong>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="min-h-0 px-1.5 py-0.5"
                   disabled={deletingId === dm.direct_chat_id}
                   onClick={(e) => void handleDelete(e, dm.direct_chat_id)}
                   aria-label={`Delete conversation with ${label}`}
                   title="Delete conversation"
                 >
-                  ✕
-                </button>
+                  <X size={12} aria-hidden />
+                </Button>
               </li>
             );
           })}

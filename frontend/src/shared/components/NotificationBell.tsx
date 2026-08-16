@@ -47,29 +47,11 @@ export const NotificationBell: React.FC = () => {
         type="button"
         onClick={handleOpen}
         aria-label="Notifications"
-        className="btn"
-        style={{ position: 'relative' }}
+        className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-surface-raised text-lg transition hover:bg-surface"
       >
         🔔
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: -4,
-              right: -4,
-              background: 'var(--ws-danger)',
-              color: '#fff',
-              borderRadius: '50%',
-              fontSize: 10,
-              fontWeight: 700,
-              minWidth: 16,
-              height: 16,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0 3px',
-            }}
-          >
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

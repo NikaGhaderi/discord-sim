@@ -1,21 +1,22 @@
 /**
- * applyPalette — turns a flat list of palette swatches into the app's nine
- * `--ws-*` design tokens (already consumed throughout workspaces.css and,
- * for the chat surfaces specifically, MessageThread/Composer/etc.'s own
- * Tailwind arbitrary-value classes -- every button, modal, sidebar, and
- * message bubble in the app reads these, so setting them on :root re-themes
- * the whole app without touching component code).
+ * applyPalette — turns a flat list of palette swatches into the app's
+ * `--ws-*` design tokens (already consumed throughout workspaces.css, the
+ * bokhar-derived ui/ kit's @theme inline bridge, and, for the chat surfaces
+ * specifically, MessageThread/Composer/etc.'s own Tailwind arbitrary-value
+ * classes -- every button, modal, sidebar, and message bubble in the app
+ * reads these, so setting them on :root re-themes the whole app without
+ * touching component code).
  *
  * Role assignment is algorithmic, not hand-picked per palette: each color's
  * luminance and saturation (chroma) decide whether it becomes the
- * background, the text color, or the accent. This always produces a light
- * background with dark text -- several of the 19 supported palettes are
- * clearly designed as dark/moody themes, and inverting per-palette would
- * require a second full set of hover/contrast rules; keeping every palette
- * in the same light-chrome mode is the tradeoff made here for something
- * that has to work correctly for 19 arbitrary palettes without hand-tuning
- * each one. A contrast safety net (see ensureContrast) guarantees text
- * stays legible even against a palette with no strong dark neutral.
+ * background, the text color, or the accent. Two branches exist: a palette
+ * whose darkest neutral swatch is genuinely dark gets a "dark shell" (that
+ * swatch intensified toward near-black, light text, colorful radial-gradient
+ * glow tokens); a palette with nothing dark enough to work with keeps the
+ * original light-background/dark-text chrome, but still gets a colorful
+ * identity via a tinted shadow token instead of a background glow. A
+ * contrast safety net (see contrastRatio checks below) guarantees text
+ * stays legible either way.
  */
 
 import { PALETTES } from './palettes';
@@ -27,13 +28,13 @@ interface RGB {
   b: number;
 }
 
-export interface ThemeTokens {
+/** The 15 hand-tunable tokens every curated palette in curatedThemes.ts
+ * still authors directly -- unchanged by this rework. */
+export interface BaseThemeTokens {
   bg: string;
   bgNav: string;
   bgSidebar: string;
   bgHover: string;
-  /** The message thread's own dark backdrop -- deliberately darker than
-   * bgBubble, so message cards read as "raised" surfaces against it. */
   bgChat: string;
   textOnChat: string;
   bgBubble: string;
@@ -47,11 +48,37 @@ export interface ThemeTokens {
   danger: string;
 }
 
+/** The 4 new tokens, always algorithmically derived (never hand-curated),
+ * for every palette -- dark-shell palettes use glowPrimary/glowSecondary as
+ * background-gradient blobs; light-chrome palettes use shadowTint as a
+ * colored box-shadow on cards/panels/dialogs instead. accentSecondary is
+ * used by both branches (a second vivid color so buttons/borders/icons
+ * aren't all one single accent). */
+export interface ExtraTokens {
+  accentSecondary: string;
+  glowPrimary: string;
+  glowSecondary: string;
+  shadowTint: string;
+  themeMode: 'dark' | 'light';
+}
+
+export type ThemeTokens = BaseThemeTokens & ExtraTokens;
+
 const BLACK: RGB = { r: 0, g: 0, b: 0 };
 const WHITE: RGB = { r: 255, g: 255, b: 255 };
 const DEFAULT_DANGER = '#dc2626';
 const STORAGE_KEY = 'discord-sim:palette';
-const CSS_VAR_BY_TOKEN: Record<keyof ThemeTokens, string> = {
+/** Below this rank-luminance (0-255 scale), a swatch reads as a plausible
+ * dark-mode surface color on its own -- not merely "the darkest shade in an
+ * otherwise-light palette". Above it, forcing a dark shell would just look
+ * like a muddy gray, so the palette stays on the light-chrome branch. */
+const DARK_ELIGIBLE_LUMINANCE = 90;
+/** How hard the chosen dark-branch bg swatch gets pushed toward pure black,
+ * so every dark-eligible palette lands at a consistent near-black depth
+ * regardless of exactly how dark its source swatch was. */
+const DARK_INTENSIFY_RATIO = 0.6;
+
+const CSS_VAR_BY_TOKEN: Record<keyof Omit<ThemeTokens, 'themeMode'>, string> = {
   bg: '--ws-bg',
   bgNav: '--ws-bg-nav',
   bgSidebar: '--ws-bg-sidebar',
@@ -67,6 +94,10 @@ const CSS_VAR_BY_TOKEN: Record<keyof ThemeTokens, string> = {
   primary: '--ws-primary',
   primaryHover: '--ws-primary-hover',
   danger: '--ws-danger',
+  accentSecondary: '--ws-accent-secondary',
+  glowPrimary: '--ws-glow-primary',
+  glowSecondary: '--ws-glow-secondary',
+  shadowTint: '--ws-shadow-tint',
 };
 
 function hexToRgb(hex: string): RGB {
@@ -128,6 +159,87 @@ function contrastRatio(a: RGB, b: RGB): number {
   return l1 > l2 ? l1 / l2 : l2 / l1;
 }
 
+function rgbToHsl({ r, g, b }: RGB): [number, number, number] {
+  const rN = r / 255;
+  const gN = g / 255;
+  const bN = b / 255;
+  const max = Math.max(rN, gN, bN);
+  const min = Math.min(rN, gN, bN);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rN) h = ((gN - bN) / d) % 6;
+  else if (max === gN) h = (bN - rN) / d + 2;
+  else h = (rN - gN) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return [h, s, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): RGB {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r1, g1, b1] = [0, 0, 0];
+  if (h < 60) [r1, g1, b1] = [c, x, 0];
+  else if (h < 120) [r1, g1, b1] = [x, c, 0];
+  else if (h < 180) [r1, g1, b1] = [0, c, x];
+  else if (h < 240) [r1, g1, b1] = [0, x, c];
+  else if (h < 300) [r1, g1, b1] = [x, 0, c];
+  else [r1, g1, b1] = [c, 0, x];
+  return { r: (r1 + m) * 255, g: (g1 + m) * 255, b: (b1 + m) * 255 };
+}
+
+/** Rotates a hex color's hue by the given degrees, keeping saturation/
+ * lightness -- used only as a last-resort fallback when a palette has no
+ * genuinely unused swatch left to spend on a new role (e.g. Graphite, whose
+ * 6 raw swatches are all already spent by its curated theme). */
+function hueShift(hex: string, degrees: number): RGB {
+  const [h, s, l] = rgbToHsl(hexToRgb(hex));
+  return hslToRgb((h + degrees + 360) % 360, s, l);
+}
+
+/** Derives the 4 new tokens for a palette, given whichever bg/primary colors
+ * are already in play (either deriveTheme's own freshly-computed ones, or a
+ * curated theme's hand-picked ones) and the full set of hex values already
+ * spent on other roles, so a new role doesn't just duplicate an existing
+ * color -- the whole point of "diverse" colorful chrome. */
+function deriveExtraTokens(
+  paletteColors: string[],
+  bgHex: string,
+  primaryHex: string,
+  excludeHexes: string[]
+): ExtraTokens {
+  const excluded = new Set(excludeHexes.map((h) => h.toLowerCase()));
+  const candidates = paletteColors
+    .filter((hex) => !excluded.has(hex.toLowerCase()))
+    .map((hex) => ({ hex, c: hexToRgb(hex) }))
+    .map((entry) => ({ ...entry, chroma: chroma(entry.c) }))
+    .sort((a, b) => b.chroma - a.chroma);
+
+  const themeMode: 'dark' | 'light' =
+    rankLuminance(hexToRgb(bgHex)) < DARK_ELIGIBLE_LUMINANCE ? 'dark' : 'light';
+
+  const accentSecondaryRgb = candidates[0] ? candidates[0].c : hueShift(primaryHex, 45);
+  const secondRgb = candidates[1] ? candidates[1].c : hueShift(toHex(accentSecondaryRgb), 60);
+
+  return {
+    accentSecondary: toHex(accentSecondaryRgb),
+    glowPrimary: toHex(accentSecondaryRgb),
+    glowSecondary: toHex(secondRgb),
+    shadowTint: toHex(secondRgb),
+    themeMode,
+  };
+}
+
+// NOTE: all 19 shipped palettes have a CURATED_THEMES entry, so
+// applyPaletteByName never actually calls deriveTheme() for any of them in
+// production -- this function (and its dark/light branch logic below) only
+// runs for a hypothetical future palette added without a curated entry, and
+// in tests. Don't be surprised that tweaking it has no visible effect on any
+// of the current 19 palettes.
 export function deriveTheme(colors: string[]): ThemeTokens {
   const withMeta = colors.map((hex) => {
     const c = hexToRgb(hex);
@@ -141,16 +253,20 @@ export function deriveTheme(colors: string[]): ThemeTokens {
   const neutrals = withMeta.filter((m) => m.chroma < 40);
   const pool = neutrals.length >= 2 ? neutrals : withMeta;
   const sortedByLum = [...pool].sort((a, b) => a.lum - b.lum);
-  const textMeta = sortedByLum[0];
-  const bgMeta = sortedByLum[sortedByLum.length - 1];
+  const darkestMeta = sortedByLum[0];
+  const lightestMeta = sortedByLum[sortedByLum.length - 1];
+
+  const isDark = darkestMeta.lum < DARK_ELIGIBLE_LUMINANCE;
+  const textMeta = isDark ? lightestMeta : darkestMeta;
+  const bgMeta = isDark ? darkestMeta : lightestMeta;
 
   let text = textMeta.c;
-  let bg = bgMeta.c;
+  let bg = isDark ? mix(bgMeta.c, BLACK, DARK_INTENSIFY_RATIO) : bgMeta.c;
   if (contrastRatio(bg, text) < 4.5) {
-    text = mix(text, BLACK, 0.6);
+    text = isDark ? mix(text, WHITE, 0.6) : mix(text, BLACK, 0.6);
   }
   if (contrastRatio(bg, text) < 4.5) {
-    bg = mix(bg, WHITE, 0.6);
+    bg = isDark ? mix(bg, BLACK, 0.6) : mix(bg, WHITE, 0.6);
   }
 
   // Every other swatch in the palette, spent one at a time on a distinct
@@ -181,26 +297,21 @@ export function deriveTheme(colors: string[]): ThemeTokens {
 
   // A second, genuinely different swatch for the nav bar/sidebar panel --
   // prefers whatever's left that's closest to bg's own lightness, so the
-  // chrome stays a light, readable panel rather than jumping to an
-  // unrelated hue, while still being a real distinct palette color instead
-  // of bg blended with text.
+  // chrome stays a coherent panel rather than jumping to an unrelated hue,
+  // while still being a real distinct palette color instead of bg blended
+  // with text.
   const bgSidebarMeta = take(remaining, (c) =>
     [...c].sort((a, b) => Math.abs(a.lum - bgMeta.lum) - Math.abs(b.lum - bgMeta.lum))[0]
   );
   let bgSidebar = bgSidebarMeta ? mix(bgSidebarMeta.c, bg, 0.35) : mix(bg, text, 0.06);
-  // Both sidebars (channel list and DM/group list) render plain --ws-text
-  // on top of this -- unlike bg, bgSidebar isn't guaranteed to contrast
-  // with text on its own, since it can come from any swatch in the
-  // palette. Pull it toward bg until it does, rather than risking
-  // light-text-on-light-panel or dark-on-dark.
   while (contrastRatio(bgSidebar, text) < 4.5) {
     bgSidebar = mix(bgSidebar, bg, 0.5);
   }
 
   // The top nav bar reads as its own distinct strip, not a continuation of
   // the left sidebar -- carries a hint of the accent color so it doesn't
-  // just look like a copy of bgSidebar. Nudged back toward bg if that
-  // tint ever made text on it hard to read.
+  // just look like a copy of bgSidebar. Nudged back toward bg if that tint
+  // ever made text on it hard to read.
   let bgNav = mix(bgSidebar, primary, 0.14);
   while (contrastRatio(bgNav, text) < 4.5) {
     bgNav = mix(bgNav, bg, 0.5);
@@ -214,23 +325,24 @@ export function deriveTheme(colors: string[]): ThemeTokens {
   );
   const border = borderMeta ? mix(borderMeta.c, bg, 0.55) : mix(bg, text, 0.18);
 
-  // The message thread gets its own dark backdrop, reusing the palette's
-  // own dark-neutral "text" color rather than a fixed gray -- this is the
-  // piece that makes the chat area itself change per palette, not just
-  // buttons and borders around it. Guaranteed dark enough for white text
-  // since it's already passed the >=4.5 contrast-against-bg check above;
-  // darkened further only in the rare case that isn't quite enough alone.
-  let bgChat = text;
-  if (contrastRatio(bgChat, WHITE) < 4.5) {
-    bgChat = mix(bgChat, BLACK, 0.5);
-  }
+  // The message thread's own backdrop. In the light branch this reuses the
+  // palette's dark "text" tone (unchanged from before -- the piece that
+  // makes the chat area itself change per palette). In the dark branch bg
+  // is already dark, so the chat backdrop is just a slightly deeper step
+  // off of it instead of jumping to an unrelated tone.
+  let bgChat: RGB;
   const textOnChat = WHITE;
+  if (isDark) {
+    bgChat = mix(bg, BLACK, 0.15);
+  } else {
+    bgChat = text;
+    if (contrastRatio(bgChat, WHITE) < 4.5) {
+      bgChat = mix(bgChat, BLACK, 0.5);
+    }
+  }
 
   // Message bubbles sit lighter than the chat backdrop they're on, so they
-  // read as raised cards rather than blending into it. Text color falls
-  // back from white to the palette's own dark "text" tone (and, failing
-  // that, pushes the bubble itself lighter) so it's always legible however
-  // light the bubble ends up.
+  // read as raised cards rather than blending into it.
   let bgBubble = mix(bgChat, WHITE, 0.22);
   let textOnBubble = WHITE;
   if (contrastRatio(bgBubble, textOnBubble) < 4.5) {
@@ -241,7 +353,7 @@ export function deriveTheme(colors: string[]): ThemeTokens {
   }
   const textSecondaryOnBubble = mix(textOnBubble, bgBubble, 0.45);
 
-  return {
+  const base: BaseThemeTokens = {
     bg: toHex(bg),
     bgNav: toHex(bgNav),
     bgSidebar: toHex(bgSidebar),
@@ -258,19 +370,29 @@ export function deriveTheme(colors: string[]): ThemeTokens {
     primaryHover: toHex(mix(primary, BLACK, 0.18)),
     danger: dangerMeta ? toHex(dangerMeta.c) : DEFAULT_DANGER,
   };
+
+  const usedHexes = [...used].map((m) => toHex(m.c));
+
+  const extra = deriveExtraTokens(colors, base.bg, base.primary, usedHexes);
+
+  return { ...base, ...extra };
 }
 
 export function applyTheme(tokens: ThemeTokens): void {
   const root = document.documentElement;
-  (Object.keys(tokens) as (keyof ThemeTokens)[]).forEach((key) => {
+  (Object.keys(CSS_VAR_BY_TOKEN) as (keyof Omit<ThemeTokens, 'themeMode'>)[]).forEach((key) => {
     root.style.setProperty(CSS_VAR_BY_TOKEN[key], tokens[key]);
   });
+  root.dataset.wsThemeMode = tokens.themeMode;
 }
 
 export function applyPaletteByName(name: string): void {
   const palette = PALETTES.find((p) => p.name === name);
   if (!palette) return;
-  const tokens = CURATED_THEMES[name] ?? deriveTheme(palette.colors);
+  const curated = CURATED_THEMES[name];
+  const tokens: ThemeTokens = curated
+    ? { ...curated, ...deriveExtraTokens(palette.colors, curated.bg, curated.primary, Object.values(curated)) }
+    : deriveTheme(palette.colors);
   applyTheme(tokens);
   window.localStorage.setItem(STORAGE_KEY, name);
 }

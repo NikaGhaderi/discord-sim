@@ -1,5 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { workspacesApi } from '../index';
 import { CHANNEL_PERMISSIONS, PERMISSION_LABELS, ChannelPermission, Role } from '../types';
 
@@ -17,9 +19,7 @@ export const RoleFormModal: React.FC<RoleFormModalProps> = ({
   onSaved,
 }) => {
   const [name, setName] = useState(existingRole?.name ?? '');
-  const [permissions, setPermissions] = useState<ChannelPermission[]>(
-    existingRole?.permissions ?? []
-  );
+  const [permissions, setPermissions] = useState<ChannelPermission[]>(existingRole?.permissions ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,27 +48,24 @@ export const RoleFormModal: React.FC<RoleFormModalProps> = ({
 
   return (
     <Modal title={existingRole ? 'Edit Role' : 'Add Role'} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <p className="error-text">{error}</p>}
-        <div className="field">
-          <label htmlFor="role-name">Role Name</label>
-          <input
-            id="role-name"
-            type="text"
-            required
-            minLength={2}
-            maxLength={50}
-            placeholder="e.g. Moderator"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={!!existingRole}
-          />
-        </div>
-        <div className="field">
-          <label>Permissions</label>
-          <div className="checkbox-list">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input
+          label="Role Name"
+          name="name"
+          required
+          minLength={2}
+          maxLength={50}
+          placeholder="e.g. Moderator"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={!!existingRole}
+          error={error ?? undefined}
+        />
+        <div>
+          <span className="text-sm font-medium text-foreground">Permissions</span>
+          <div className="mt-2 flex flex-col gap-2">
             {CHANNEL_PERMISSIONS.map((permission) => (
-              <label key={permission} className="checkbox-row">
+              <label key={permission} className="flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={permissions.includes(permission)}
@@ -79,13 +76,13 @@ export const RoleFormModal: React.FC<RoleFormModalProps> = ({
             ))}
           </div>
         </div>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Saving...' : 'Save'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar } from '@shared/components/Avatar';
+import { Button } from '@shared/components/ui/Button';
+import { Input } from '@shared/components/ui/Input';
 import { profileApi, PublicProfile } from '../../profile';
 import { privateSpacesApi } from '../index';
 import { Group, GroupMember } from '../types';
@@ -136,44 +138,53 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
 
   return (
     <div className="group-settings-panel">
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
 
-      <form onSubmit={handleSave} className="field">
-        <label htmlFor="group-name-input">Group Name</label>
-        <input
-          id="group-name-input"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={isSaving}>
+      <form onSubmit={handleSave} className="flex flex-col gap-2">
+        <Input id="group-name-input" label="Group Name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Button type="submit" className="mt-1 w-full" disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save Name'}
-        </button>
+        </Button>
       </form>
 
-      <div className="field" style={{ marginTop: '20px' }}>
-        <label htmlFor="group-invite-link">Invite Link</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input id="group-invite-link" type="text" readOnly value={group.invite_token} />
-          <button type="button" className="btn" onClick={() => void handleCopyInviteLink()}>
-            {didCopyInviteLink ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
+      <div className="mt-5">
+        <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="group-invite-link">
+          Invite Link
+          <div className="flex gap-2">
+            <input
+              id="group-invite-link"
+              type="text"
+              readOnly
+              value={group.invite_token}
+              className="min-h-11 flex-1 rounded-xl border border-border bg-background px-3.5 text-foreground"
+            />
+            <Button type="button" variant="secondary" onClick={() => void handleCopyInviteLink()}>
+              {didCopyInviteLink ? 'Copied!' : 'Copy'}
+            </Button>
+          </div>
+        </label>
       </div>
 
-      <div className="group-members" style={{ marginTop: '20px' }}>
-        <h4>Members</h4>
-        {isLoadingMembers && <p>Loading members…</p>}
-        {membersError && <p role="alert">Couldn&apos;t load members.</p>}
+      <div className="mt-5">
+        <h4 className="mb-2 text-sm font-semibold text-foreground">Members</h4>
+        {isLoadingMembers && <p className="text-sm text-muted">Loading members…</p>}
+        {membersError && (
+          <p role="alert" className="text-sm text-danger">
+            Couldn&apos;t load members.
+          </p>
+        )}
         {!isLoadingMembers && !membersError && (
-          <ul>
+          <ul className="flex flex-col gap-1">
             {members.map((member) => {
               const memberProfile = memberProfilesById[member.user_id];
               const memberLabel =
                 memberProfile?.username ?? `User #${member.user_id}`;
               return (
-                <li key={member.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <li key={member.user_id} className="flex items-center gap-2 text-sm text-foreground">
                   <Avatar avatarUrl={memberProfile?.avatar_url} label={memberLabel} size={20} />
                   {memberLabel}
                   {member.is_admin && ' (admin)'}
@@ -184,23 +195,30 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         )}
       </div>
 
-      <form onSubmit={(e) => void handleInvite(e)} className="field" style={{ marginTop: '20px' }}>
-        <label htmlFor="group-invite-username">Invite a member (username)</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            id="group-invite-username"
-            type="text"
-            placeholder="username"
-            value={inviteUsername}
-            onChange={(e) => setInviteUsername(e.target.value)}
-            required
-          />
-          <button type="submit" className="btn btn-primary" disabled={isInviting}>
-            {isInviting ? 'Sending...' : 'Send Invite'}
-          </button>
-        </div>
-        {inviteError && <p role="alert">{inviteError}</p>}
-        {inviteSent && <p>{inviteSent}</p>}
+      <form onSubmit={(e) => void handleInvite(e)} className="mt-5 flex flex-col gap-2">
+        <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="group-invite-username">
+          Invite a member (username)
+          <div className="flex gap-2">
+            <input
+              id="group-invite-username"
+              type="text"
+              placeholder="username"
+              value={inviteUsername}
+              onChange={(e) => setInviteUsername(e.target.value)}
+              required
+              className="min-h-11 flex-1 rounded-xl border border-border bg-background px-3.5 text-foreground placeholder:text-muted/70"
+            />
+            <Button type="submit" disabled={isInviting}>
+              {isInviting ? 'Sending...' : 'Send Invite'}
+            </Button>
+          </div>
+        </label>
+        {inviteError && (
+          <p role="alert" className="text-sm text-danger">
+            {inviteError}
+          </p>
+        )}
+        {inviteSent && <p className="text-sm text-muted">{inviteSent}</p>}
       </form>
 
       {/*
@@ -209,23 +227,13 @@ export const GroupSettingsPanel: React.FC<GroupSettingsPanelProps> = ({
         docstring cites Phase 1 doc §8-3-6 -- any member may delete the
         whole group, superseding SCRUM-26's original admin-only AC).
       */}
-      <div className="danger-zone" style={{ marginTop: '20px', display: 'flex', gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => void handleDeleteOrLeave('leave')}
-          className="btn"
-          disabled={isRemoving}
-        >
+      <div className="mt-5 flex gap-2">
+        <Button variant="secondary" onClick={() => void handleDeleteOrLeave('leave')} disabled={isRemoving}>
           Leave Group
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleDeleteOrLeave('delete')}
-          className="btn btn-danger"
-          disabled={isRemoving}
-        >
+        </Button>
+        <Button variant="danger" onClick={() => void handleDeleteOrLeave('delete')} disabled={isRemoving}>
           Delete Group
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, FormEvent } from 'react';
 import { Modal } from '@shared/components/Modal';
+import { Input } from '@shared/components/ui/Input';
+import { Button } from '@shared/components/ui/Button';
 import { workspacesApi } from '../index';
 import { Channel, ChannelPermission } from '../types';
 import { ManageRolesModal } from './ManageRolesModal';
@@ -84,9 +86,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete channel "${channel.name}"? This cannot be undone.`)) {
-      return;
-    }
+    if (!window.confirm(`Delete channel "${channel.name}"? This cannot be undone.`)) return;
     setError(null);
     try {
       await workspacesApi.deleteChannel(channel.channel_id);
@@ -103,11 +103,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
     setError(null);
     setIsSavingNickname(true);
     try {
-      await workspacesApi.updateMemberNickname(
-        channel.channel_id,
-        currentUserId,
-        nickname.trim()
-      );
+      await workspacesApi.updateMemberNickname(channel.channel_id, currentUserId, nickname.trim());
       setDidSaveNickname(true);
       setTimeout(() => setDidSaveNickname(false), 2000);
     } catch {
@@ -142,73 +138,75 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
 
   return (
     <Modal title="Channel Settings" onClose={onClose}>
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
       {canManageChannel && (
-        <form onSubmit={handleRename}>
-          <div className="field">
-            <label htmlFor="settings-channel-name">Channel Name</label>
-            <input
-              id="settings-channel-name"
-              type="text"
-              required
-              minLength={2}
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-block" disabled={isSaving}>
+        <form onSubmit={handleRename} className="flex flex-col gap-3">
+          <Input
+            label="Channel Name"
+            id="settings-channel-name"
+            required
+            minLength={2}
+            maxLength={100}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Button type="submit" className="w-full" disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save Name'}
-          </button>
+          </Button>
         </form>
       )}
 
-      <div className="field">
-        <label htmlFor="settings-invite-link">Invite Link</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input id="settings-invite-link" type="text" readOnly value={channel.invite_token} />
-          <button type="button" className="btn" onClick={handleCopyInvite}>
-            {didCopyInvite ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
+      <div className="mt-4">
+        <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="settings-invite-link">
+          Invite Link
+          <div className="flex gap-2">
+            <input
+              id="settings-invite-link"
+              type="text"
+              readOnly
+              value={channel.invite_token}
+              className="min-h-11 flex-1 rounded-xl border border-border bg-background px-3.5 text-foreground"
+            />
+            <Button type="button" variant="secondary" onClick={handleCopyInvite}>
+              {didCopyInvite ? 'Copied!' : 'Copy'}
+            </Button>
+          </div>
+        </label>
       </div>
 
       {currentUserId !== undefined && (
-        <form onSubmit={handleSaveNickname} style={{ marginTop: 16 }}>
-          <div className="field">
-            <label htmlFor="settings-my-nickname">My Nickname (this channel)</label>
-            <input
-              id="settings-my-nickname"
-              type="text"
-              placeholder="Set a nickname for this channel"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-block" disabled={isSavingNickname}>
+        <form onSubmit={handleSaveNickname} className="mt-4 flex flex-col gap-3">
+          <Input
+            label="My Nickname (this channel)"
+            id="settings-my-nickname"
+            placeholder="Set a nickname for this channel"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+          />
+          <Button type="submit" variant="secondary" className="w-full" disabled={isSavingNickname}>
             {isSavingNickname ? 'Saving...' : didSaveNickname ? 'Saved!' : 'Save Nickname'}
-          </button>
+          </Button>
         </form>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
+      <div className="mt-5 flex flex-col gap-2">
         {canManageRoles && (
-          <button type="button" className="btn btn-block" onClick={() => setSubPanel('roles')}>
+          <Button variant="secondary" className="w-full" onClick={() => setSubPanel('roles')}>
             Manage Roles
-          </button>
+          </Button>
         )}
         {canManageTopics && (
-          <button type="button" className="btn btn-block" onClick={() => setSubPanel('topics')}>
+          <Button variant="secondary" className="w-full" onClick={() => setSubPanel('topics')}>
             Manage Topics
-          </button>
+          </Button>
         )}
-        <button type="button" className="btn btn-block" disabled={isLeaving} onClick={handleLeave}>
+        <Button variant="secondary" className="w-full" disabled={isLeaving} onClick={handleLeave}>
           {isLeaving ? 'Leaving...' : 'Leave Channel'}
-        </button>
+        </Button>
         {canManageChannel && (
-          <button type="button" className="btn btn-danger btn-block" onClick={handleDelete}>
+          <Button variant="danger" className="w-full" onClick={handleDelete}>
             Delete Channel
-          </button>
+          </Button>
         )}
       </div>
     </Modal>

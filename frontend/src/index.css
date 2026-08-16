@@ -1,6 +1,32 @@
 @import "tailwindcss";
 
 /*
+ * Bridges bokhar-derived ui/ kit components' semantic Tailwind color names
+ * onto this app's existing --ws-* custom properties (see
+ * shared/theme/applyPalette.ts), the same technique bokhar itself uses for
+ * its own fixed palette. Ported kit components' `bg-brand`/`text-muted`/etc.
+ * classes resolve through this to whatever the active palette currently has
+ * written into --ws-*, and repaint live on theme switch -- no ported
+ * component needs to reference --ws-* directly.
+ */
+@theme inline {
+  --color-background: var(--ws-bg);
+  --color-surface: var(--ws-bg-sidebar);
+  --color-surface-raised: var(--ws-bg-hover);
+  --color-nav: var(--ws-bg-nav);
+  --color-border: var(--ws-border);
+  --color-foreground: var(--ws-text);
+  --color-muted: var(--ws-text-secondary);
+  --color-brand: var(--ws-primary);
+  --color-accent: var(--ws-accent-secondary);
+  --color-danger: var(--ws-danger);
+  /* Not palette-derived -- a single small checkmark-icon use in Toast, not
+     worth a 19-palette-aware token for. */
+  --color-success: #22c55e;
+  --radius-card: 0.875rem;
+}
+
+/*
  * The app fills the browser window exactly -- the outer page never
  * scrolls; only specific inner regions (a message list, a modal body) do.
  * This requires the full ancestor chain down to #root to have a real
@@ -17,4 +43,80 @@ body,
 #root {
   display: flex;
   flex-direction: column;
+}
+
+/* Dark-shell palettes: two soft, low-opacity color blobs behind the page,
+   echoing bokhar's own fixed purple/lime radial gradients but built from
+   whichever two vivid swatches this palette's deriveExtraTokens picked.
+   Applied to body AND to .main-panel/.sidebar: this app's layout has no
+   page-level chrome gap the way bokhar's does (#root's flex children tile
+   the full viewport edge-to-edge with their own opaque backgrounds), so a
+   body-only gradient would sit entirely behind fully-opaque content and
+   never actually render -- the two page surfaces get the same gradient
+   layered above their own solid --ws-* background color instead. */
+:root[data-ws-theme-mode='dark'] body {
+  background:
+    radial-gradient(circle at 18% -10%, color-mix(in srgb, var(--ws-glow-primary) 20%, transparent), transparent 31rem),
+    radial-gradient(circle at 90% 18%, color-mix(in srgb, var(--ws-glow-secondary) 12%, transparent), transparent 24rem),
+    var(--ws-bg);
+}
+
+:root[data-ws-theme-mode='dark'] .main-panel,
+:root[data-ws-theme-mode='dark'] .sidebar {
+  background-image:
+    radial-gradient(circle at 18% -10%, color-mix(in srgb, var(--ws-glow-primary) 16%, transparent), transparent 31rem),
+    radial-gradient(circle at 90% 18%, color-mix(in srgb, var(--ws-glow-secondary) 10%, transparent), transparent 24rem);
+  background-repeat: no-repeat;
+}
+
+/* Light-chrome palettes: no background glow (would wash out a light page) --
+   instead every Card/Modal-surface gets a colored shadow instead of a flat
+   black one, so the palette still reads as colorful rather than neutral. */
+:root:not([data-ws-theme-mode='dark']) body {
+  background: var(--ws-bg);
+}
+
+:root:not([data-ws-theme-mode='dark']) .rounded-card,
+:root:not([data-ws-theme-mode='dark']) .modal-overlay > div {
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--ws-shadow-tint) 28%, transparent);
+}
+
+.ws-btn {
+  transition: box-shadow 0.15s ease, background-image 0.2s ease, transform 0.05s ease;
+}
+
+/* Filled/bordered button variants (primary/secondary/danger -- not ghost,
+   which has no fill of its own and would just show a smudge) get the same
+   mode-aware colored-shadow treatment as cards/modals, at a smaller scale --
+   a soft glow-tinted shadow on dark-shell palettes, a shadow-tint shadow on
+   light-chrome ones. disabled:shadow-none since a disabled button shouldn't
+   read as interactive/liftable.
+
+   On top of that, a translucent white-to-black diagonal gradient sits over
+   whatever solid --ws-* color the button's own bg-brand/bg-danger/etc class
+   provides (background-image paints above background-color, so the flat
+   fill still shows through) -- this reads as light hitting the button from
+   one corner regardless of the underlying hue, without this file needing to
+   know what that hue is. Hovering flips the gradient's angle (top-left lit
+   -> bottom-right lit), simulating the light source itself moving. */
+.ws-btn-lit {
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 16%), rgb(0 0 0 / 14%));
+}
+.ws-btn-lit:not(:disabled):hover {
+  background-image: linear-gradient(315deg, rgb(255 255 255 / 22%), rgb(0 0 0 / 18%));
+}
+.ws-btn-lit:disabled {
+  box-shadow: none;
+}
+:root[data-ws-theme-mode='dark'] .ws-btn-lit:not(:disabled) {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ws-glow-primary) 25%, transparent);
+}
+:root[data-ws-theme-mode='dark'] .ws-btn-lit:not(:disabled):hover {
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ws-glow-primary) 48%, transparent);
+}
+:root:not([data-ws-theme-mode='dark']) .ws-btn-lit:not(:disabled) {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ws-shadow-tint) 20%, transparent);
+}
+:root:not([data-ws-theme-mode='dark']) .ws-btn-lit:not(:disabled):hover {
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ws-shadow-tint) 40%, transparent);
 }

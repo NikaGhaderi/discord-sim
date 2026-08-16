@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ProfileView, ProfileData } from '../components/ProfileView';
 import { ProfileEditForm } from '../components/ProfileEditForm';
 import { profileApi, UserProfile } from '../index';
+import { LoadingState, ErrorState } from '@shared/components/ui/AsyncState';
 
 const toProfileData = (profile: UserProfile): ProfileData => ({
   display_name: profile.display_name,
@@ -71,11 +72,11 @@ export const ProfilePage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div>Loading…</div>;
+    return <LoadingState label="Loading…" />;
   }
 
   if (error || !profile) {
-    return <div>Couldn&apos;t load profile.</div>;
+    return <ErrorState detail="Couldn't load profile." />;
   }
 
   return (
@@ -88,7 +89,11 @@ export const ProfilePage: React.FC = () => {
         />
       ) : (
         <>
-          {avatarError && <p role="alert" style={{ textAlign: 'center', color: '#c0392b' }}>{avatarError}</p>}
+          {avatarError && (
+            <p role="alert" className="text-center text-sm text-danger">
+              {avatarError}
+            </p>
+          )}
           <ProfileView
             profile={toProfileData(profile)}
             isOwnProfile

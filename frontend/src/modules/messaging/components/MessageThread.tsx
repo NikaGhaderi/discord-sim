@@ -292,7 +292,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         {messages.map((msg) => (
           <div
             key={msg.base_message_id}
-            className="flex flex-col bg-[var(--ws-bg-bubble)] text-[var(--ws-text-on-bubble)] p-3 rounded-lg"
+            className="flex flex-col bg-[var(--ws-bg-bubble)]/90 text-[var(--ws-text-on-bubble)] p-3 rounded-lg"
           >
             <div className="flex items-center space-x-2">
               <button

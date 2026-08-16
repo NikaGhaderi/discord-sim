@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Menu, Search as SearchIcon, Clock, Settings as SettingsIcon } from 'lucide-react';
 import { workspacesApi } from '../index';
 import { Channel, ChannelMember, ChannelPermission } from '../types';
 import { ChannelSidebar } from '../components/ChannelSidebar';
@@ -11,6 +12,7 @@ import { MessageThread } from '../../messaging/components/MessageThread';
 import { SearchBar, SearchResultItem } from '../../messaging/components/SearchBar';
 import { ScheduledMessagesPanel } from '../../messaging/components/ScheduledMessagesPanel';
 import { Modal } from '@shared/components/Modal';
+import { Button } from '@shared/components/ui/Button';
 import '../workspaces.css';
 
 type OpenPanel = 'none' | 'search' | 'scheduled';
@@ -111,10 +113,7 @@ export const WorkspacePage: React.FC = () => {
   return (
     <div className="workspace-layout" dir="ltr" lang="en">
       {isMobileSidebarOpen && (
-        <div
-          className="mobile-sidebar-backdrop"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
+        <div className="mobile-sidebar-backdrop" onClick={() => setIsMobileSidebarOpen(false)} />
       )}
       <ChannelSidebar
         channels={channels}
@@ -134,21 +133,21 @@ export const WorkspacePage: React.FC = () => {
         }}
       />
 
-      <main className="main-panel">
+      <main className="main-panel bg-background">
         {selectedChannel ? (
           <>
-            <header className="main-header">
+            <header className="main-header flex items-center gap-3 border-b border-border bg-surface px-5 py-3">
               <button
                 type="button"
-                className="btn mobile-menu-btn"
+                className="mobile-menu-btn inline-flex min-h-9 min-w-9 items-center justify-center rounded-xl text-muted hover:bg-surface-raised hover:text-foreground"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 aria-label="Open channel list"
               >
-                ☰
+                <Menu size={18} aria-hidden />
               </button>
               <span
                 onClick={() => setIsMemberListOpen(true)}
-                style={{ cursor: 'pointer' }}
+                className="cursor-pointer"
                 title="View channel members"
                 aria-label={`View members of ${selectedChannel.name}`}
                 role="button"
@@ -156,16 +155,19 @@ export const WorkspacePage: React.FC = () => {
               >
                 <strong># {selectedChannel.name}</strong>
               </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn" onClick={() => setOpenPanel('search')}>
+              <div className="ml-auto flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setOpenPanel('search')}>
+                  <SearchIcon size={14} aria-hidden />
                   Search
-                </button>
-                <button type="button" className="btn" onClick={() => setOpenPanel('scheduled')}>
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setOpenPanel('scheduled')}>
+                  <Clock size={14} aria-hidden />
                   Scheduled
-                </button>
-                <button type="button" className="btn" onClick={() => setIsSettingsOpen(true)}>
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setIsSettingsOpen(true)}>
+                  <SettingsIcon size={14} aria-hidden />
                   Settings
-                </button>
+                </Button>
               </div>
             </header>
             <TopicTabs
@@ -174,7 +176,7 @@ export const WorkspacePage: React.FC = () => {
               onSelectTopic={setSelectedTopicId}
               refreshKey={isSettingsOpen ? 1 : 0}
             />
-            <div className="main-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div className="main-content flex min-h-0 flex-1 flex-col">
               <MessageThread
                 topicId={activeTopicId}
                 currentUserId={currentUserId ?? undefined}
@@ -187,17 +189,17 @@ export const WorkspacePage: React.FC = () => {
           </>
         ) : (
           <>
-            <header className="main-header">
+            <header className="main-header flex items-center border-b border-border bg-surface px-5 py-3">
               <button
                 type="button"
-                className="btn mobile-menu-btn"
+                className="mobile-menu-btn inline-flex min-h-9 min-w-9 items-center justify-center rounded-xl text-muted hover:bg-surface-raised hover:text-foreground"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 aria-label="Open channel list"
               >
-                ☰
+                <Menu size={18} aria-hidden />
               </button>
             </header>
-            <p className="empty-state">Select or create a channel to get started.</p>
+            <p className="empty-state text-muted">Select or create a channel to get started.</p>
           </>
         )}
       </main>
@@ -209,9 +211,7 @@ export const WorkspacePage: React.FC = () => {
           myPermissions={myChannelPermissions}
           onClose={() => setIsSettingsOpen(false)}
           onUpdated={(channelId, name) => {
-            setChannels((prev) =>
-              prev.map((c) => (c.channel_id === channelId ? { ...c, name } : c))
-            );
+            setChannels((prev) => prev.map((c) => (c.channel_id === channelId ? { ...c, name } : c)));
           }}
           onDeleted={(channelId) => {
             removeChannelFromList(channelId);
@@ -237,10 +237,7 @@ export const WorkspacePage: React.FC = () => {
         <Modal title="Search Messages" onClose={() => setOpenPanel('none')}>
           <SearchBar
             searchFn={async (query): Promise<SearchResultItem[]> => {
-              const page = await messagingApi.searchMessages({
-                query,
-                topic_id: activeTopicId,
-              });
+              const page = await messagingApi.searchMessages({ query, topic_id: activeTopicId });
               return page.results.map((m) => ({
                 id: String(m.base_message_id),
                 sender: m.sender_username,
